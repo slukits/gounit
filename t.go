@@ -12,6 +12,7 @@ import (
 // T wraps a *testing.T*-instance into a gounit.T instance which adjusts
 // testing.T's api.
 type T struct {
+	Idx    int
 	t      *testing.T
 	logger func(...interface{})
 }
@@ -21,7 +22,7 @@ type T struct {
 // suite-embedder implementing the SuiteLogging interface.
 func (t *T) Log(args ...interface{}) { t.logger(args...) }
 
-// Log writes given format string leveraging Sprintf to set logger which
+// Logf writes given format string leveraging Sprintf to set logger which
 // defaults to the logger of wrapped *testing.T* instance.  The default
 // may be overwritten by a suite-embedder implementing the SuiteLogging
 // interface.

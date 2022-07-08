@@ -5,6 +5,7 @@
 package gounit_test
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/slukits/gounit"
@@ -29,5 +30,40 @@ func Test_a_suite_s_tests_are_run(t *testing.T) {
 	if testSuite.Exp != testSuite.Logs {
 		t.Errorf("expected test-suite log: %s; got: %s",
 			testSuite.Exp, testSuite.Logs)
+	}
+}
+
+func Test_a_suite_s_tests_are_indexed_by_appearance(t *testing.T) {
+	testSuite := &fx.TestIndexing{Exp: map[string]int{
+		"Test_0": 0,
+		"Test_1": 1,
+		"Test_2": 2,
+	}}
+	if testSuite.Got != nil {
+		t.Fatal("expected initially empty *Got*-property")
+	}
+	gounit.Run(testSuite, t)
+	if len(testSuite.Exp) != len(testSuite.Got) {
+		t.Fatalf("expected %d logged tests; got: %d",
+			len(testSuite.Exp), len(testSuite.Got))
+	}
+	for tst, idx := range testSuite.Exp {
+		if testSuite.Got[tst] == idx {
+			continue
+		}
+		t.Fatalf("expected test %s to have index %d; got %d",
+			tst, idx, testSuite.Got[tst])
+	}
+}
+
+func Test_a_suite_s_file_is_its_test_file(t *testing.T) {
+	_, exp, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("couldn't determine test-file")
+	}
+	suite := &struct{ gounit.Suite }{}
+	gounit.Run(suite, t)
+	if exp != suite.File() {
+		t.Errorf("expected suite file %s; got %s", exp, suite.File())
 	}
 }
