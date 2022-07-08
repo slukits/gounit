@@ -5,9 +5,12 @@
 package gounit_test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/slukits/gounit"
+	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/testdata/fx"
 )
 
@@ -31,3 +34,53 @@ func Test_T_instance_logs_to_suite_s_logger(t *testing.T) {
 			testSuite.Logs)
 	}
 }
+
+type TrueAssertion struct{ Suite }
+
+func (s *TrueAssertion) Returns_true_if_passed_value_is_true(t *T) {
+	suite := &fx.TestTrueReturnsTrue{}
+	Run(suite, GoT(t))
+	t.True(fmt.Sprintf("%v", true) == suite.Logs)
+}
+
+func (s *TrueAssertion) Returns_false_if_passed_value_is_false(t *T) {
+	suite := &fx.TestTrueReturnsFalse{}
+	Run(suite, GoT(t))
+	t.True(fmt.Sprintf("%v", false) == suite.Logs)
+}
+
+func (s *TrueAssertion) Errors_if_passed_value_is_false(t *T) {
+	suite := &fx.TestTrueErrors{Exp: "errorer called"}
+	Run(suite, GoT(t))
+	t.True(suite.Exp == suite.Logs)
+}
+
+func (s *TrueAssertion) Overwrites_error_message(t *T) {
+	suite := &fx.TestTrueError{Msg: "replacement message"}
+	Run(suite, GoT(t))
+	t.True(strings.HasSuffix(suite.Logs, suite.Msg))
+}
+
+func (s *TrueAssertion) Overwrites_formatted_error_message(t *T) {
+	msgs := []interface{}{"fmt %s", "error"}
+	suite := &fx.TestTrueFmtError{Msgs: msgs}
+	Run(suite, GoT(t))
+	t.True(strings.HasSuffix(
+		suite.Logs, fmt.Sprintf(msgs[0].(string), msgs[1])))
+}
+
+func (s *TrueAssertion) Fails_if_overwrites_have_no_string(t *T) {
+	msgs := []interface{}{42, 42}
+	suite := &fx.TestTrueFmtError{Msgs: msgs}
+	Run(suite, GoT(t))
+	t.True(strings.HasSuffix(
+		suite.Logs, fmt.Sprintf(FormatMsgErr, msgs[0])))
+}
+
+func TestTrueAssertion(t *testing.T) {
+	Run(&TrueAssertion{}, t)
+}
+
+// type DBG struct{ Suite }
+//
+// func TestDBG(t *testing.T) { Run(&DBG{}, t) }
