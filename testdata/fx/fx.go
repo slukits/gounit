@@ -13,6 +13,8 @@ package fx
 import (
 	"fmt"
 	"runtime"
+	"sync"
+	"time"
 
 	"github.com/slukits/gounit"
 )
@@ -73,7 +75,7 @@ type TestSuiteLogging struct {
 func (s *TestSuiteLogging) Log_test(t *gounit.T) { t.Log(s.Exp) }
 
 // Log_fmt_test logs *ExpFmt*.
-func (s *TestSuiteLogging) Log_fmt_test(t *gounit.T) {
+func (s TestSuiteLogging) Log_fmt_test(t *gounit.T) {
 	t.Logf("%s", s.ExpFmt)
 }
 
@@ -158,3 +160,77 @@ func (s *TestIndexing) Test_6(t *gounit.T) {
 }
 
 func (fl *TestIndexing) File() string { return file }
+
+// TestSetup  has its *SetUp*-method called before each test iff it logs
+// "-11-22" or "-22-11" or "-1-212" or "-1-221" or "-2-121" or "-2-112".
+// NOTE this suite's tests run in parallel making an effort to randomly
+// pause a setup or test execution to have different log-values for
+// different test-runs.
+type TestSetup struct {
+	FixtureLog
+	gounit.Suite
+}
+
+func (s *TestSetup) SetUp(t *gounit.T) {
+	t.Parallel()
+	if time.Now().UnixMicro()%2 == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+	t.Log(-1 * (t.Idx + 1))
+}
+
+func (s *TestSetup) Test_A(t *gounit.T) {
+	if time.Now().UnixMicro()%2 == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+	t.Log(t.Idx + 1)
+}
+
+func (s *TestSetup) Test_B(t *gounit.T) {
+	if time.Now().UnixMicro()%2 == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+	t.Log(t.Idx + 1)
+}
+
+func (s *TestSetup) File() string {
+	return file
+}
+
+// TestTearDown  has its *SetUp*-method called before each test iff it logs
+// "1-12-2" or "2-21-1" or "12-1-2" or "12-2-1" or "21-2-1" or "21-1-2".
+// NOTE this suite's tests run in parallel making an effort to randomly
+// pause a tear-down or test execution to have different log-values for
+// different test-runs.
+type TestTearDown struct {
+	FixtureLog
+	gounit.Suite
+}
+
+func (s *TestTearDown) SetUp(t *gounit.T) {
+	t.Parallel()
+}
+func (s *TestTearDown) TearDown(t *gounit.T) {
+	if time.Now().UnixMicro()%2 == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+	t.Log(-1 * (t.Idx + 1))
+}
+
+func (s *TestTearDown) Test_A(t *gounit.T) {
+	if time.Now().UnixMicro()%2 == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+	t.Log(t.Idx + 1)
+}
+
+func (s *TestTearDown) Test_B(t *gounit.T) {
+	if time.Now().UnixMicro()%2 == 0 {
+		time.Sleep(1 * time.Millisecond)
+	}
+	t.Log(t.Idx + 1)
+}
+
+func (s *TestTearDown) File() string {
+	return file
+}

@@ -22,6 +22,7 @@ import (
 // test-coverage which is also undesirable.
 
 func Test_a_suite_s_tests_are_run(t *testing.T) {
+	t.Parallel()
 	testSuite := &fx.TestAllSuiteTestsAreRun{Exp: "A_test has been run"}
 	if "" != testSuite.Logs {
 		t.Fatal("expected initially an empty log")
@@ -67,6 +68,7 @@ func Test_a_suite_s_tests_are_indexed_by_appearance(t *testing.T) {
 }
 
 func Test_a_suite_s_file_is_its_test_file(t *testing.T) {
+	t.Parallel()
 	_, exp, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("couldn't determine test-file")
@@ -76,4 +78,44 @@ func Test_a_suite_s_file_is_its_test_file(t *testing.T) {
 	if exp != suite.File() {
 		t.Errorf("expected suite file %s; got %s", exp, suite.File())
 	}
+}
+
+type run struct{ gounit.Suite }
+
+func (s *run) Executes_setup_before_each_suite_test(t *gounit.T) {
+	suite, goT := &fx.TestSetup{}, gounit.GoT(t)
+	t.True(suite.Logs == "")
+	// run testSuite in a sub-test to ensure all its tests are run
+	// before we investigate the result.
+	if !goT.Run("TestSetup", func(_t *testing.T) {
+		gounit.Run(suite, _t)
+	}) {
+		goT.Fatalf("expected TestSetup-suite to not fail")
+	}
+	t.True(
+		suite.Logs == "-11-22" || suite.Logs == "-22-11" ||
+			suite.Logs == "-1-212" || suite.Logs == "-1-221" ||
+			suite.Logs == "-2-121" || suite.Logs == "-2-112")
+}
+
+func (s *run) Executes_tear_down_after_each_suite_test(t *gounit.T) {
+	suite, goT := &fx.TestTearDown{}, gounit.GoT(t)
+	t.True(suite.Logs == "")
+	// run testSuite in a sub-test to ensure all its tests are run
+	// before we investigate the result
+	if !goT.Run("TestTearDown", func(_t *testing.T) {
+		gounit.Run(suite, _t)
+	}) {
+		goT.Fatalf("expected TestTearDown-suite to not fail")
+	}
+	t.True(
+		suite.Logs == "1-12-2" || suite.Logs == "2-21-1" ||
+			suite.Logs == "12-1-2" || suite.Logs == "12-2-1" ||
+			suite.Logs == "21-2-1" || suite.Logs == "21-1-2")
+	goT.Log(suite.Logs)
+}
+
+func TestRun(t *testing.T) {
+	t.Parallel()
+	gounit.Run(&run{}, t)
 }

@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -19,22 +20,32 @@ import (
 // 		type MySuite struct { gounit.Suite }
 //      func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
 type Suite struct {
-	t     *testing.T
-	file  string
-	self  interface{}
-	value reflect.Value
-	rtype reflect.Type
+	t               *testing.T
+	file            string
+	self            interface{}
+	value           reflect.Value
+	rtype           reflect.Type
+	setUp, tearDown *reflect.Method
 }
 
 func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 	s.self, s.t = self, t
-	s.value = reflect.ValueOf(self)
-	s.rtype = reflect.TypeOf(self)
 	_, file, _, ok := runtime.Caller(2)
 	if !ok {
 		panic("can't determine test-suites file")
 	}
 	s.file = file
+	s.value = reflect.ValueOf(self)
+	s.rtype = reflect.TypeOf(self)
+	for i := 0; i < s.rtype.NumMethod(); i++ {
+		m := s.rtype.Method(i)
+		switch m.Name {
+		case "SetUp":
+			s.setUp = &m
+		case "TearDown":
+			s.tearDown = &m
+		}
+	}
 	return s
 }
 
@@ -43,7 +54,7 @@ func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 // suite to provide a different file.
 func (s *Suite) File() string { return s.file }
 
-var special = "Logger"
+const special = "SetUpTearDown"
 
 // run executes all public methods of embedding test-suite which have
 // exactly two arguments.
@@ -52,6 +63,9 @@ func (s *Suite) run(t *testing.T, indices func(string, string) int) {
 	for i := 0; i < s.rtype.NumMethod(); i++ {
 		method := s.rtype.Method(i)
 		if method.Type.NumIn() != 2 {
+			continue
+		}
+		if strings.Contains(special, method.Name) {
 			continue
 		}
 		t.Run(method.Name, subTestFactory(
@@ -130,6 +144,10 @@ type SuiteLogging interface {
 	Logger() func(args ...interface{})
 }
 
+type SuiteErrorer interface {
+	Error() func(...interface{})
+}
+
 // newSubTestFactory returns for given suite a sub-test-factory, i.e. a
 // function wrapping test-methods into function that can be passed to
 // the Run-method of a *testing.T*-instance.
@@ -137,14 +155,37 @@ func newSubTestFactory(
 	suite *Suite,
 ) func(reflect.Method, int) func(*testing.T) {
 	suiteLogging, hasLogger := suite.self.(SuiteLogging)
+	suiteErrorer, hasErrorer := suite.self.(SuiteErrorer)
+	var tearDown func(t *T)
+	if suite.tearDown != nil {
+		tearDown = func(t *T) {
+			(*suite.tearDown).Func.Call(
+				[]reflect.Value{suite.value, reflect.ValueOf(t)})
+		}
+	}
 	return func(test reflect.Method, idx int) func(*testing.T) {
 		return func(t *testing.T) {
-			suiteT := &T{Idx: idx, t: t, logger: t.Log}
+			suiteT := &T{
+				Idx:     idx,
+				t:       t,
+				logger:  t.Log,
+				errorer: t.Error,
+			}
 			if hasLogger {
 				suiteT.logger = suiteLogging.Logger()
 			}
+			if hasErrorer {
+				suiteT.errorer = suiteErrorer.Error()
+			}
 			suiteTVl := reflect.ValueOf(suiteT)
+			if suite.setUp != nil {
+				(*suite.setUp).Func.Call(
+					[]reflect.Value{suite.value, suiteTVl})
+			}
 			test.Func.Call([]reflect.Value{suite.value, suiteTVl})
+			if tearDown != nil {
+				tearDown(suiteT)
+			}
 		}
 	}
 }
