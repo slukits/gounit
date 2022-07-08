@@ -80,16 +80,25 @@ func (s *TestSuiteLogging) Log_fmt_test(t *gounit.T) {
 func (fl *TestSuiteLogging) File() string { return file }
 
 // TestIndexing logs for each test-call its name and index to evaluate
-// if tests are indexed by their order of appearance.
+// if tests are indexed by their order of appearance.  This suite's
+// tests are all run in parallel to ensure they don't run ordered.
 type TestIndexing struct {
 	gounit.Suite
-	Exp map[string]int
-	Got map[string]int
+	Exp   map[string]int
+	Got   map[string]int
+	mutex *sync.Mutex
+}
+
+func NewTestIndexingSuite(exp map[string]int) *TestIndexing {
+	s := &TestIndexing{Exp: exp, mutex: &sync.Mutex{}}
+	return s
 }
 
 // log interprets its first argument as test-method name, its second as
 // its index and inserts it into *Got*.
 func (s *TestIndexing) log(args ...interface{}) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	if len(args) != 2 {
 		panic("test indexing: log: expect exactly two arguments")
 	}
@@ -102,7 +111,7 @@ func (s *TestIndexing) log(args ...interface{}) {
 		panic("test indexing: log: expected second arg to be int")
 	}
 	if s.Got == nil {
-		s.Got = make(map[string]int, 3)
+		s.Got = make(map[string]int, 7)
 	}
 	s.Got[name] = idx
 }
@@ -114,15 +123,38 @@ func (s *TestIndexing) Logger() func(args ...interface{}) {
 }
 
 func (s *TestIndexing) Test_0(t *gounit.T) {
+	t.Parallel()
 	t.Log("Test_0", t.Idx)
 }
 
 func (s *TestIndexing) Test_1(t *gounit.T) {
+	t.Parallel()
 	t.Log("Test_1", t.Idx)
 }
 
-func (s TestIndexing) Test_2(t *gounit.T) {
+func (s *TestIndexing) Test_2(t *gounit.T) {
+	t.Parallel()
 	t.Log("Test_2", t.Idx)
+}
+
+func (s *TestIndexing) Test_3(t *gounit.T) {
+	t.Parallel()
+	t.Log("Test_3", t.Idx)
+}
+
+func (s *TestIndexing) Test_4(t *gounit.T) {
+	t.Parallel()
+	t.Log("Test_4", t.Idx)
+}
+
+func (s *TestIndexing) Test_5(t *gounit.T) {
+	t.Parallel()
+	t.Log("Test_5", t.Idx)
+}
+
+func (s *TestIndexing) Test_6(t *gounit.T) {
+	t.Parallel()
+	t.Log("Test_6", t.Idx)
 }
 
 func (fl *TestIndexing) File() string { return file }

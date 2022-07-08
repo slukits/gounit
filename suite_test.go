@@ -34,15 +34,25 @@ func Test_a_suite_s_tests_are_run(t *testing.T) {
 }
 
 func Test_a_suite_s_tests_are_indexed_by_appearance(t *testing.T) {
-	testSuite := &fx.TestIndexing{Exp: map[string]int{
+	testSuite := fx.NewTestIndexingSuite(map[string]int{
 		"Test_0": 0,
 		"Test_1": 1,
 		"Test_2": 2,
-	}}
+		"Test_3": 3,
+		"Test_4": 4,
+		"Test_5": 5,
+		"Test_6": 6,
+	})
 	if testSuite.Got != nil {
 		t.Fatal("expected initially empty *Got*-property")
 	}
-	gounit.Run(testSuite, t)
+	// run testSuite in a sub-test to ensure all its tests are run
+	// before we investigate the result.
+	if !t.Run("TestIndexing", func(_t *testing.T) {
+		gounit.Run(testSuite, _t)
+	}) {
+		t.Fatalf("expected TestIndexing-suite to not fail")
+	}
 	if len(testSuite.Exp) != len(testSuite.Got) {
 		t.Fatalf("expected %d logged tests; got: %d",
 			len(testSuite.Exp), len(testSuite.Got))
@@ -51,7 +61,7 @@ func Test_a_suite_s_tests_are_indexed_by_appearance(t *testing.T) {
 		if testSuite.Got[tst] == idx {
 			continue
 		}
-		t.Fatalf("expected test %s to have index %d; got %d",
+		t.Errorf("expected test %s to have index %d; got %d",
 			tst, idx, testSuite.Got[tst])
 	}
 }

@@ -12,9 +12,9 @@ import (
 // T wraps a *testing.T*-instance into a gounit.T instance which adjusts
 // testing.T's api.
 type T struct {
-	Idx    int
-	t      *testing.T
-	logger func(...interface{})
+	Idx     int
+	t       *testing.T
+	logger  func(...interface{})
 }
 
 // Log writes given arguments to set logger which defaults to the logger
