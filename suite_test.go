@@ -6,6 +6,7 @@ package gounit_test
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/slukits/gounit"
@@ -134,7 +135,22 @@ func (s *run) Executes_init_before_any_other_test(t *gounit.T) {
 	}) {
 		goT.Fatalf("expected TestTearDown-suite to not fail")
 	}
-	t.True("__init__01" == suite.Logs || "__init__10" == suite.Logs)
+	t.True(10+len(gounit.InitPrefix) == len(suite.Logs))
+	t.True(strings.HasPrefix(suite.Logs, gounit.InitPrefix))
+}
+
+func (s *run) Executes_finalize_after_all_test_ran(t *gounit.T) {
+	suite, goT := &fx.TestFinalize{}, gounit.GoT(t)
+	t.True(suite.Logs == "")
+	// run testSuite in a sub-test to ensure all its tests are run
+	// before we investigate the result
+	if !goT.Run("TestTearDown", func(_t *testing.T) {
+		gounit.Run(suite, _t)
+	}) {
+		goT.Fatalf("expected TestTearDown-suite to not fail")
+	}
+	t.True(10+len(gounit.FinalPrefix) == len(suite.Logs))
+	t.True(strings.HasSuffix(suite.Logs, gounit.FinalPrefix))
 }
 
 func TestRun(t *testing.T) {

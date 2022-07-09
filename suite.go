@@ -18,6 +18,15 @@ import (
 // *gounit.Run* you must embed this type, e.g.:
 //
 // 		type MySuite struct { gounit.Suite }
+//
+// 	    // optional Init-method
+// 	    // optional SetUp-method
+// 	    // optional TearDown-method
+//
+//		// ... the suite-tests as methods of *MySuite ...
+//
+// 	    // optional Finalize-method
+//
 //      func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
 type Suite struct {
 	t               *testing.T
@@ -28,6 +37,57 @@ type Suite struct {
 	setUp, tearDown *reflect.Method
 }
 
+// newFinalizer returns a function which may be used to register at
+// t.Cleanup which calls suite's (given) Finalize-method with provided
+// values.
+func newFinalizer(
+	method *reflect.Method, suite, gounitF reflect.Value,
+) func() {
+	return func() {
+		method.Func.Call([]reflect.Value{suite, gounitF})
+	}
+}
+
+// exec executes a found Init-method in a Suite.
+func (s *Suite) exec(init *reflect.Method, t *testing.T) {
+	suiteLogging, hasLogger := s.self.(SuiteLogging)
+	suiteCanceler, hasCanceler := s.self.(SuiteCanceler)
+	suiteI := &I{
+		t:       t,
+		logger:  t.Log,
+		cancler: t.FailNow,
+	}
+	if hasLogger {
+		suiteI.logger = suiteLogging.Logger()
+	}
+	if hasCanceler {
+		suiteI.cancler = suiteCanceler.Cancel()
+	}
+	init.Func.Call([]reflect.Value{
+		s.value, reflect.ValueOf(suiteI)})
+}
+
+// fWrapper wraps given testing.T-instance in a F-instance for a suites
+// finalizer.
+func (s *Suite) fWrapper(t *testing.T) *F {
+	suiteLogging, hasLogger := s.self.(SuiteLogging)
+	suiteCanceler, hasCanceler := s.self.(SuiteCanceler)
+	suiteF := &F{
+		t:       t,
+		logger:  t.Log,
+		cancler: t.FailNow,
+	}
+	if hasLogger {
+		suiteF.logger = suiteLogging.Logger()
+	}
+	if hasCanceler {
+		suiteF.cancler = suiteCanceler.Cancel()
+	}
+	return suiteF
+}
+
+// init initializes this suite's reused reflection values and handles
+// its special methods if any.
 func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 	s.self, s.t = self, t
 	_, file, _, ok := runtime.Caller(2)
@@ -45,21 +105,10 @@ func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 		case "TearDown":
 			s.tearDown = &m
 		case "Init":
-			suiteLogging, hasLogger := s.self.(SuiteLogging)
-			suiteCanceler, hasCanceler := s.self.(SuiteCanceler)
-			suiteI := &I{
-				t:       t,
-				logger:  t.Log,
-				cancler: t.FailNow,
-			}
-			if hasLogger {
-				suiteI.logger = suiteLogging.Logger()
-			}
-			if hasCanceler {
-				suiteI.cancler = suiteCanceler.Cancel()
-			}
-			m.Func.Call([]reflect.Value{
-				s.value, reflect.ValueOf(suiteI)})
+			s.exec(&m, t)
+		case "Finalize":
+			t.Cleanup(newFinalizer(
+				&m, s.value, reflect.ValueOf(s.fWrapper(t))))
 		}
 	}
 	return s
@@ -70,10 +119,10 @@ func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 // suite to provide a different file.
 func (s *Suite) File() string { return s.file }
 
-const special = "SetUpTearDownInit"
+const special = "SetUpTearDownInitFinalize"
 
 // run executes all public methods of embedding test-suite which have
-// exactly two arguments.
+// exactly two arguments and are not special.
 func (s *Suite) run(t *testing.T, indices func(string, string) int) {
 	subTestFactory := newSubTestFactory(s)
 	for i := 0; i < s.rtype.NumMethod(); i++ {
@@ -121,11 +170,19 @@ type SuiteEmbedder interface {
 }
 
 // Run sets up embedded Suite-instance and runs all methods of given
-// test-suite embedder which are public and have exactly two arguments.
-// NOTE the reflection of suite-embedder methods could be more specific,
-// i.e. the second argument must be of type *gounit.T*.  To keep
-// generated overhead at a minimum all methods with exactly two
-// arguments are considered tests.
+// test-suite embedder which are public, have exactly one argument
+// and are not special.  NOTE the reflection of suite-embedder methods
+// could be more specific, e.g. the argument must be of type *gounit.T*.
+// To keep generated overhead at a minimum all methods with exactly one
+// argument are considered tests unless they are special:
+//
+// - Init(*gounit.I): run before any other method of a suite
+//
+// - SetUp(*gounit.T): run before every suite-test
+//
+// - TearDown(*gounit.T): run after every suite-test
+//
+// - Finalize(*testing.F): run after any other method of a suite
 func Run(suite SuiteEmbedder, t *testing.T) {
 	s := suite.init(suite, t)
 	indices := ensureIndexing(suite)
@@ -170,7 +227,7 @@ type SuiteErrorer interface {
 	Error() func(...interface{})
 }
 
-// SuiteErrorer overwrites default test-cancellation handling which
+// SuiteCanceler overwrites default test-cancellation handling which
 // defaults to a testing.T.FailNow-call of a wrapped testing.T-instance.
 // I.e. calling on a gounit.T instance t methods like Fatal, Fatalf,
 // FailNow, FatalIfNot, or FatalOn end up in an FailNow-call of the

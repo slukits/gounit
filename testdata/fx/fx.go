@@ -285,6 +285,11 @@ func (s *TestTearDownAfterCancel) Cancel() func() {
 
 func (s *TestTearDownAfterCancel) File() string { return file }
 
+// TestInit logs for each setup-call '-1', each tear-down-call '-2' and
+// of the two tests their respective index.  Finally the Init method
+// logs *InitPrefix*, i.e. log length should be 10+len(InitPrefix) and
+// should start with InitPrefix iff Init was called first and all
+// methods are executed as expected.
 type TestInit struct {
 	FixtureLog
 	gounit.Suite
@@ -292,9 +297,36 @@ type TestInit struct {
 
 func (s *TestInit) Init(t *gounit.I) { t.Log("") }
 
-func (s *TestInit) SetUp(t *gounit.T) { t.Parallel() }
+func (s *TestInit) SetUp(t *gounit.T) {
+	t.Parallel()
+	t.Log(-1)
+}
+func (s *TestInit) TearDown(t *gounit.T) { t.Log(-2) }
 
 func (s *TestInit) Test_a(t *gounit.T) { t.Log(t.Idx) }
 func (s *TestInit) Test_b(t *gounit.T) { t.Log(t.Idx) }
 
 func (s *TestInit) File() string { return file }
+
+// TestFinalize logs for each setup-call '-1', each tear-down-call '-2'
+// and of the two tests their respective index.  Finally the Finalize
+// method logs *FinalPrefix*, i.e. log length should be
+// 10+len(FinalPrefix) and should end with FinalPrefix iff Finalize was
+// called last and all methods are executed as expected.
+type TestFinalize struct {
+	FixtureLog
+	gounit.Suite
+}
+
+func (s *TestFinalize) SetUp(t *gounit.T) {
+	t.Parallel()
+	t.Log(-1)
+}
+func (s *TestFinalize) TearDown(t *gounit.T) { t.Log(-2) }
+
+func (s *TestFinalize) Test_a(t *gounit.T) { t.Log(t.Idx) }
+func (s *TestFinalize) Test_b(t *gounit.T) { t.Log(t.Idx) }
+
+func (s *TestFinalize) Finalize(t *gounit.F) { t.Log("") }
+
+func (s *TestFinalize) File() string { return file }
