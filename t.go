@@ -12,10 +12,12 @@ import (
 // T wraps a *testing.T*-instance into a gounit.T instance which adjusts
 // testing.T's api.
 type T struct {
-	Idx     int
-	t       *testing.T
-	logger  func(...interface{})
-	errorer func(...interface{})
+	Idx      int
+	t        *testing.T
+	tearDown func(*T)
+	logger   func(...interface{})
+	errorer  func(...interface{})
+	cancler  func()
 }
 
 // Log writes given arguments to set logger which defaults to the logger
@@ -39,6 +41,42 @@ func (t *T) Parallel() { t.t.Parallel() }
 func (t *T) Error(args ...interface{}) {
 	t.t.Helper()
 	t.errorer(args...)
+}
+
+func (t *T) FailNow() {
+	t.t.Helper()
+	if t.tearDown != nil {
+		t.tearDown(t)
+	}
+	t.cancler()
+}
+
+func (t *T) FatalIfNot(assertion bool) {
+	if assertion {
+		return
+	}
+	t.t.Helper()
+	t.FailNow()
+}
+
+func (t *T) FatalOn(err error) {
+	if err == nil {
+		return
+	}
+	t.t.Helper()
+	t.Fatal(err.Error())
+}
+
+func (t *T) Fatal(args ...interface{}) {
+	t.t.Helper()
+	t.Log(args...)
+	t.FailNow()
+}
+
+func (t *T) Fatalf(format string, args ...interface{}) {
+	t.t.Helper()
+	t.Log(fmt.Sprintf(format, args...))
+	t.FailNow()
 }
 
 const TrueErr = "expected given value to be true"

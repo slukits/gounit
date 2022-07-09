@@ -35,6 +35,7 @@ func Test_a_suite_s_tests_are_run(t *testing.T) {
 }
 
 func Test_a_suite_s_tests_are_indexed_by_appearance(t *testing.T) {
+	t.Parallel()
 	testSuite := fx.NewTestIndexingSuite(map[string]int{
 		"Test_0": 0,
 		"Test_1": 1,
@@ -82,6 +83,8 @@ func Test_a_suite_s_file_is_its_test_file(t *testing.T) {
 
 type run struct{ gounit.Suite }
 
+func (s *run) SetUp(t *gounit.T) { t.Parallel() }
+
 func (s *run) Executes_setup_before_each_suite_test(t *gounit.T) {
 	suite, goT := &fx.TestSetup{}, gounit.GoT(t)
 	t.True(suite.Logs == "")
@@ -112,10 +115,24 @@ func (s *run) Executes_tear_down_after_each_suite_test(t *gounit.T) {
 		suite.Logs == "1-12-2" || suite.Logs == "2-21-1" ||
 			suite.Logs == "12-1-2" || suite.Logs == "12-2-1" ||
 			suite.Logs == "21-2-1" || suite.Logs == "21-1-2")
-	goT.Log(suite.Logs)
+}
+
+func (s *run) Executes_tear_down_after_a_canceled_test(t *gounit.T) {
+	suite, goT := &fx.TestTearDownAfterCancel{}, gounit.GoT(t)
+	t.True(suite.Logs == "")
+	gounit.Run(suite, goT)
+	t.True("0011223344" == suite.Logs)
+	// NOTE if we let the fatal tests of this test's test-suite actually
+	// fail --- having the more reasonable log "01234" as consequence
+	// --- would make "go test" report these tests as failed which were
+	// false positives in this case.  Therefor I settled for the
+	// double-execution of tear-down, i.e. the above log-entry.
 }
 
 func TestRun(t *testing.T) {
 	t.Parallel()
 	gounit.Run(&run{}, t)
 }
+
+// type DBG struct{ gounit.Suite }
+// func TestDBG(t *testing.T) { gounit.Run(&DBG{}, t) }

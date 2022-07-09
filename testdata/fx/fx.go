@@ -11,6 +11,7 @@
 package fx
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -231,6 +232,39 @@ func (s *TestTearDown) Test_B(t *gounit.T) {
 	t.Log(t.Idx + 1)
 }
 
-func (s *TestTearDown) File() string {
-	return file
+func (s *TestTearDown) File() string { return file }
+
+type TestTearDownAfterCancel struct {
+	FixtureLog
+	gounit.Suite
 }
+
+func (s *TestTearDownAfterCancel) TearDown(t *gounit.T) {
+	t.Log(t.Idx)
+}
+
+func (s *TestTearDownAfterCancel) Fail_now_test(t *gounit.T) {
+	t.FailNow() // should log 0
+}
+
+func (s *TestTearDownAfterCancel) Fatal_if_not_test(t *gounit.T) {
+	t.FatalIfNot(false) // should log 1
+}
+
+func (s *TestTearDownAfterCancel) Fatal_on_test(t *gounit.T) {
+	t.FatalOn(errors.New("")) // should log 2
+}
+
+func (s *TestTearDownAfterCancel) Fatal_test(t *gounit.T) {
+	t.Fatal("") // should log 3
+}
+
+func (s *TestTearDownAfterCancel) Fatalf_test(t *gounit.T) {
+	t.Fatalf("%s", "") // should log 4
+}
+
+func (s *TestTearDownAfterCancel) Cancel() func() {
+	return func() {}
+}
+
+func (s *TestTearDownAfterCancel) File() string { return file }

@@ -144,8 +144,25 @@ type SuiteLogging interface {
 	Logger() func(args ...interface{})
 }
 
+// SuiteErrorer overwrites default test-error handling which defaults to
+// a testing.T.Error-call of a wrapped testing.T-instance.  I.e. calling
+// on a gounit.T instance t methods like Error, Errorf or FailOn end up
+// in an Error-call of the testing.T-instance which is wrapped by t.  If
+// a suite implements the SuiteErrorer-interface provided function is
+// called in case of an test-error.
 type SuiteErrorer interface {
 	Error() func(...interface{})
+}
+
+// SuiteErrorer overwrites default test-cancellation handling which
+// defaults to a testing.T.FailNow-call of a wrapped testing.T-instance.
+// I.e. calling on a gounit.T instance t methods like Fatal, Fatalf,
+// FailNow, FatalIfNot, or FatalOn end up in an FailNow-call of the
+// testing.T-instance which is wrapped by t.  If a suite implements the
+// SuiteCanceler-interface provided function is called in case of an
+// test-cancellation.
+type SuiteCanceler interface {
+	Cancel() func()
 }
 
 // newSubTestFactory returns for given suite a sub-test-factory, i.e. a
@@ -156,6 +173,7 @@ func newSubTestFactory(
 ) func(reflect.Method, int) func(*testing.T) {
 	suiteLogging, hasLogger := suite.self.(SuiteLogging)
 	suiteErrorer, hasErrorer := suite.self.(SuiteErrorer)
+	suiteCanceler, hasCanceler := suite.self.(SuiteCanceler)
 	var tearDown func(t *T)
 	if suite.tearDown != nil {
 		tearDown = func(t *T) {
@@ -166,16 +184,21 @@ func newSubTestFactory(
 	return func(test reflect.Method, idx int) func(*testing.T) {
 		return func(t *testing.T) {
 			suiteT := &T{
-				Idx:     idx,
-				t:       t,
-				logger:  t.Log,
-				errorer: t.Error,
+				Idx:      idx,
+				t:        t,
+				tearDown: tearDown,
+				logger:   t.Log,
+				errorer:  t.Error,
+				cancler:  t.FailNow,
 			}
 			if hasLogger {
 				suiteT.logger = suiteLogging.Logger()
 			}
 			if hasErrorer {
 				suiteT.errorer = suiteErrorer.Error()
+			}
+			if hasCanceler {
+				suiteT.cancler = suiteCanceler.Cancel()
 			}
 			suiteTVl := reflect.ValueOf(suiteT)
 			if suite.setUp != nil {
