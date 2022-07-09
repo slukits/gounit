@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Stephan Lukits. All rights reserved.
-//  Use of this source code is governed by a MIT-style
+// Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
 package gounit_test
@@ -156,6 +156,28 @@ func (s *run) Executes_finalize_after_all_test_ran(t *gounit.T) {
 func TestRun(t *testing.T) {
 	t.Parallel()
 	gounit.Run(&run{}, t)
+}
+
+type suite struct{ gounit.Suite }
+
+func (s *suite) Canceler_implementation_overwrites_cancellation(
+	t *gounit.T,
+) {
+	suite, goT := &fx.TestCancelerImplementation{}, gounit.GoT(t)
+	t.True(suite.Got == nil)
+	// run testSuite in a sub-test to ensure all its tests are run
+	// before we investigate the result
+	if !goT.Run("TestTearDown", func(_t *testing.T) {
+		gounit.Run(suite, _t)
+	}) {
+		goT.Fatalf("expected TestTearDown-suite to not fail")
+	}
+	t.True(10 == len(suite.Got))
+}
+
+func TestSuite(t *testing.T) {
+	t.Parallel()
+	gounit.Run(&suite{}, t)
 }
 
 // type DBG struct{ gounit.Suite }

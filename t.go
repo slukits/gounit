@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Stephan Lukits. All rights reserved.
-//  Use of this source code is governed by a MIT-style
+// Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
 package gounit
@@ -12,11 +12,11 @@ import (
 // T instances are passed to suite tests providing means for logging,
 // assertion, failing, cancellation and concurrency-control for a test:
 //
-//      type MySuite { gounit.Suite }
+//     type MySuite { gounit.Suite }
 //
-//      func (s *MySuite) A_test(t *gounit.T) { t.Log("A_test run") }
+//     func (s *MySuite) A_test(t *gounit.T) { t.Log("A_test run") }
 //
-//      func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t)}
+//     func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t)}
 type T struct {
 	Idx      int
 	t        *testing.T
@@ -139,11 +139,11 @@ const FinalPrefix = "__final__"
 
 // I instances are passed from gounit into a test-suite's Init-method:
 //
-//      type MySuite { gounit.Suite }
+//     type MySuite { gounit.Suite }
 //
-//      func (s *MySuite) Init(t *gounit.I) { t.Log("init called") }
+//     func (s *MySuite) Init(t *gounit.I) { t.Log("init called") }
 //
-//      func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
+//     func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
 //
 // An I instance provides logging-mechanisms and the possibility to
 // cancel a suite's tests-run.  NOTE implementations of SuiteLogger or
@@ -206,13 +206,13 @@ func (i *I) FatalOn(err error) {
 // F instances are passed from gounit into a test-suite's
 // Finalize-method:
 //
-//      type MySuite { gounit.Suite }
+//     type MySuite { gounit.Suite }
 //
-//      func (s *MySuite) Finalize(t *gounit.I) {
-//	 		t.Log("finalize called")
-// 		}
+//     func (s *MySuite) Finalize(t *gounit.I) {
+//         t.Log("finalize called")
+//     }
 //
-//      func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
+//     func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
 //
 // An I instance provides logging-mechanisms and the possibility to
 // cancel a suite's tests-run.  NOTE implementations of SuiteLogger or

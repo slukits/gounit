@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Stephan Lukits. All rights reserved.
-//  Use of this source code is governed by a MIT-style
+// Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
 // Package fx provides gounit test-fixture suites.
@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
@@ -330,3 +331,75 @@ func (s *TestFinalize) Test_b(t *gounit.T) { t.Log(t.Idx) }
 func (s *TestFinalize) Finalize(t *gounit.F) { t.Log("") }
 
 func (s *TestFinalize) File() string { return file }
+
+type TestCancelerImplementation struct {
+	gounit.Suite
+	fatalIfNot bool
+	Got        map[int]bool
+}
+
+func (s *TestCancelerImplementation) log(args ...interface{}) {
+	if s.Got == nil {
+		s.Got = map[int]bool{}
+	}
+	ID := -1
+	if len(args) == 0 {
+		if s.Got[T_FATAL_IF_NOT] {
+			panic("expected at least one argument")
+		}
+		s.Got[T_FATAL_IF_NOT] = true
+		return
+	}
+	switch value := args[len(args)-1].(type) {
+	case int:
+		ID = value
+	case string:
+		id, err := strconv.Atoi(value)
+		if err != nil {
+			panic("expected cancellation ID; got %v")
+		}
+		ID = id
+	}
+	if ID < 0 || ID > F_FATAL_ON {
+		panic(fmt.Sprintf(
+			"expected cancellation ID in {%d, ...,%d}; got %d",
+			T_FATAL_IF_NOT, F_FATAL_ON, ID))
+	}
+	s.Got[ID] = true
+}
+
+func (s *TestCancelerImplementation) Logger() func(...interface{}) {
+	return s.log
+}
+
+func (s *TestCancelerImplementation) Cancel() func() {
+	return func() {
+		if !s.fatalIfNot {
+			return
+		}
+		s.fatalIfNot = false
+		s.log()
+	}
+}
+
+func (s *TestCancelerImplementation) Init(t *gounit.I) {
+	t.Fatal(I_FATAL)
+	t.Fatalf("%d", I_FATALF)
+	t.FatalOn(errors.New(strconv.Itoa(I_FATAL_ON)))
+}
+
+func (s *TestCancelerImplementation) Test(t *gounit.T) {
+	s.fatalIfNot = true
+	t.FatalIfNot(false)
+	t.FatalOn(errors.New(strconv.Itoa(T_FATAL_ON)))
+	t.Fatal(T_FATAL)
+	t.Fatalf("%d", T_FATALF)
+}
+
+func (s *TestCancelerImplementation) Finalize(t *gounit.F) {
+	t.Fatal(F_FATAL)
+	t.Fatalf("%d", F_FATALF)
+	t.FatalOn(errors.New(strconv.Itoa(F_FATAL_ON)))
+}
+
+func (s *TestCancelerImplementation) File() string { return file }
