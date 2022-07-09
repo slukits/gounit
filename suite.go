@@ -17,17 +17,17 @@ import (
 // I.e. if you want to run the tests of your own test-suite using
 // *gounit.Run* you must embed this type, e.g.:
 //
-// 		type MySuite struct { gounit.Suite }
+//     type MySuite struct { gounit.Suite }
 //
-// 	    // optional Init-method
-// 	    // optional SetUp-method
-// 	    // optional TearDown-method
+//     // optional Init-method
+//     // optional SetUp-method
+//     // optional TearDown-method
 //
-//		// ... the suite-tests as methods of *MySuite ...
+//	    .. the suite-tests as methods of *MySuite ...
 //
-// 	    // optional Finalize-method
+//     // optional Finalize-method
 //
-//      func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
+//     func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
 type Suite struct {
 	t               *testing.T
 	file            string
@@ -161,7 +161,7 @@ func ensureIndexing(suite SuiteEmbedder) (indices func(string, string) int) {
 
 // SuiteEmbedder is automatically implemented by embedding a
 // Suite-instance.  I.e.:
-// 		type MySuite struct{ gounit.Suite }
+//     type MySuite struct{ gounit.Suite }
 // implements the SuiteEmbedder-interface's private methods.
 type SuiteEmbedder interface {
 	init(interface{}, *testing.T) *Suite
@@ -182,7 +182,7 @@ type SuiteEmbedder interface {
 //
 // - TearDown(*gounit.T): run after every suite-test
 //
-// - Finalize(*testing.F): run after any other method of a suite
+// - Finalize(*gounit.F): run after any other method of a suite
 func Run(suite SuiteEmbedder, t *testing.T) {
 	s := suite.init(suite, t)
 	indices := ensureIndexing(suite)
@@ -193,26 +193,26 @@ func Run(suite SuiteEmbedder, t *testing.T) {
 // logging mechanism of gounit.T-instances passed to suite-tests with
 // provided function of the Logger-method. E.g.:
 //
-// 		type MySuite {
-//	 		gounit.Suite
-//			Logs string
-// 		}
+//     type MySuite {
+//	       gounit.Suite
+//	       Logs string
+//     }
 //
-//		func (s *MySuite) Logger() func(...interface{}) {
-//			return func(args ...interface{}) {
-//				s.Logs += fmt.Sprint(args...)
-// 			}
-// 		}
+//	   func (s *MySuite) Logger() func(...interface{}) {
+//	       return func(args ...interface{}) {
+//	           s.Logs += fmt.Sprint(args...)
+//         }
+//     }
 //
-// 		func (s *MySuite) A_test(t *gounit.T) {
-// 			t.Log("A_test has run")
-// 		}
+//     func (s *MySuite) A_test(t *gounit.T) {
+//         t.Log("A_test has run")
+//     }
 //
-//		func TestMySuite(t *testing.T) {
-//			testSuite := &MySuite{}
-//			gounit.Run(testSuite, t)
-//			t.Log(testSuite.Logs) // prints "A_test has run" if verbose
-// 		}
+//	   func TestMySuite(t *testing.T) {
+//	       testSuite := &MySuite{}
+//	       gounit.Run(testSuite, t)
+//	       t.Log(testSuite.Logs) // prints "A_test has run" if verbose
+//     }
 type SuiteLogging interface {
 	Logger() func(args ...interface{})
 }
