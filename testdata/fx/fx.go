@@ -22,10 +22,18 @@ import (
 
 // FixtureLog provides the general logging facility for test suites
 // fixtures by implementing gounit.SuiteLogger.
-type FixtureLog struct{ Logs string }
+type FixtureLog struct {
+	Logs  string
+	mutex *sync.Mutex
+}
 
-// log logs given arguments to the *Logs* property
+// log logs concurrency save given arguments to the *Logs* property.
 func (fl *FixtureLog) log(args ...interface{}) {
+	if fl.mutex == nil {
+		fl.mutex = &sync.Mutex{}
+	}
+	fl.mutex.Lock()
+	defer fl.mutex.Unlock()
 	fl.Logs += fmt.Sprint(args...)
 }
 
@@ -234,6 +242,14 @@ func (s *TestTearDown) Test_B(t *gounit.T) {
 
 func (s *TestTearDown) File() string { return file }
 
+// TestTearDownAfterCancel implements for each possible test
+// cancellation --- FailNow, FatalIfNot, FatalOn, Fatal, Fatalf --- a
+// suite test while tear-down simply logs the teared down test's index.
+// gounit.T's default cancellation is overwritten by this test-suite
+// suppressing the actual cancellation which has the consequence that
+// tear-down is called twice once during the cancellation process and
+// once after the suite-test since its cancellation is suppressed.  I.e.
+// the expected log is "0011223344".
 type TestTearDownAfterCancel struct {
 	FixtureLog
 	gounit.Suite
@@ -268,3 +284,17 @@ func (s *TestTearDownAfterCancel) Cancel() func() {
 }
 
 func (s *TestTearDownAfterCancel) File() string { return file }
+
+type TestInit struct {
+	FixtureLog
+	gounit.Suite
+}
+
+func (s *TestInit) Init(t *gounit.I) { t.Log("") }
+
+func (s *TestInit) SetUp(t *gounit.T) { t.Parallel() }
+
+func (s *TestInit) Test_a(t *gounit.T) { t.Log(t.Idx) }
+func (s *TestInit) Test_b(t *gounit.T) { t.Log(t.Idx) }
+
+func (s *TestInit) File() string { return file }

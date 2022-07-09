@@ -44,6 +44,22 @@ func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 			s.setUp = &m
 		case "TearDown":
 			s.tearDown = &m
+		case "Init":
+			suiteLogging, hasLogger := s.self.(SuiteLogging)
+			suiteCanceler, hasCanceler := s.self.(SuiteCanceler)
+			suiteI := &I{
+				t:       t,
+				logger:  t.Log,
+				cancler: t.FailNow,
+			}
+			if hasLogger {
+				suiteI.logger = suiteLogging.Logger()
+			}
+			if hasCanceler {
+				suiteI.cancler = suiteCanceler.Cancel()
+			}
+			m.Func.Call([]reflect.Value{
+				s.value, reflect.ValueOf(suiteI)})
 		}
 	}
 	return s
@@ -54,7 +70,7 @@ func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 // suite to provide a different file.
 func (s *Suite) File() string { return s.file }
 
-const special = "SetUpTearDown"
+const special = "SetUpTearDownInit"
 
 // run executes all public methods of embedding test-suite which have
 // exactly two arguments.

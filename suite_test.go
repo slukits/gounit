@@ -121,12 +121,20 @@ func (s *run) Executes_tear_down_after_a_canceled_test(t *gounit.T) {
 	suite, goT := &fx.TestTearDownAfterCancel{}, gounit.GoT(t)
 	t.True(suite.Logs == "")
 	gounit.Run(suite, goT)
-	t.True("0011223344" == suite.Logs)
-	// NOTE if we let the fatal tests of this test's test-suite actually
-	// fail --- having the more reasonable log "01234" as consequence
-	// --- would make "go test" report these tests as failed which were
-	// false positives in this case.  Therefor I settled for the
-	// double-execution of tear-down, i.e. the above log-entry.
+	t.True("0011223344" == suite.Logs) // see suite's documentation
+}
+
+func (s *run) Executes_init_before_any_other_test(t *gounit.T) {
+	suite, goT := &fx.TestInit{}, gounit.GoT(t)
+	t.True(suite.Logs == "")
+	// run testSuite in a sub-test to ensure all its tests are run
+	// before we investigate the result
+	if !goT.Run("TestTearDown", func(_t *testing.T) {
+		gounit.Run(suite, _t)
+	}) {
+		goT.Fatalf("expected TestTearDown-suite to not fail")
+	}
+	t.True("__init__01" == suite.Logs || "__init__10" == suite.Logs)
 }
 
 func TestRun(t *testing.T) {
