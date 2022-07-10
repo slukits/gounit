@@ -47,19 +47,28 @@ func (t *T) Logf(format string, args ...interface{}) {
 // parallel flagged tests.
 func (t *T) Parallel() { t.t.Parallel() }
 
-// Error log given arguments and flag test as failed but continue its
+// Error logs given arguments and flags test as failed but continues its
 // execution.  t's errorer defaults to a Error-call of a wrapped
 // testing.T instance and may be overwritten for a test-suite by
-// implementing SuiteErrorer.
+// implementing *SuiteErrorer*.
 func (t *T) Error(args ...interface{}) {
 	t.t.Helper()
 	t.errorer(args...)
 }
 
+// Errorf logs given format-string leveraging fmt.Sprintf and flags test
+// as failed but continues its execution.  t's errorer defaults to a
+// Error-call of a wrapped testing.T instance and may be overwritten for
+// a test-suite by implementing *SuiteErrorer*.
+func (t *T) Errorf(format string, args ...interface{}) {
+	t.t.Helper()
+	t.Error(fmt.Sprintf(format, args...))
+}
+
 // FailNow cancels the execution of the test after a potential tear-down
 // was called.  t's canceler defaults to a FailNow-call of a wrapped
 // testing.T instance and may be overwritten for a test-suite by
-// implementing SuiteCanceler.
+// implementing *SuiteCanceler*.
 func (t *T) FailNow() {
 	t.t.Helper()
 	if t.tearDown != nil {
@@ -103,39 +112,6 @@ func (t *T) Fatalf(format string, args ...interface{}) {
 	t.t.Helper()
 	t.Log(fmt.Sprintf(format, args...))
 	t.FailNow()
-}
-
-const TrueErr = "expected given value to be true"
-
-// True errors the test and returns false iff given value is not true;
-// otherwise true is returned.  Given (formatted) message replace the
-// default error message, i.e. msg[0] must be a string if len(msg) == 1
-// it must be a format-string iff len(msg) > 1.
-func (t *T) True(value bool, msg ...interface{}) bool {
-	t.t.Helper()
-	if true != value {
-		t.Error(assertErr("true", TrueErr, msg...))
-		return false
-	}
-	return true
-}
-
-const Assert = "assert %s: %v"
-const FormatMsgErr = "expected first message-argument to be string; got %T"
-
-func assertErr(label, msg string, args ...interface{}) string {
-	if len(args) == 0 {
-		return fmt.Sprintf(Assert, label, msg)
-	}
-	if len(args) == 1 {
-		return fmt.Sprintf(Assert, label, args[0])
-	}
-	ext, ok := args[0].(string)
-	if !ok {
-		return fmt.Sprintf("%s: %s", fmt.Sprintf(Assert, label, msg),
-			fmt.Sprintf(FormatMsgErr, args[0]))
-	}
-	return fmt.Sprintf(Assert, label, fmt.Sprintf(ext, args[1:]...))
 }
 
 const InitPrefix = "__init__"

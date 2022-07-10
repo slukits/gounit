@@ -4,7 +4,13 @@
 
 package fx
 
-import "github.com/slukits/gounit"
+import (
+	"fmt"
+	"runtime"
+	"strings"
+
+	"github.com/slukits/gounit"
+)
 
 // TestTrueErrors implements a test calling t.True(false) and overwrites
 // the default errorer.
@@ -114,3 +120,115 @@ func (s *TestTrueFmtError) Error() func(args ...interface{}) {
 }
 
 func (s *TestTrueFmtError) File() string { return file }
+
+type TestAssertion struct {
+	FixtureLog
+	gounit.Suite
+
+	// True executes on given T-instance a successful assertion and
+	// returns its value which is expected to be true
+	True func(*gounit.T) bool
+
+	// False executes on given T-instance a failing assertion and
+	// returns its value which is expected to be false
+	False func(*gounit.T) bool
+
+	// Fails executes on given T-instance a failing assertion and
+	// returns the expected error-message
+	Fails func(*gounit.T) string
+
+	// Overwrites executes on given T-instance a failing assertion with
+	// an overwritten error message and returns the expected
+	// error-message's suffix.
+	Overwrite func(*gounit.T, string)
+
+	// Overwrites executes on given T-instance a failing assertion with
+	// an overwritten formatted error message and returns the expected
+	// error-message's suffix.
+	FmtOverwrite func(*gounit.T, string, string)
+
+	Msg string
+
+	Msgs map[string]string
+	t    *gounit.T
+}
+
+func (s *TestAssertion) funcName(n string) string {
+	idx := strings.LastIndex(n, ".")
+	if idx < 0 {
+		return n
+	}
+	return n[idx+1:]
+}
+
+func (s *TestAssertion) log(key, value string) {
+	if s.Msgs == nil {
+		s.Msgs = map[string]string{}
+	}
+	s.Msgs[key] = value
+}
+
+func (s *TestAssertion) error(args ...interface{}) {
+	pc := make([]uintptr, 6)
+	n := runtime.Callers(1, pc)
+	if n < 5 {
+		return
+	}
+	frames := runtime.CallersFrames(pc[4:])
+	frame, ok := frames.Next()
+	if ok && strings.HasPrefix( // testing for panicking adds a call
+		s.funcName(frame.Function), "func") {
+		frame, _ = frames.Next()
+	}
+	s.log(s.funcName(frame.Function), fmt.Sprint(args...))
+}
+
+func (s *TestAssertion) Error() func(args ...interface{}) {
+	return s.error
+}
+
+func (s *TestAssertion) Test_true(t *gounit.T) {
+	if !s.True(t) {
+		s.Msg = "test assertion: true: returned false"
+		t.FailNow()
+	}
+}
+
+func (s *TestAssertion) Test_false(t *gounit.T) {
+	if s.False(t) {
+		s.Msg = "test assertion: false: returned true"
+		t.FailNow()
+	}
+}
+
+func (s *TestAssertion) Test_fail(t *gounit.T) {
+	exp := s.Fails(t)
+	if !strings.Contains(s.Msgs["Test_fail"], exp) {
+		s.Msg = fmt.Sprintf(
+			"fail: expect fail-msg to contain: '%s'; got '%s'",
+			exp, s.Msgs["Test_fail"])
+		t.FailNow()
+	}
+}
+
+func (s *TestAssertion) Test_failing_overwrite(t *gounit.T) {
+	const exp = "overwritten error"
+	s.Overwrite(t, exp)
+	if !strings.Contains(s.Msgs["Test_failing_overwrite"], exp) {
+		s.Msg = fmt.Sprintf(
+			"failing overwrite: expect fail-msg to contain: '%s'; got '%s'",
+			exp, s.Msgs["Test_failing_overwrite"])
+		t.FailNow()
+	}
+}
+
+func (s *TestAssertion) Test_failing_fmt_overwrite(t *gounit.T) {
+	const exp = "overwritten error"
+	s.FmtOverwrite(t, "%s", exp)
+	if !strings.Contains(s.Msgs["Test_failing_fmt_overwrite"], exp) {
+		s.Msg = fmt.Sprintf(
+			"failing fmt-overwrite: expect fail-msg to contain: '%s'; got '%s'",
+			exp, s.Msgs["Test_failing_fmt_overwrite"])
+		t.FailNow()
+	}
+}
