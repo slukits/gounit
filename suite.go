@@ -121,25 +121,6 @@ func (s *Suite) File() string { return s.file }
 
 const special = "SetUpTearDownInitFinalize"
 
-// run executes all public methods of embedding test-suite which have
-// exactly two arguments and are not special.
-func (s *Suite) run(t *testing.T, indices func(string, string) int) {
-	subTestFactory := newSubTestFactory(s)
-	for i := 0; i < s.rtype.NumMethod(); i++ {
-		method := s.rtype.Method(i)
-		if method.Type.NumIn() != 2 {
-			continue
-		}
-		if strings.Contains(special, method.Name) {
-			continue
-		}
-		t.Run(method.Name, subTestFactory(
-			method,
-			indices(s.rtype.Elem().Name(), method.Name),
-		))
-	}
-}
-
 func newIndices(fileName string) func(string, string) int {
 	return func(suite, test string) int {
 		return indexer.get(fileName, suite, test)
@@ -174,7 +155,7 @@ type SuiteEmbedder interface {
 // and are not special.  NOTE the reflection of suite-embedder methods
 // could be more specific, e.g. the argument must be of type *gounit.T*.
 // To keep generated overhead at a minimum all methods with exactly one
-// argument are considered tests unless they are special:
+// argument are considered tests unless they are special (or private):
 //
 // - Init(*gounit.I): run before any other method of a suite
 //
@@ -186,7 +167,20 @@ type SuiteEmbedder interface {
 func Run(suite SuiteEmbedder, t *testing.T) {
 	s := suite.init(suite, t)
 	indices := ensureIndexing(suite)
-	s.run(t, indices)
+	subTestFactory := newSubTestFactory(s)
+	for i := 0; i < s.rtype.NumMethod(); i++ {
+		method := s.rtype.Method(i)
+		if method.Type.NumIn() != 2 {
+			continue
+		}
+		if strings.Contains(special, method.Name) {
+			continue
+		}
+		t.Run(method.Name, subTestFactory(
+			method,
+			indices(s.rtype.Elem().Name(), method.Name),
+		))
+	}
 }
 
 // SuiteLogging implementation of a suite-embedder overwrites provided
