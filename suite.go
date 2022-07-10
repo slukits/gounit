@@ -5,10 +5,7 @@
 package gounit
 
 import (
-	"go/parser"
-	"go/token"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -30,7 +27,6 @@ import (
 //     func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
 type Suite struct {
 	t               *testing.T
-	file            string
 	self            interface{}
 	value           reflect.Value
 	rtype           reflect.Type
@@ -90,11 +86,6 @@ func (s *Suite) fWrapper(t *testing.T) *F {
 // its special methods if any.
 func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 	s.self, s.t = self, t
-	_, file, _, ok := runtime.Caller(2)
-	if !ok {
-		panic("can't determine test-suites file")
-	}
-	s.file = file
 	s.value = reflect.ValueOf(self)
 	s.rtype = reflect.TypeOf(self)
 	for i := 0; i < s.rtype.NumMethod(); i++ {
@@ -114,31 +105,7 @@ func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 	return s
 }
 
-// File returns the file of Run's caller which is typically the
-// file-name of the embedding suite.  Add your own File-method to your
-// suite to provide a different file.
-func (s *Suite) File() string { return s.file }
-
 const special = "SetUpTearDownInitFinalize"
-
-func newIndices(fileName string) func(string, string) int {
-	return func(suite, test string) int {
-		return indexer.get(fileName, suite, test)
-	}
-}
-
-// ensureIndexing figures the suite's test-file which is Run and makes
-// sure *indexer* has indexed all suite-methods of this file in order of
-// their appearance.
-func ensureIndexing(suite SuiteEmbedder) (indices func(string, string) int) {
-	fSet := token.NewFileSet()
-	astFl, err := parser.ParseFile(fSet, suite.File(), nil, 0)
-	if err != nil {
-		panic(err)
-	}
-	indexer.ensureIndexingOf(astFl, suite.File())
-	return newIndices(suite.File())
-}
 
 // SuiteEmbedder is automatically implemented by embedding a
 // Suite-instance.  I.e.:
@@ -146,7 +113,6 @@ func ensureIndexing(suite SuiteEmbedder) (indices func(string, string) int) {
 // implements the SuiteEmbedder-interface's private methods.
 type SuiteEmbedder interface {
 	init(interface{}, *testing.T) *Suite
-	File() string
 }
 
 // Run sets up embedded Suite-instance and runs all methods of given
@@ -165,7 +131,6 @@ type SuiteEmbedder interface {
 // - Finalize(*gounit.F): run after any other method of a suite
 func Run(suite SuiteEmbedder, t *testing.T) {
 	s := suite.init(suite, t)
-	indices := ensureIndexing(suite)
 	subTestFactory := newSubTestFactory(s)
 	for i := 0; i < s.rtype.NumMethod(); i++ {
 		method := s.rtype.Method(i)
@@ -175,10 +140,7 @@ func Run(suite SuiteEmbedder, t *testing.T) {
 		if strings.Contains(special, method.Name) {
 			continue
 		}
-		t.Run(method.Name, subTestFactory(
-			method,
-			indices(s.rtype.Elem().Name(), method.Name),
-		))
+		t.Run(method.Name, subTestFactory(method))
 	}
 }
 
@@ -236,7 +198,7 @@ type SuiteCanceler interface {
 // the Run-method of a *testing.T*-instance.
 func newSubTestFactory(
 	suite *Suite,
-) func(reflect.Method, int) func(*testing.T) {
+) func(reflect.Method) func(*testing.T) {
 	suiteLogging, hasLogger := suite.self.(SuiteLogging)
 	suiteErrorer, hasErrorer := suite.self.(SuiteErrorer)
 	suiteCanceler, hasCanceler := suite.self.(SuiteCanceler)
@@ -247,10 +209,9 @@ func newSubTestFactory(
 				[]reflect.Value{suite.value, reflect.ValueOf(t)})
 		}
 	}
-	return func(test reflect.Method, idx int) func(*testing.T) {
+	return func(test reflect.Method) func(*testing.T) {
 		return func(t *testing.T) {
 			suiteT := &T{
-				Idx:      idx,
 				t:        t,
 				tearDown: tearDown,
 				logger:   t.Log,

@@ -16,6 +16,8 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/slukits/gounit"
@@ -89,86 +91,6 @@ func (s TestSuiteLogging) Log_fmt_test(t *gounit.T) {
 
 func (fl *TestSuiteLogging) File() string { return file }
 
-// TestIndexing logs for each test-call its name and index to evaluate
-// if tests are indexed by their order of appearance.  This suite's
-// tests are all run in parallel to ensure they don't run ordered.
-type TestIndexing struct {
-	gounit.Suite
-	Exp   map[string]int
-	Got   map[string]int
-	mutex *sync.Mutex
-}
-
-func NewTestIndexingSuite(exp map[string]int) *TestIndexing {
-	s := &TestIndexing{Exp: exp, mutex: &sync.Mutex{}}
-	return s
-}
-
-// log interprets its first argument as test-method name, its second as
-// its index and inserts it into *Got*.
-func (s *TestIndexing) log(args ...interface{}) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	if len(args) != 2 {
-		panic("test indexing: log: expect exactly two arguments")
-	}
-	name, ok := args[0].(string)
-	if !ok {
-		panic("test indexing: log: expected first arg to be string")
-	}
-	idx, ok := args[1].(int)
-	if !ok {
-		panic("test indexing: log: expected second arg to be int")
-	}
-	if s.Got == nil {
-		s.Got = make(map[string]int, 7)
-	}
-	s.Got[name] = idx
-}
-
-// Logger implements the Logger interface, i.e. the suite-tests runner
-// will use the returned function to implement gounit.T.Log/-Logf.
-func (s *TestIndexing) Logger() func(args ...interface{}) {
-	return s.log
-}
-
-func (s *TestIndexing) Test_0(t *gounit.T) {
-	t.Parallel()
-	t.Log("Test_0", t.Idx)
-}
-
-func (s *TestIndexing) Test_1(t *gounit.T) {
-	t.Parallel()
-	t.Log("Test_1", t.Idx)
-}
-
-func (s *TestIndexing) Test_2(t *gounit.T) {
-	t.Parallel()
-	t.Log("Test_2", t.Idx)
-}
-
-func (s *TestIndexing) Test_3(t *gounit.T) {
-	t.Parallel()
-	t.Log("Test_3", t.Idx)
-}
-
-func (s *TestIndexing) Test_4(t *gounit.T) {
-	t.Parallel()
-	t.Log("Test_4", t.Idx)
-}
-
-func (s *TestIndexing) Test_5(t *gounit.T) {
-	t.Parallel()
-	t.Log("Test_5", t.Idx)
-}
-
-func (s *TestIndexing) Test_6(t *gounit.T) {
-	t.Parallel()
-	t.Log("Test_6", t.Idx)
-}
-
-func (fl *TestIndexing) File() string { return file }
-
 // TestSetup  has its *SetUp*-method called before each test iff it logs
 // "-11-22" or "-22-11" or "-1-212" or "-1-221" or "-2-121" or "-2-112".
 // NOTE this suite's tests run in parallel making an effort to randomly
@@ -177,28 +99,31 @@ func (fl *TestIndexing) File() string { return file }
 type TestSetup struct {
 	FixtureLog
 	gounit.Suite
+	idx uint32
+	fx  gounit.Fixtures
 }
 
 func (s *TestSetup) SetUp(t *gounit.T) {
 	t.Parallel()
+	s.fx.Set(t, int(atomic.AddUint32(&s.idx, 1)))
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(-1 * (t.Idx + 1))
+	t.Log(-1 * s.fx.Int(t))
 }
 
 func (s *TestSetup) Test_A(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(t.Idx + 1)
+	t.Log(s.fx.Int(t))
 }
 
 func (s *TestSetup) Test_B(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(t.Idx + 1)
+	t.Log(s.fx.Int(t))
 }
 
 func (s *TestSetup) File() string {
@@ -213,49 +138,61 @@ func (s *TestSetup) File() string {
 type TestTearDown struct {
 	FixtureLog
 	gounit.Suite
+	idx uint32
+	fx  gounit.Fixtures
 }
 
 func (s *TestTearDown) SetUp(t *gounit.T) {
 	t.Parallel()
+	s.fx.Set(t, int(atomic.AddUint32(&s.idx, 1)))
 }
 func (s *TestTearDown) TearDown(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(-1 * (t.Idx + 1))
+	t.Log(-1 * s.fx.Del(t).(int))
 }
 
 func (s *TestTearDown) Test_A(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(t.Idx + 1)
+	t.Log(s.fx.Int(t))
 }
 
 func (s *TestTearDown) Test_B(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(t.Idx + 1)
+	t.Log(s.fx.Int(t))
 }
 
 func (s *TestTearDown) File() string { return file }
 
 // TestTearDownAfterCancel implements for each possible test
 // cancellation --- FailNow, FatalIfNot, FatalOn, Fatal, Fatalf --- a
-// suite test while tear-down simply logs the teared down test's index.
-// gounit.T's default cancellation is overwritten by this test-suite
-// suppressing the actual cancellation which has the consequence that
-// tear-down is called twice once during the cancellation process and
-// once after the suite-test since its cancellation is suppressed.  I.e.
-// the expected log is "0011223344".
+// suite test while tear-down simply logs the number of called teared
+// down.  gounit.T's default cancellation is overwritten by this
+// test-suite suppressing the actual cancellation which has the
+// consequence that tear-down is called twice once during the
+// cancellation process and once after the suite-test since its
+// cancellation is suppressed.  I.e. every second tear down call is
+// ignored to get the expected log of "12345".
 type TestTearDownAfterCancel struct {
 	FixtureLog
 	gounit.Suite
+	idx    uint32
+	logged bool
 }
 
 func (s *TestTearDownAfterCancel) TearDown(t *gounit.T) {
-	t.Log(t.Idx)
+	if s.logged {
+		// since the fatales are suppressed ignore second log call
+		s.logged = false
+		return
+	}
+	s.logged = true
+	t.Log(atomic.AddUint32(&s.idx, 1))
 }
 
 func (s *TestTearDownAfterCancel) Fail_now_test(t *gounit.T) {
@@ -302,8 +239,8 @@ func (s *TestInit) SetUp(t *gounit.T) {
 }
 func (s *TestInit) TearDown(t *gounit.T) { t.Log(-2) }
 
-func (s *TestInit) Test_a(t *gounit.T) { t.Log(t.Idx) }
-func (s *TestInit) Test_b(t *gounit.T) { t.Log(t.Idx) }
+func (s *TestInit) Test_a(t *gounit.T) { t.Log(0) }
+func (s *TestInit) Test_b(t *gounit.T) { t.Log(1) }
 
 func (s *TestInit) File() string { return file }
 
@@ -323,8 +260,8 @@ func (s *TestFinalize) SetUp(t *gounit.T) {
 }
 func (s *TestFinalize) TearDown(t *gounit.T) { t.Log(-2) }
 
-func (s *TestFinalize) Test_a(t *gounit.T) { t.Log(t.Idx) }
-func (s *TestFinalize) Test_b(t *gounit.T) { t.Log(t.Idx) }
+func (s *TestFinalize) Test_a(t *gounit.T) { t.Log(0) }
+func (s *TestFinalize) Test_b(t *gounit.T) { t.Log(1) }
 
 func (s *TestFinalize) Finalize(t *gounit.F) { t.Log("") }
 
@@ -401,3 +338,34 @@ func (s *TestCancelerImplementation) Finalize(t *gounit.F) {
 }
 
 func (s *TestCancelerImplementation) File() string { return file }
+
+type TestInitFinalHaveRunTest struct {
+	FixtureLog
+	gounit.Suite
+
+	// InitLog is logged by the Init-method
+	InitLog string
+
+	// FinalLog is logged by the Finalize-method
+	FinalLog string
+
+	RunT *testing.T
+
+	Fatal string
+}
+
+func (s *TestInitFinalHaveRunTest) Init(t *gounit.I) {
+	if s.RunT != t.GoT() {
+		s.Fatal = "init: test has not run-test"
+		t.GoT().FailNow()
+	}
+	t.Log(s.InitLog)
+}
+
+func (s *TestInitFinalHaveRunTest) Finalize(t *gounit.F) {
+	if s.RunT != t.GoT() {
+		s.Fatal = "finalize: test has not run-test"
+		t.GoT().FailNow()
+	}
+	t.Log(s.FinalLog)
+}

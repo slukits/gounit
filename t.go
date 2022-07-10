@@ -18,7 +18,6 @@ import (
 //
 //     func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t)}
 type T struct {
-	Idx      int
 	t        *testing.T
 	tearDown func(*T)
 	logger   func(...interface{})

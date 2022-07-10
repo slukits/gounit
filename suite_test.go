@@ -5,7 +5,7 @@
 package gounit_test
 
 import (
-	"runtime"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -32,53 +32,6 @@ func Test_a_suite_s_tests_are_run(t *testing.T) {
 	if testSuite.Exp != testSuite.Logs {
 		t.Errorf("expected test-suite log: %s; got: %s",
 			testSuite.Exp, testSuite.Logs)
-	}
-}
-
-func Test_a_suite_s_tests_are_indexed_by_appearance(t *testing.T) {
-	t.Parallel()
-	testSuite := fx.NewTestIndexingSuite(map[string]int{
-		"Test_0": 0,
-		"Test_1": 1,
-		"Test_2": 2,
-		"Test_3": 3,
-		"Test_4": 4,
-		"Test_5": 5,
-		"Test_6": 6,
-	})
-	if testSuite.Got != nil {
-		t.Fatal("expected initially empty *Got*-property")
-	}
-	// run testSuite in a sub-test to ensure all its tests are run
-	// before we investigate the result.
-	if !t.Run("TestIndexing", func(_t *testing.T) {
-		gounit.Run(testSuite, _t)
-	}) {
-		t.Fatalf("expected TestIndexing-suite to not fail")
-	}
-	if len(testSuite.Exp) != len(testSuite.Got) {
-		t.Fatalf("expected %d logged tests; got: %d",
-			len(testSuite.Exp), len(testSuite.Got))
-	}
-	for tst, idx := range testSuite.Exp {
-		if testSuite.Got[tst] == idx {
-			continue
-		}
-		t.Errorf("expected test %s to have index %d; got %d",
-			tst, idx, testSuite.Got[tst])
-	}
-}
-
-func Test_a_suite_s_file_is_its_test_file(t *testing.T) {
-	t.Parallel()
-	_, exp, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("couldn't determine test-file")
-	}
-	suite := &struct{ gounit.Suite }{}
-	gounit.Run(suite, t)
-	if exp != suite.File() {
-		t.Errorf("expected suite file %s; got %s", exp, suite.File())
 	}
 }
 
@@ -122,7 +75,7 @@ func (s *run) Executes_tear_down_after_a_canceled_test(t *gounit.T) {
 	suite := &fx.TestTearDownAfterCancel{}
 	t.True(suite.Logs == "")
 	gounit.Run(suite, t.GoT())
-	t.True("0011223344" == suite.Logs) // see suite's documentation
+	t.True("12345" == suite.Logs)
 }
 
 func (s *run) Executes_init_before_any_other_test(t *gounit.T) {
@@ -153,6 +106,21 @@ func (s *run) Executes_finalize_after_all_test_ran(t *gounit.T) {
 	t.True(strings.HasSuffix(suite.Logs, gounit.FinalPrefix))
 }
 
+func (s *run) Provides_its_test_to_init_and_finalize(t *gounit.T) {
+	suite := &fx.TestInitFinalHaveRunTest{InitLog: "i", FinalLog: "f"}
+	t.True(suite.Logs == "")
+	if !t.GoT().Run("TestTearDown", func(_t *testing.T) {
+		suite.RunT = _t
+		gounit.Run(suite, _t)
+	}) {
+		t.GoT().Fatalf("expected TestTearDown-suite to not fail: %s",
+			suite.Fatal)
+	}
+	t.True(
+		fmt.Sprintf("%si%sf", gounit.InitPrefix, gounit.FinalPrefix) ==
+			suite.Logs)
+}
+
 func TestRun(t *testing.T) {
 	t.Parallel()
 	gounit.Run(&run{}, t)
@@ -179,6 +147,3 @@ func TestSuite(t *testing.T) {
 	t.Parallel()
 	gounit.Run(&suite{}, t)
 }
-
-// type DBG struct{ gounit.Suite }
-// func TestDBG(t *testing.T) { gounit.Run(&DBG{}, t) }
