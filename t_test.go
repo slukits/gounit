@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/slukits/gounit"
 	. "github.com/slukits/gounit"
@@ -349,6 +350,44 @@ func (s *AssertionTests) For_panicking(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertPanics", func(_t *testing.T) {
+		gounit.Run(suite, _t)
+	}) {
+		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
+	}
+}
+
+func (s *AssertionTests) For_within(t *T) {
+	var newTs = func(d uint) *TimeStepper {
+		return (&TimeStepper{}).SetDuration(
+			time.Duration(d) * time.Millisecond)
+	}
+	cond := func() bool { return false }
+	suite := &fx.TestAssertion{
+		True: func(t *T) bool {
+			first := true
+			return <-t.Within(newTs(2), func() bool {
+				if first {
+					first = false
+					return false
+				}
+				return true
+			}) && <-t.Within(newTs(1), func() bool { return true })
+		},
+		False: func(t *T) bool {
+			return <-t.Within(newTs(2), cond)
+		},
+		Fails: func(t *T) string {
+			<-t.Within(newTs(1), cond)
+			return gounit.WithinErr
+		},
+		Overwrite: func(t *T, ow string) {
+			<-t.Within(newTs(1), cond, ow)
+		},
+		FmtOverwrite: func(t *T, fmt, s string) {
+			<-t.Within(newTs(1), cond, fmt, s)
+		},
+	}
+	if !t.GoT().Run("AssertWithin", func(_t *testing.T) {
 		gounit.Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)

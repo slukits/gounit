@@ -6,7 +6,6 @@ package fx
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 
 	"github.com/slukits/gounit"
@@ -147,6 +146,8 @@ type TestAssertion struct {
 	// error-message's suffix.
 	FmtOverwrite func(*gounit.T, string, string)
 
+	msg string
+
 	Msg string
 
 	Msgs map[string]string
@@ -169,18 +170,7 @@ func (s *TestAssertion) log(key, value string) {
 }
 
 func (s *TestAssertion) error(args ...interface{}) {
-	pc := make([]uintptr, 6)
-	n := runtime.Callers(1, pc)
-	if n < 5 {
-		return
-	}
-	frames := runtime.CallersFrames(pc[4:])
-	frame, ok := frames.Next()
-	if ok && strings.HasPrefix( // testing for panicking adds a call
-		s.funcName(frame.Function), "func") {
-		frame, _ = frames.Next()
-	}
-	s.log(s.funcName(frame.Function), fmt.Sprint(args...))
+	s.log(s.msg, fmt.Sprint(args...))
 }
 
 func (s *TestAssertion) Error() func(args ...interface{}) {
@@ -202,6 +192,7 @@ func (s *TestAssertion) Test_false(t *gounit.T) {
 }
 
 func (s *TestAssertion) Test_fail(t *gounit.T) {
+	s.msg = "Test_fail"
 	exp := s.Fails(t)
 	if !strings.Contains(s.Msgs["Test_fail"], exp) {
 		s.Msg = fmt.Sprintf(
@@ -212,6 +203,7 @@ func (s *TestAssertion) Test_fail(t *gounit.T) {
 }
 
 func (s *TestAssertion) Test_failing_overwrite(t *gounit.T) {
+	s.msg = "Test_failing_overwrite"
 	const exp = "overwritten error"
 	s.Overwrite(t, exp)
 	if !strings.Contains(s.Msgs["Test_failing_overwrite"], exp) {
@@ -223,6 +215,7 @@ func (s *TestAssertion) Test_failing_overwrite(t *gounit.T) {
 }
 
 func (s *TestAssertion) Test_failing_fmt_overwrite(t *gounit.T) {
+	s.msg = "Test_failing_fmt_overwrite"
 	const exp = "overwritten error"
 	s.FmtOverwrite(t, "%s", exp)
 	if !strings.Contains(s.Msgs["Test_failing_fmt_overwrite"], exp) {

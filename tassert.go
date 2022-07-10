@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -282,6 +283,37 @@ func (t *T) Panics(f func(), msg ...interface{}) (hasPanicked bool) {
 	}()
 	f()
 	return true
+}
+
+// WithinErr default message for failed "Within"-assertion
+const WithinErr = "timeout while condition unfulfilled"
+
+// Within tries after each step of given time-stepper if given condition
+// returns true and fails the test iff the whole duration of given time
+// stepper is elapsed without given condition returning true.  Use the
+// returned channel to wait for either the fulfillment of the condition
+// or the failing timeout.
+func (t *T) Within(
+	d *TimeStepper, cond func() bool, mm ...interface{},
+) chan bool {
+	done := make(chan bool)
+	go func() {
+		time.Sleep(d.Step())
+		if cond() {
+			done <- true
+			return
+		}
+		for d.AddStep() {
+			time.Sleep(d.Step())
+			if cond() {
+				done <- true
+				return
+			}
+		}
+		t.Error(assertErr("within", WithinErr, mm...))
+		done <- false
+	}()
+	return done
 }
 
 // Assert is the skeleton of assertion errors.
