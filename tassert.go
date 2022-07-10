@@ -59,7 +59,7 @@ func (t *T) Eq(a, b interface{}, msg ...interface{}) bool {
 	return false
 }
 
-// NewErr default message for failed 'Neq'-assertion.
+// NeqErr default message for failed 'Neq'-assertion.
 const NeqErr = "expected given values to differ"
 
 // Neq errors the test and returns false iff given values diff is empty;
@@ -79,7 +79,7 @@ func (t *T) Neq(a, b interface{}, msg ...interface{}) bool {
 	return false
 }
 
-// NewErr default message for failed 'Contains'-assertion.
+// ContainsErr default message for failed 'Contains'-assertion.
 const ContainsErr = "%s doesn't contain %s"
 
 // Contains errors the test and returns false iff given string doesn't
@@ -103,7 +103,7 @@ func (t *T) Contains(str, sub string, msg ...interface{}) bool {
 	return true
 }
 
-// MachedErr default message for failed *'Matched'-assertion.
+// MatchedErr default message for failed *'Matched'-assertion.
 const MatchedErr = "Regexp '%s'\ndoesn't match '%s'"
 
 // Matched errors the test and returns false iff given string isn't
@@ -284,7 +284,12 @@ func (t *T) Panics(f func(), msg ...interface{}) (hasPanicked bool) {
 	return true
 }
 
+// Assert is the skeleton of assertion errors.
 const Assert = "assert %s: %v"
+
+// FormatMsgErr is the error message in case an assertion was called
+// with more then one optional message argument whereas the first
+// argument is not a (format-)string.
 const FormatMsgErr = "expected first message-argument to be string; got %T"
 
 func assertErr(label, msg string, args ...interface{}) string {

@@ -2,7 +2,7 @@ package gounit
 
 import "sync"
 
-// Fixture provides a simple concurrency fixture storage for gounit
+// Fixtures provides a simple concurrency fixture storage for gounit
 // tests.  A Fixtures instance must not be copied after its first use.
 type Fixtures struct {
 	mutex sync.Mutex

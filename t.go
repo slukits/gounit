@@ -86,7 +86,7 @@ func (t *T) FatalIfNot(assertion bool) {
 	t.FailNow()
 }
 
-// FatalIfNot cancels receiving test (see *FailNow*) after logging given
+// FatalOn cancels receiving test (see *FailNow*) after logging given
 // error message iff passed argument is not nil and is a no-op
 // otherwise.
 func (t *T) FatalOn(err error) {
@@ -113,7 +113,12 @@ func (t *T) Fatalf(format string, args ...interface{}) {
 	t.FailNow()
 }
 
+// InitPrefix prefixes logging-messages of the Init-method to enable the
+// reporter to discriminate Init-logs and Finalize-logs.
 const InitPrefix = "__init__"
+
+// FinalPrefix prefixes logging-messages of the Finalize-method to
+// enable the reporter to discriminate Finalize-logs and Init-logs.
 const FinalPrefix = "__final__"
 
 // I instances are passed from gounit into a test-suite's Init-method:
@@ -175,10 +180,10 @@ func (i *I) Fatalf(format string, args ...interface{}) {
 	i.cancler()
 }
 
-// Fatalf cancels the test-suite's tests-run iff given error is not nil.
-// The cancellation defaults to a FailNow call of wrapped test-runner's
-// testing.T-instance or its replacement  provided by a suite's
-// SuiteCanceler-implementation.
+// FatalOn cancels the test-suite's tests-run iff given error is not
+// nil.  The cancellation defaults to a FailNow call of wrapped
+// test-runner's testing.T-instance or its replacement provided by a
+// suite's SuiteCanceler-implementation.
 func (i *I) FatalOn(err error) {
 	i.t.Helper()
 	if err != nil {
@@ -248,10 +253,10 @@ func (f *F) Fatalf(format string, args ...interface{}) {
 	f.cancler()
 }
 
-// Fatalf cancels the test-suite's tests-run iff given error is not nil.
-// The cancellation defaults to a FailNow call of wrapped test-runner's
-// testing.T-instance or its replacement  provided by a suite's
-// SuiteCanceler-implementation.
+// FatalOn cancels the test-suite's tests-run iff given error is not
+// nil.  The cancellation defaults to a FailNow call of wrapped
+// test-runner's testing.T-instance or its replacement  provided by a
+// suite's SuiteCanceler-implementation.
 func (f *F) FatalOn(err error) {
 	f.t.Helper()
 	if err != nil {
