@@ -146,7 +146,6 @@ func ensureIndexing(suite SuiteEmbedder) (indices func(string, string) int) {
 // implements the SuiteEmbedder-interface's private methods.
 type SuiteEmbedder interface {
 	init(interface{}, *testing.T) *Suite
-	run(*testing.T, func(string, string) int)
 	File() string
 }
 

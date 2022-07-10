@@ -87,14 +87,14 @@ type run struct{ gounit.Suite }
 func (s *run) SetUp(t *gounit.T) { t.Parallel() }
 
 func (s *run) Executes_setup_before_each_suite_test(t *gounit.T) {
-	suite, goT := &fx.TestSetup{}, gounit.GoT(t)
+	suite := &fx.TestSetup{}
 	t.True(suite.Logs == "")
 	// run testSuite in a sub-test to ensure all its tests are run
 	// before we investigate the result.
-	if !goT.Run("TestSetup", func(_t *testing.T) {
+	if !t.GoT().Run("TestSetup", func(_t *testing.T) {
 		gounit.Run(suite, _t)
 	}) {
-		goT.Fatalf("expected TestSetup-suite to not fail")
+		t.GoT().Fatalf("expected TestSetup-suite to not fail")
 	}
 	t.True(
 		suite.Logs == "-11-22" || suite.Logs == "-22-11" ||
@@ -103,14 +103,14 @@ func (s *run) Executes_setup_before_each_suite_test(t *gounit.T) {
 }
 
 func (s *run) Executes_tear_down_after_each_suite_test(t *gounit.T) {
-	suite, goT := &fx.TestTearDown{}, gounit.GoT(t)
+	suite := &fx.TestTearDown{}
 	t.True(suite.Logs == "")
 	// run testSuite in a sub-test to ensure all its tests are run
 	// before we investigate the result
-	if !goT.Run("TestTearDown", func(_t *testing.T) {
+	if !t.GoT().Run("TestTearDown", func(_t *testing.T) {
 		gounit.Run(suite, _t)
 	}) {
-		goT.Fatalf("expected TestTearDown-suite to not fail")
+		t.GoT().Fatalf("expected TestTearDown-suite to not fail")
 	}
 	t.True(
 		suite.Logs == "1-12-2" || suite.Logs == "2-21-1" ||
@@ -119,35 +119,35 @@ func (s *run) Executes_tear_down_after_each_suite_test(t *gounit.T) {
 }
 
 func (s *run) Executes_tear_down_after_a_canceled_test(t *gounit.T) {
-	suite, goT := &fx.TestTearDownAfterCancel{}, gounit.GoT(t)
+	suite := &fx.TestTearDownAfterCancel{}
 	t.True(suite.Logs == "")
-	gounit.Run(suite, goT)
+	gounit.Run(suite, t.GoT())
 	t.True("0011223344" == suite.Logs) // see suite's documentation
 }
 
 func (s *run) Executes_init_before_any_other_test(t *gounit.T) {
-	suite, goT := &fx.TestInit{}, gounit.GoT(t)
+	suite := &fx.TestInit{}
 	t.True(suite.Logs == "")
 	// run testSuite in a sub-test to ensure all its tests are run
 	// before we investigate the result
-	if !goT.Run("TestTearDown", func(_t *testing.T) {
+	if !t.GoT().Run("TestTearDown", func(_t *testing.T) {
 		gounit.Run(suite, _t)
 	}) {
-		goT.Fatalf("expected TestTearDown-suite to not fail")
+		t.GoT().Fatalf("expected TestTearDown-suite to not fail")
 	}
 	t.True(10+len(gounit.InitPrefix) == len(suite.Logs))
 	t.True(strings.HasPrefix(suite.Logs, gounit.InitPrefix))
 }
 
 func (s *run) Executes_finalize_after_all_test_ran(t *gounit.T) {
-	suite, goT := &fx.TestFinalize{}, gounit.GoT(t)
+	suite := &fx.TestFinalize{}
 	t.True(suite.Logs == "")
 	// run testSuite in a sub-test to ensure all its tests are run
 	// before we investigate the result
-	if !goT.Run("TestTearDown", func(_t *testing.T) {
+	if !t.GoT().Run("TestTearDown", func(_t *testing.T) {
 		gounit.Run(suite, _t)
 	}) {
-		goT.Fatalf("expected TestTearDown-suite to not fail")
+		t.GoT().Fatalf("expected TestTearDown-suite to not fail")
 	}
 	t.True(10+len(gounit.FinalPrefix) == len(suite.Logs))
 	t.True(strings.HasSuffix(suite.Logs, gounit.FinalPrefix))
@@ -163,14 +163,14 @@ type suite struct{ gounit.Suite }
 func (s *suite) Canceler_implementation_overwrites_cancellation(
 	t *gounit.T,
 ) {
-	suite, goT := &fx.TestCancelerImplementation{}, gounit.GoT(t)
+	suite := &fx.TestCancelerImplementation{}
 	t.True(suite.Got == nil)
 	// run testSuite in a sub-test to ensure all its tests are run
 	// before we investigate the result
-	if !goT.Run("TestTearDown", func(_t *testing.T) {
+	if !t.GoT().Run("TestTearDown", func(_t *testing.T) {
 		gounit.Run(suite, _t)
 	}) {
-		goT.Fatalf("expected TestTearDown-suite to not fail")
+		t.GoT().Fatalf("expected TestTearDown-suite to not fail")
 	}
 	t.True(10 == len(suite.Got))
 }
