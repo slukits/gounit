@@ -22,17 +22,15 @@ import (
 )
 
 // FixtureLog provides the general logging facility for test suites
-// fixtures by implementing gounit.SuiteLogger.
+// fixtures by implementing gounit.SuiteLogger.  A FixtureLog mustn't
+// been copied once it has been used.
 type FixtureLog struct {
 	Logs  string
-	mutex *sync.Mutex
+	mutex sync.Mutex
 }
 
 // log logs concurrency save given arguments to the *Logs* property.
 func (fl *FixtureLog) log(args ...interface{}) {
-	if fl.mutex == nil {
-		fl.mutex = &sync.Mutex{}
-	}
 	fl.mutex.Lock()
 	defer fl.mutex.Unlock()
 	fl.Logs += fmt.Sprint(args...)

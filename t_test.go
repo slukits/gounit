@@ -35,6 +35,23 @@ func Test_T_instance_logs_to_suite_s_logger(t *testing.T) {
 	}
 }
 
+type T_Instance struct{ Suite }
+
+func SetUp(t *T) { t.Parallel() }
+
+func (s *T_Instance) Noops_if_fatal_on_nil(t *T) {
+	t.FatalOn(nil)
+}
+
+func (s *T_Instance) Noops_if_fatal_if_not_true(t *T) {
+	t.FatalIfNot(true)
+}
+
+func TestTInstance(t *testing.T) {
+	t.Parallel()
+	Run(&T_Instance{}, t)
+}
+
 type TrueAssertion struct{ Suite }
 
 func (s *TrueAssertion) Returns_true_if_passed_value_is_true(t *T) {
