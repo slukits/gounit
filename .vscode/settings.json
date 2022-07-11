@@ -4,8 +4,11 @@
         "embedder",
         "Embeder",
         "Errorer",
+        "Factoryer",
+        "gdamore",
         "Noops",
         "Paniced",
-        "rtype"
+        "rtype",
+        "tcell"
     ]
 }
