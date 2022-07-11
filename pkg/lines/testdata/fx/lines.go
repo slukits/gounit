@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package mck mocks up a line.View for testing.
-package mck
+package fx
 
 import (
 	"github.com/gdamore/tcell/v2"

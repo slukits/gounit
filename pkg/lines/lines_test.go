@@ -10,25 +10,25 @@ import (
 
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/pkg/lines"
-	"github.com/slukits/gounit/pkg/lines/testdata/mck"
+	"github.com/slukits/gounit/pkg/lines/testdata/fx"
 )
 
 type NewView struct{ Suite }
 
 func (s *NewView) Fails_if_tcell_s_screen_creation_fails(t *T) {
-	lines.SetScreenFactory(&mck.ScreenFactory{Fail: true})
+	lines.SetScreenFactory(&fx.ScreenFactory{Fail: true})
 	_, err := lines.NewView()
-	t.ErrIs(err, mck.ScreenErr)
+	t.ErrIs(err, fx.ScreenErr)
 }
 
 func (s *NewView) Fails_if_tcell_s_screen_init_fails(t *T) {
-	lines.SetScreenFactory(&mck.ScreenFactory{FailInit: true})
+	lines.SetScreenFactory(&fx.ScreenFactory{FailInit: true})
 	_, err := lines.NewView()
-	t.ErrIs(err, mck.InitErr)
+	t.ErrIs(err, fx.InitErr)
 }
 
 func (s *NewView) Succeeds_if_none_of_the_above(t *T) {
-	lines.SetScreenFactory(&mck.ScreenFactory{})
+	lines.SetScreenFactory(&fx.ScreenFactory{})
 	_, err := lines.NewView()
 	t.FatalOn(err)
 }
@@ -43,9 +43,9 @@ func (s *NewView) May_fail_in_graphical_test_environment(t *T) {
 }
 
 func (s *NewView) Sim_fails_if_tcell_s_sim_init_fails(t *T) {
-	lines.SetScreenFactory(&mck.ScreenFactory{FailInit: true})
+	lines.SetScreenFactory(&fx.ScreenFactory{FailInit: true})
 	_, _, err := lines.NewSim()
-	t.ErrIs(err, mck.InitErr)
+	t.ErrIs(err, fx.InitErr)
 }
 
 func (s *NewView) Sim_succeeds_if_none_of_the_above(t *T) {
@@ -76,11 +76,11 @@ type FX struct {
 	DefaultLineCount int
 }
 
-func (f *FX) View(t *T, maxEvt ...int) *mck.View {
+func (f *FX) View(t *T, maxEvt ...int) *fx.View {
 	if len(maxEvt) == 0 {
-		return f.Get(t).(*mck.View)
+		return f.Get(t).(*fx.View)
 	}
-	v := f.Get(t).(*mck.View)
+	v := f.Get(t).(*fx.View)
 	v.MaxEvents = maxEvt[0]
 	return v
 }
@@ -90,7 +90,7 @@ func (s *View) Init(t *I) {
 	s.fx.DefaultLineCount = 25
 }
 
-func (s *View) SetUp(t *T) { s.fx.Set(t, mck.NewView(t)) }
+func (s *View) SetUp(t *T) { s.fx.Set(t, fx.NewView(t)) }
 
 func (s *View) Provides_initial_resize_event(t *T) {
 	v, resizeListenerCalled := s.fx.View(t), false
@@ -222,7 +222,7 @@ func TestView(t *testing.T) {
 type DBG struct{ Suite }
 
 func (s *DBG) Fails_if_registered_runes_change(t *T) {
-	v, err := mck.NewView(t), error(nil)
+	v, err := fx.NewView(t), error(nil)
 	v.MaxEvents = 1
 	v.Triggers.QuitRunes = []rune{'q', 'Y'}
 	v.Listeners.Resize = func(v *lines.View) {
