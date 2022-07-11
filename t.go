@@ -7,6 +7,7 @@ package gounit
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 // T instances are passed to suite tests providing means for logging,
@@ -196,13 +197,13 @@ func (i *I) FatalOn(err error) {
 //
 //     type MySuite { gounit.Suite }
 //
-//     func (s *MySuite) Finalize(t *gounit.I) {
+//     func (s *MySuite) Finalize(t *gounit.F) {
 //         t.Log("finalize called")
 //     }
 //
 //     func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
 //
-// An I instance provides logging-mechanisms and the possibility to
+// An F instance provides logging-mechanisms and the possibility to
 // cancel a suite's tests-run.  NOTE implementations of SuiteLogger or
 // SuiteCanceler in a test-suite replace the default logging or
 // cancellation behavior of an I-instance.  It defaults to testing.T.Log
@@ -262,4 +263,15 @@ func (f *F) FatalOn(err error) {
 	if err != nil {
 		f.Fatal(err.Error())
 	}
+}
+
+// Timeout returns a channel which receives a message after given
+// duration *d*
+func (t *T) Timeout(d time.Duration) chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		time.Sleep(d)
+		close(done)
+	}()
+	return done
 }

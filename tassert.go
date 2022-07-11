@@ -108,7 +108,7 @@ func (t *T) Contains(str, sub string, msg ...interface{}) bool {
 const MatchedErr = "Regexp '%s'\ndoesn't match '%s'"
 
 // Matched errors the test and returns false iff given string isn't
-// matched by given sub-string; otherwise true is returned.  Given
+// matched by given regex; otherwise true is returned.  Given
 // (formatted) message replaces the default error message, i.e. msg[0]
 // must be a string if len(msg) == 1 it must be a format-string iff
 // len(msg) > 1.
@@ -316,7 +316,7 @@ func (t *T) Within(
 	return done
 }
 
-// Assert is the skeleton of assertion errors.
+// Assert is the format-string for assertion errors.
 const Assert = "assert %s: %v"
 
 // FormatMsgErr is the error message in case an assertion was called

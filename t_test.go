@@ -62,6 +62,13 @@ func (s *T_Instance) Uses_suite_s_errorer(t *T) {
 	t.True(s.suiteErrorerUsed)
 }
 
+func (s *T_Instance) Times_out_after_given_duration(t *T) {
+	d := 2 * time.Millisecond
+	start := time.Now()
+	<-t.Timeout(d)
+	t.True(d.Milliseconds() <= time.Now().Sub(start).Milliseconds())
+}
+
 func TestTInstance(t *testing.T) {
 	t.Parallel()
 	Run(&T_Instance{}, t)
@@ -357,7 +364,7 @@ func (s *AssertionTests) For_panicking(t *T) {
 }
 
 func (s *AssertionTests) For_within(t *T) {
-	var newTs = func(d uint) *TimeStepper {
+	newTs := func(d uint) *TimeStepper {
 		return (&TimeStepper{}).SetDuration(
 			time.Duration(d) * time.Millisecond)
 	}
@@ -397,7 +404,3 @@ func (s *AssertionTests) For_within(t *T) {
 func TestAssertionTests(t *testing.T) {
 	Run(&AssertionTests{}, t)
 }
-
-type DBG struct{ Suite }
-
-func TestDBG(t *testing.T) { Run(&DBG{}, t) }
