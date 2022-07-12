@@ -130,6 +130,18 @@ func (s *AView) Provides_len_many_lines(t *T) {
 	t.Eq(s.fx.DefaultLineCount, got)
 }
 
+func (s *AView) Displays_an_error_if_len_to_small(t *T) {
+	v, resizeCalled := s.fx.View(t), false
+	v.Min = 30
+	v.Register.Resize(func(v *lines.View) {
+		resizeCalled = true
+	})
+	go v.Listen()
+	<-v.Synced
+	t.Contains(v.String(), fmt.Sprintf(lines.ErrScreenFmt, v.Min))
+	t.False(resizeCalled)
+}
+
 func (s *AView) Resize_adjust_length_accordingly(t *T) {
 	v, exp, resizeCount := s.fx.View(t, 1), 20, 0
 	v.Register.Resize(func(v *lines.View) {

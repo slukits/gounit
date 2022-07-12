@@ -58,6 +58,11 @@ type View struct {
 	// Register holds a view's registered event listeners to which are
 	// occurring events reported. (see type *Register*).
 	Register ListenerRegister
+
+	// Min indicates the minimal expected number of screen lines.  An
+	// error is displayed and resizes events a not reported to its
+	// listener if the screen-height is below Min.
+	Min int
 }
 
 // ListenerRegister allows to wrap a Register-instance and replace it
@@ -178,7 +183,26 @@ func (v *View) Listen() error {
 	}
 }
 
-func (v *View) ensureSynced() {
+const ErrScreenFmt = "minimum screen-height: %d"
+
+func (v *View) isScreenToSmall() bool {
+	toSmall := v.Len() < v.Min
+	if !toSmall {
+		if v.errScr != nil && v.errScr.Active {
+			v.errScr.Active = false
+		}
+		return false
+	}
+	if !v.ErrScreen().Active {
+		v.ErrScreen().Active = true
+	}
+
+	if v.ErrScreen().String() != fmt.Sprintf(ErrScreenFmt, v.Min) {
+		v.ErrScreen().Set(fmt.Sprintf(ErrScreenFmt, v.Min))
+	}
+	return true
+}
+
 	if v.ll.isDirty() {
 		v.lib.Show()
 	}
