@@ -45,10 +45,15 @@ import (
 // followed by a (blocking) call of *Listen* starting the event-loop.
 // Calling *Quit* stops the event-loop and releases resources.
 type View struct {
-	lib      tcell.Screen
-	ll       []*Line
-	evtRunes string
-	evtKeys  ints.Set
+	lib       tcell.Screen
+	ll        lines
+	evtRunes  string
+	evtKeys   ints.Set
+	isPolling bool
+
+	// Synced provides a message each time it is guaranteed that the
+	// potential effect of an event is on the screen.
+	Synced chan bool
 
 	// Register holds a view's registered event listeners to which are
 	// occurring events reported. (see type *Register*).
@@ -80,7 +85,8 @@ func NewView() (*View, error) {
 	if err := lib.Init(); err != nil {
 		return nil, err
 	}
-	return &View{lib: lib, Register: newRegister()}, nil
+	return &View{lib: lib, Register: newRegister(),
+		Synced: make(chan bool, 1)}, nil
 }
 
 // NewSim returns a new View instance wrapping tcell's simulation
@@ -92,7 +98,8 @@ func NewSim() (*View, tcell.SimulationScreen, error) {
 	if err := lib.Init(); err != nil {
 		return nil, nil, err
 	}
-	return &View{lib: lib, Register: newRegister()}, lib, nil
+	return &View{lib: lib, Register: newRegister(),
+		Synced: make(chan bool, 1)}, lib, nil
 }
 
 // Len returns the number of lines of a terminal screen.  Note len of
@@ -102,11 +109,24 @@ func (v *View) Len() int {
 	return h
 }
 
+// IsPolling returns true if receiving view is in the event-loop.
+func (v *View) IsPolling() bool {
+	return v.isPolling
+}
+
 // For calls ascending ordered for each line of registered view back.
 func (v *View) For(cb func(*Line)) {
 	for _, l := range v.ll {
 		cb(l)
 	}
+}
+
+// Line returns line with given index or nil if no such line exists.
+func (v *View) Line(idx int) *Line {
+	if idx < 0 || idx >= len(v.ll) {
+		return nil
+	}
+	return v.ll[idx]
 }
 
 // Listen starts the view's event-loop listening for user-input and
@@ -119,10 +139,17 @@ func (v *View) Listen() error {
 	//     v.Listeners.Resize(v)
 	// }
 
+	v.isPolling = true
+
 	for {
 
 		// Poll event (blocking as I understand)
 		ev := v.lib.PollEvent()
+
+		select {
+		case <-v.Synced:
+		default:
+		}
 
 		// Process event
 		switch ev := ev.(type) {
@@ -131,6 +158,7 @@ func (v *View) Listen() error {
 			v.ensureLines()
 			v.Register.reportResize(v)
 			v.lib.Sync()
+			v.Synced <- true
 		case *tcell.EventKey:
 			if v.Register.reportQuit(ev) {
 				v.Quit()
@@ -138,13 +166,22 @@ func (v *View) Listen() error {
 			}
 			if ev.Key() == tcell.KeyRune {
 				v.Register.reportRune(v, ev.Rune())
-				continue
+			} else {
+				v.Register.reportKey(v, ev.Key(), ev.Modifiers())
 			}
-			v.Register.reportKey(v, ev.Key(), ev.Modifiers())
+			v.ensureSynced()
+			v.Synced <- true
 		default:
 			return nil
 		}
 	}
+}
+
+func (v *View) ensureSynced() {
+	if v.ll.isDirty() {
+		v.lib.Show()
+	}
+	v.ll.clean()
 }
 
 // ensureLines adapts after a resize event the view's lines-slice.
@@ -156,14 +193,18 @@ func (v *View) ensureLines() {
 		v.ll = v.ll[:v.Len()]
 		return
 	}
+	lower, n := len(v.ll), 0
 	for len(v.ll) < v.Len() {
-		v.ll = append(v.ll, &Line{})
+		v.ll = append(v.ll, &Line{lib: v.lib, Idx: lower + n})
+		n++
 	}
 }
 
-// Quit the event-loop.
+// Quit the event-loop, i.e. IsPolling will be false.
 func (v *View) Quit() {
+	v.isPolling = false
 	v.lib.Fini()
+	close(v.Synced)
 }
 
 // Register implements a View-instance's Register property storing the

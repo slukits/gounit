@@ -6,6 +6,8 @@
 package fx
 
 import (
+	"strings"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/slukits/gounit"
 	"github.com/slukits/gounit/pkg/lines"
@@ -26,8 +28,15 @@ type View struct {
 
 	// NextEventProcessed receives a message after each event-listener
 	// call.  It is closed if the event-loop terminates after MaxEvents
-	// many events have been reported to event-listeners.
+	// many events have been reported to event-listeners.  NOTE it is
+	// guaranteed that the message is sent *after* all lines-updates have
+	// made it to the screen.
 	NextEventProcessed chan struct{}
+
+	// LastScreen provides the screen content right before quitting.
+	// NOTE it is guaranteed that that this snapshot is taken *after*
+	// all lines-updates have made it to the screen
+	LastScreen string
 }
 
 // NewView creates a new lines.View test-fixture with additional
@@ -52,26 +61,36 @@ func (v *View) FxRegister() *RegisterWrapper {
 	return v.View.Register.(*RegisterWrapper)
 }
 
-// SetNumberOfLines sets the screen lines to given number.
-func (v *View) SetNumberOfLines(n int) {
+// SetNumberOfLines sets the screen lines to given number.  Note if an
+// resize event listener is registered we can directly wait on returned
+// channel.
+func (v *View) SetNumberOfLines(n int) chan struct{} {
 	v.t.GoT().Helper()
 	w, _ := v.lib.Size()
 	v.lib.SetSize(w, n)
 	v.t.FatalOn(v.lib.PostEvent(tcell.NewEventResize(w, n)))
+	return v.NextEventProcessed
 }
 
 // FireRuneEvent dispatches given run-key-press event.  Note modifier
-// keys are ignored for rune-triggered key-events.
-func (v *View) FireRuneEvent(r rune) {
+// keys are ignored for rune-triggered key-events.  Note if an event
+// listener is registered for this rune we can directly wait on returned
+// channel.
+func (v *View) FireRuneEvent(r rune) chan struct{} {
 	v.lib.InjectKey(tcell.KeyRune, r, tcell.ModNone)
+	return v.NextEventProcessed
 }
 
-func (v *View) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) {
+// FireKeyEvent dispatches given special-key-press event.  Note if an
+// event listener is registered for this key we can directly wait on
+// returned channel.
+func (v *View) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) chan struct{} {
 	if len(m) == 0 {
 		v.lib.InjectKey(k, 0, tcell.ModNone)
-		return
+	} else {
+		v.lib.InjectKey(k, 0, m[0])
 	}
-	v.lib.InjectKey(k, 0, m[0])
+	return v.NextEventProcessed
 }
 
 // Listen posts the initial resize event and starts the wrapped View's
@@ -87,9 +106,46 @@ func (v *View) Listen() error {
 	return nil
 }
 
+// String returns the test-screen's content as string with line breaks
+// where a new screen line starts.  Empty lines at the end of the screen
+// are not returned and empty cells at the end of a line are trimmed.
+func (v *View) String() string {
+	b, w, h := v.lib.GetContents()
+	sb := &strings.Builder{}
+	for i := 0; i < h; i++ {
+		line := ""
+		for j := 0; j < w; j++ {
+			cell := b[cellIdx(j, i, w)]
+			if len(cell.Runes) == 0 {
+				continue
+			}
+			line += string(cell.Runes[0])
+		}
+		if len(strings.TrimSpace(line)) == 0 {
+			sb.WriteString("\n")
+			continue
+		}
+		sb.WriteString(strings.TrimRight(
+			line, " \t\r") + "\n")
+	}
+	return strings.TrimLeft(
+		strings.TrimRight(sb.String(), " \t\r\n"), "\n")
+}
+
+func cellIdx(x, y, w int) int {
+	if x == 0 {
+		return y * w
+	}
+	if y == 0 {
+		return x
+	}
+	return y*w + x
+}
+
 // Quit exits wrapped View's event loop and closes the
 // *NextEventProcessed* channel.
 func (v *View) Quit() {
+	v.LastScreen = v.String()
 	v.View.Quit()
 	close(v.NextEventProcessed)
 }
@@ -113,8 +169,10 @@ func (r *RegisterWrapper) runeWrapper(
 ) func(*lines.View) {
 	return func(v *lines.View) {
 		l(v)
-		r.informAboutProcessedEvent()
-		r.decrementMaxEvents()
+		go func() {
+			<-v.Synced
+			r.decrementMaxEvents()
+		}()
 	}
 }
 
@@ -131,8 +189,10 @@ func (r *RegisterWrapper) runesWrapper(
 ) func(*lines.View, rune) {
 	return func(v *lines.View, _r rune) {
 		l(v, _r)
-		r.informAboutProcessedEvent()
-		r.decrementMaxEvents()
+		go func() {
+			<-v.Synced
+			r.decrementMaxEvents()
+		}()
 	}
 }
 
@@ -152,8 +212,10 @@ func (r *RegisterWrapper) keyWrapper(
 ) func(*lines.View, tcell.ModMask) {
 	return func(v *lines.View, m tcell.ModMask) {
 		l(v, m)
-		r.informAboutProcessedEvent()
-		r.decrementMaxEvents()
+		go func() {
+			<-v.Synced
+			r.decrementMaxEvents()
+		}()
 	}
 }
 
@@ -162,8 +224,10 @@ func (r *RegisterWrapper) resizeWrapper(
 ) func(*lines.View) {
 	return func(v *lines.View) {
 		l(v)
-		r.informAboutProcessedEvent()
-		r.decrementMaxEvents()
+		go func() {
+			<-v.Synced
+			r.decrementMaxEvents()
+		}()
 	}
 }
 
@@ -197,10 +261,12 @@ func (r *RegisterWrapper) Quit(listener func()) {
 
 func (r *RegisterWrapper) decrementMaxEvents() {
 	r.vw.MaxEvents--
-	if r.vw.MaxEvents >= 0 {
+	if r.vw.MaxEvents < 0 {
+		r.vw.Quit()
+		<-r.vw.View.Synced // wait for closing to finish
 		return
 	}
-	r.vw.Quit()
+	r.informAboutProcessedEvent()
 }
 
 func (r *RegisterWrapper) informAboutProcessedEvent() {

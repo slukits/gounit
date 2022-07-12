@@ -86,12 +86,23 @@ func (f *FX) View(t *T, maxEvt ...int) *fx.View {
 	return v
 }
 
+func (f *FX) Del(t *T) interface{} {
+	v := f.Fixtures.Del(t).(*fx.View)
+	if v.IsPolling() {
+		v.Quit()
+	}
+	return v
+}
+
 func (s *AView) Init(t *I) {
 	s.fx.Fixtures = &Fixtures{}
 	s.fx.DefaultLineCount = 25
 }
 
-func (s *AView) SetUp(t *T) { s.fx.Set(t, fx.NewView(t)) }
+func (s *AView) SetUp(t *T) {
+	t.Parallel()
+	s.fx.Set(t, fx.NewView(t))
+}
 
 func (s *AView) Provides_initial_resize_event(t *T) {
 	v, resizeListenerCalled := s.fx.View(t), false
@@ -132,8 +143,7 @@ func (s *AView) Resize_adjust_length_accordingly(t *T) {
 	})
 	go v.Listen()
 	<-v.NextEventProcessed // wait for initial resize to happen
-	v.SetNumberOfLines(exp)
-	<-v.NextEventProcessed // wait for resize event to happen
+	<-v.SetNumberOfLines(exp)
 	t.Eq(2, resizeCount)
 }
 
@@ -162,12 +172,9 @@ func (s *AView) Resize_adjusts_the_provided_lines(t *T) {
 	})
 	go v.Listen()
 	<-v.NextEventProcessed
-	v.SetNumberOfLines(s.fx.DefaultLineCount)
-	<-v.NextEventProcessed
-	v.SetNumberOfLines(expFirst)
-	<-v.NextEventProcessed
-	v.SetNumberOfLines(expSecond)
-	<-v.NextEventProcessed
+	<-v.SetNumberOfLines(s.fx.DefaultLineCount)
+	<-v.SetNumberOfLines(expFirst)
+	<-v.SetNumberOfLines(expSecond)
 	t.Eq(4, resizeCount)
 }
 
@@ -199,7 +206,7 @@ func (s *AView) Quits_event_loop_on_quit_event_without_listener(t *T) {
 		v.Listen()
 		terminated = true
 	}()
-	v.FireRuneEvent('q')
+	v.FireRuneEvent('q') // here we can not wait on the event!!
 	<-t.Timeout(1 * time.Millisecond)
 	t.True(terminated)
 }
@@ -233,11 +240,9 @@ func (s *AView) Reports_registered_rune_and_key_events(t *T) {
 	go v.Listen()
 	t.FatalOn(err)
 	t.FatalOn(v.Register.Rune(func(v *lines.View) { aRune = true }, 'a'))
-	v.FireKeyEvent(tcell.KeyEnter, tcell.ModShift)
-	<-v.NextEventProcessed
+	<-v.FireKeyEvent(tcell.KeyEnter, tcell.ModShift)
 	t.True(shiftEnter)
-	v.FireRuneEvent('a')
-	<-v.NextEventProcessed
+	<-v.FireRuneEvent('a')
 	t.True(aRune)
 	t.Eq(-1, v.MaxEvents)
 }
@@ -286,21 +291,23 @@ func (s *AView) Reports_all_rune_events_to_runes_listener_til_removed(
 	v.Register.Rune(func(v *lines.View) { aRune = true }, 'a')
 	v.Register.Runes(func(v *lines.View, r rune) { allRunes = true })
 	go v.Listen()
-	v.FireRuneEvent('a')
-	<-v.NextEventProcessed
+	<-v.FireRuneEvent('a')
 	t.True(allRunes)
 	v.Register.Runes(nil)
-	v.FireRuneEvent('a')
-	<-v.NextEventProcessed
+	<-v.FireRuneEvent('a')
 	t.True(aRune)
 	t.Eq(-1, v.MaxEvents)
+}
+
+func (s *AView) Provides_nil_line_if_given_index_out_of_bound(t *T) {
+	v := s.fx.View(t)
+	v.Register.Resize(func(v *lines.View) {
+		t.Eq((*lines.Line)(nil), v.Line(v.Len()))
+	})
+	v.Listen()
 }
 
 func TestAView(t *testing.T) {
 	t.Parallel()
 	Run(&AView{}, t)
 }
-
-type DBG struct{ Suite }
-
-func TestDBG(t *testing.T) { Run(&DBG{}, t) }
