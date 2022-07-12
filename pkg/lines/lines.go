@@ -126,6 +126,28 @@ func (v *View) For(cb func(*Line)) {
 	}
 }
 
+// ForScreen calls ascending ordered back for each line shown on the
+// screen.
+func (v *View) ForScreen(cb func(*Line)) {
+	v.lines.Lock()
+	defer v.lines.Unlock()
+	for i := 0; i < v.Len(); i++ {
+		cb(v.ll[i])
+	}
+}
+
+func (v *View) ForN(n int, cb func(*Line)) {
+	v.lines.Lock()
+	defer v.lines.Unlock()
+	if n <= 0 {
+		return
+	}
+	v.synchronizeLinesSet(n)
+	for i := 0; i < n; i++ {
+		cb(v.ll[i])
+	}
+}
+
 // Line returns line with given index or nil if no such line exists.
 func (v *View) Line(idx int) *Line {
 	if idx < 0 || idx >= len(v.ll) {
