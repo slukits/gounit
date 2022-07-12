@@ -32,6 +32,7 @@ package lines
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/gdamore/tcell/v2"
@@ -45,11 +46,15 @@ import (
 // followed by a (blocking) call of *Listen* starting the event-loop.
 // Calling *Quit* stops the event-loop and releases resources.
 type View struct {
-	lib       tcell.Screen
-	ll        lines
+	lib tcell.Screen
+	ll  lines
+	// protect ll in case a event-triggered screen-synchronizing happens
+	// while an increase in lines-count is requested.
+	lines     *sync.Mutex
 	evtRunes  string
 	evtKeys   ints.Set
 	isPolling bool
+	errScr    *ErrScr
 
 	// Synced provides a message each time it is guaranteed that the
 	// potential effect of an event is on the screen.
@@ -91,7 +96,8 @@ func NewView() (*View, error) {
 		return nil, err
 	}
 	return &View{lib: lib, Register: newRegister(),
-		Synced: make(chan bool, 1)}, nil
+		Synced: make(chan bool, 1),
+		lines:  &sync.Mutex{}}, nil
 }
 
 // NewSim returns a new View instance wrapping tcell's simulation
@@ -104,7 +110,8 @@ func NewSim() (*View, tcell.SimulationScreen, error) {
 		return nil, nil, err
 	}
 	return &View{lib: lib, Register: newRegister(),
-		Synced: make(chan bool, 1)}, lib, nil
+		Synced: make(chan bool, 1),
+		lines:  &sync.Mutex{}}, lib, nil
 }
 
 // Len returns the number of lines of a terminal screen.  Note len of
@@ -121,6 +128,8 @@ func (v *View) IsPolling() bool {
 
 // For calls ascending ordered for each line of registered view back.
 func (v *View) For(cb func(*Line)) {
+	v.lines.Lock()
+	defer v.lines.Unlock()
 	for _, l := range v.ll {
 		cb(l)
 	}
@@ -150,6 +159,8 @@ func (v *View) ForN(n int, cb func(*Line)) {
 
 // Line returns line with given index or nil if no such line exists.
 func (v *View) Line(idx int) *Line {
+	v.lines.Lock()
+	defer v.lines.Unlock()
 	if idx < 0 || idx >= len(v.ll) {
 		return nil
 	}
@@ -182,10 +193,11 @@ func (v *View) Listen() error {
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			v.lib.Clear()
-			v.synchronizeLinesSet()
-			v.Register.reportResize(v)
-			v.lib.Sync()
-			v.ll.clean()
+			v.synchronizeLinesSet(v.Len())
+			if !v.isScreenToSmall() {
+				v.Register.reportResize(v)
+			}
+			v.ensureSynced(false)
 			v.Synced <- true
 		case *tcell.EventKey:
 			if v.Register.reportQuit(ev) {
@@ -197,7 +209,7 @@ func (v *View) Listen() error {
 			} else {
 				v.Register.reportKey(v, ev.Key(), ev.Modifiers())
 			}
-			v.ensureSynced()
+			v.ensureSynced(true)
 			v.Synced <- true
 		default:
 			return nil
@@ -225,25 +237,43 @@ func (v *View) isScreenToSmall() bool {
 	return true
 }
 
-	if v.ll.isDirty() {
-		v.lib.Show()
+func (v *View) ensureSynced(show bool) {
+	sync := func() {
+		if show {
+			v.lib.Show()
+		} else {
+			v.lib.Sync()
+		}
 	}
-	v.ll.clean()
+	if v.errScr != nil {
+		if v.errScr.Active {
+			if v.errScr.isDirty {
+				v.errScr.sync()
+			}
+			sync()
+			return
+		}
+	}
+	v.lines.Lock()
+	defer v.lines.Unlock()
+	if v.ll.isDirty() {
+		v.ll.sync()
+		sync()
+	}
 }
 
 // synchronizeLinesSet adapts after a resize event the view's lines-slice.
-func (v *View) synchronizeLinesSet() {
-	if len(v.ll) == v.Len() {
+func (v *View) synchronizeLinesSet(n int) {
+	if len(v.ll) >= n {
 		return
 	}
-	if len(v.ll) > v.Len() {
-		v.ll = v.ll[:v.Len()]
-		return
-	}
-	lower, n := len(v.ll), 0
-	for len(v.ll) < v.Len() {
-		v.ll = append(v.ll, &Line{lib: v.lib, Idx: lower + n})
-		n++
+	lower, m := len(v.ll), 0
+	for len(v.ll) < n {
+		v.ll = append(v.ll, &Line{
+			lib:   v.lib,
+			mutex: &sync.Mutex{},
+			Idx:   lower + m})
+		m++
 	}
 }
 

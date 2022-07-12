@@ -4,7 +4,11 @@
 
 package lines
 
-import "github.com/gdamore/tcell/v2"
+import (
+	"sync"
+
+	"github.com/gdamore/tcell/v2"
+)
 
 type lines []*Line
 
@@ -18,12 +22,12 @@ func (ll *lines) isDirty() bool {
 	return false
 }
 
-func (ll *lines) clean() {
+func (ll *lines) sync() {
 	for _, l := range *ll {
 		if !l.dirty {
 			continue
 		}
-		l.dirty = false
+		l.sync()
 	}
 }
 
@@ -31,45 +35,62 @@ func (ll *lines) clean() {
 // automatically synchronized with the screen.  Note changes of a line
 // are not concurrency save.
 type Line struct {
-	lib     tcell.Screen
+	lib tcell.Screen
+	// in case an event triggered screen-synchronization happens while a
+	// line's content is updated.
+	mutex   *sync.Mutex
+	stale   string
 	content string
 	dirty   bool
 
 	// Idx is the zero based line index corresponding with the screen
 	// line.
 	Idx int
+
+	Style tcell.Style
 }
 
 // Set updates the content of a line.
 func (l *Line) Set(content string) *Line {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
 	if content == l.content {
 		return l
 	}
 	if !l.dirty {
 		l.dirty = true
 	}
-
-	if len(content) >= len(l.content) {
-		return l.setLonger(content)
+	if l.stale == "" {
+		l.stale = l.content
 	}
-	return l.setShorter(content)
-}
-
-func (l *Line) setShorter(content string) *Line {
-	base, add := len(content), len(l.content)-len(content)
-	l.setLonger(content)
-	for i := 0; i < add; i++ {
-		l.lib.SetContent(base+i, l.Idx, ' ', nil, tcell.StyleDefault)
-	}
-	return l
-}
-
-func (l *Line) setLonger(content string) *Line {
 	l.content = content
-	for i, r := range content {
-		l.lib.SetContent(i, l.Idx, r, nil, tcell.StyleDefault)
-	}
 	return l
+}
+
+func (l *Line) sync() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	l.dirty = false
+	if len(l.content) >= len(l.stale) {
+		l.setLonger()
+	} else {
+		l.setShorter()
+	}
+	l.stale = ""
+}
+
+func (l *Line) setShorter() {
+	base, add := len(l.content), len(l.stale)-len(l.content)
+	l.setLonger()
+	for i := 0; i < add; i++ {
+		l.lib.SetContent(base+i, l.Idx, ' ', nil, l.Style)
+	}
+}
+
+func (l *Line) setLonger() {
+	for i, r := range l.content {
+		l.lib.SetContent(i, l.Idx, r, nil, l.Style)
+	}
 }
 
 // IsDirty returns true if a line content has changed since the last

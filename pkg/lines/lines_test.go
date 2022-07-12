@@ -5,6 +5,7 @@
 package lines_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -130,6 +131,14 @@ func (s *AView) Provides_len_many_lines(t *T) {
 	t.Eq(s.fx.DefaultLineCount, got)
 }
 
+func (s *AView) Provides_nil_line_if_given_index_out_of_bound(t *T) {
+	v := s.fx.View(t)
+	v.Register.Resize(func(v *lines.View) {
+		t.Eq((*lines.Line)(nil), v.Line(v.Len()))
+	})
+	v.Listen()
+}
+
 func (s *AView) Displays_an_error_if_len_to_small(t *T) {
 	v, resizeCalled := s.fx.View(t), false
 	v.Min = 30
@@ -159,25 +168,37 @@ func (s *AView) Resize_adjust_length_accordingly(t *T) {
 	t.Eq(2, resizeCount)
 }
 
-func (s *AView) Resize_adjusts_the_provided_lines(t *T) {
-	v, expFirst, expSecond, resizeCount := s.fx.View(t, 3), 15, 20, 0
+func (s *AView) Increases_lines_count_by_request(t *T) {
+	v, exp := s.fx.View(t), 42
+	v.Register.Resize(func(v *lines.View) {
+		got := 0
+		v.ForN(-1, func(l *lines.Line) { got++ })
+		t.Eq(0, got)
+		v.ForN(exp, func(l *lines.Line) { got++ })
+		t.Eq(exp, got)
+	})
+	go v.Listen()
+}
+
+func (s *AView) Resize_adjusts_the_provided_screen_lines(t *T) {
+	v, expFirst, expSecond, resizeCount := s.fx.View(t, 3), 15, 30, 0
 	v.Register.Resize(func(v *lines.View) {
 		switch resizeCount {
 		case 0:
 			got := 0
-			v.For(func(*lines.Line) { got++ })
+			v.ForScreen(func(*lines.Line) { got++ })
 			t.Eq(s.fx.DefaultLineCount, v.Len())
 		case 1:
 			got := 0
-			v.For(func(*lines.Line) { got++ })
+			v.ForScreen(func(*lines.Line) { got++ })
 			t.Eq(s.fx.DefaultLineCount, v.Len())
 		case 2:
 			got := 0
-			v.For(func(*lines.Line) { got++ })
+			v.ForScreen(func(*lines.Line) { got++ })
 			t.Eq(expFirst, got)
 		case 3:
 			got := 0
-			v.For(func(*lines.Line) { got++ })
+			v.ForScreen(func(*lines.Line) { got++ })
 			t.Eq(expSecond, got)
 		}
 		resizeCount++
@@ -309,14 +330,6 @@ func (s *AView) Reports_all_rune_events_to_runes_listener_til_removed(
 	<-v.FireRuneEvent('a')
 	t.True(aRune)
 	t.Eq(-1, v.MaxEvents)
-}
-
-func (s *AView) Provides_nil_line_if_given_index_out_of_bound(t *T) {
-	v := s.fx.View(t)
-	v.Register.Resize(func(v *lines.View) {
-		t.Eq((*lines.Line)(nil), v.Line(v.Len()))
-	})
-	v.Listen()
 }
 
 func TestAView(t *testing.T) {
