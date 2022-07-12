@@ -23,7 +23,7 @@ type T struct {
 	tearDown func(*T)
 	logger   func(...interface{})
 	errorer  func(...interface{})
-	cancler  func()
+	canceler func()
 }
 
 // GoT returns a pointer to wrapped testing.T instance which was created
@@ -74,7 +74,7 @@ func (t *T) FailNow() {
 	if t.tearDown != nil {
 		t.tearDown(t)
 	}
-	t.cancler()
+	t.canceler()
 }
 
 // FatalIfNot cancels receiving test (see *FailNow*) if passed argument
@@ -91,10 +91,10 @@ func (t *T) FatalIfNot(assertion bool) {
 // error message iff passed argument is not nil and is a no-op
 // otherwise.
 func (t *T) FatalOn(err error) {
+	t.t.Helper()
 	if err == nil {
 		return
 	}
-	t.t.Helper()
 	t.Fatal(err.Error())
 }
 
@@ -137,9 +137,9 @@ const FinalPrefix = "__final__"
 // and testing.T.FailNow of the wrapped testing.T instance which is the
 // one from the test-runner.
 type I struct {
-	t       *testing.T
-	logger  func(...interface{})
-	cancler func()
+	t        *testing.T
+	logger   func(...interface{})
+	canceler func()
 }
 
 // GoT returns a pointer to wrapped testing.T instance of the
@@ -168,7 +168,7 @@ func (i *I) Logf(format string, args ...interface{}) {
 func (i *I) Fatal(args ...interface{}) {
 	i.t.Helper()
 	i.Log(args...)
-	i.cancler()
+	i.canceler()
 }
 
 // Fatalf cancels the test-suite's tests-run after given arguments were
@@ -178,7 +178,7 @@ func (i *I) Fatal(args ...interface{}) {
 func (i *I) Fatalf(format string, args ...interface{}) {
 	i.t.Helper()
 	i.Logf(format, args...)
-	i.cancler()
+	i.canceler()
 }
 
 // FatalOn cancels the test-suite's tests-run iff given error is not
@@ -210,9 +210,9 @@ func (i *I) FatalOn(err error) {
 // and testing.T.FailNow of the wrapped testing.T instance which is the
 // one from the test-runner.
 type F struct {
-	t       *testing.T
-	logger  func(...interface{})
-	cancler func()
+	t        *testing.T
+	logger   func(...interface{})
+	canceler func()
 }
 
 // GoT returns a pointer to wrapped testing.T instance of the
@@ -241,7 +241,7 @@ func (f *F) Logf(format string, args ...interface{}) {
 func (f *F) Fatal(args ...interface{}) {
 	f.t.Helper()
 	f.Log(args...)
-	f.cancler()
+	f.canceler()
 }
 
 // Fatalf cancels the test-suite's tests-run after given arguments were
@@ -251,7 +251,7 @@ func (f *F) Fatal(args ...interface{}) {
 func (f *F) Fatalf(format string, args ...interface{}) {
 	f.t.Helper()
 	f.Logf(format, args...)
-	f.cancler()
+	f.canceler()
 }
 
 // FatalOn cancels the test-suite's tests-run iff given error is not

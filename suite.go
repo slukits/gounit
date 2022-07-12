@@ -49,15 +49,15 @@ func (s *Suite) exec(init *reflect.Method, t *testing.T) {
 	suiteLogging, hasLogger := s.self.(SuiteLogging)
 	suiteCanceler, hasCanceler := s.self.(SuiteCanceler)
 	suiteI := &I{
-		t:       t,
-		logger:  t.Log,
-		cancler: t.FailNow,
+		t:        t,
+		logger:   t.Log,
+		canceler: t.FailNow,
 	}
 	if hasLogger {
 		suiteI.logger = suiteLogging.Logger()
 	}
 	if hasCanceler {
-		suiteI.cancler = suiteCanceler.Cancel()
+		suiteI.canceler = suiteCanceler.Cancel()
 	}
 	init.Func.Call([]reflect.Value{
 		s.value, reflect.ValueOf(suiteI)})
@@ -69,15 +69,15 @@ func (s *Suite) fWrapper(t *testing.T) *F {
 	suiteLogging, hasLogger := s.self.(SuiteLogging)
 	suiteCanceler, hasCanceler := s.self.(SuiteCanceler)
 	suiteF := &F{
-		t:       t,
-		logger:  t.Log,
-		cancler: t.FailNow,
+		t:        t,
+		logger:   t.Log,
+		canceler: t.FailNow,
 	}
 	if hasLogger {
 		suiteF.logger = suiteLogging.Logger()
 	}
 	if hasCanceler {
-		suiteF.cancler = suiteCanceler.Cancel()
+		suiteF.canceler = suiteCanceler.Cancel()
 	}
 	return suiteF
 }
@@ -216,7 +216,7 @@ func newSubTestFactory(
 				tearDown: tearDown,
 				logger:   t.Log,
 				errorer:  t.Error,
-				cancler:  t.FailNow,
+				canceler: t.FailNow,
 			}
 			if hasLogger {
 				suiteT.logger = suiteLogging.Logger()
@@ -225,7 +225,7 @@ func newSubTestFactory(
 				suiteT.errorer = suiteErrorer.Error()
 			}
 			if hasCanceler {
-				suiteT.cancler = suiteCanceler.Cancel()
+				suiteT.canceler = suiteCanceler.Cancel()
 			}
 			suiteTVl := reflect.ValueOf(suiteT)
 			if suite.setUp != nil {
