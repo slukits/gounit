@@ -7,6 +7,7 @@ package lines_test
 import (
 	"testing"
 
+	"github.com/gdamore/tcell/v2"
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/pkg/lines"
 	"github.com/slukits/gounit/pkg/lines/testdata/fx"
@@ -56,6 +57,40 @@ func (s *ALine) Updates_on_screen_with_content_changing_event(t *T) {
 	t.Eq(init, v.String())
 	<-v.FireRuneEvent('u')
 	t.Eq(update, v.LastScreen)
+}
+
+func (s *ALine) Is_not_dirty_after_screen_synchronization(t *T) {
+	v := s.fx.View(t, 2)
+	v.Register.Resize(func(v *lines.View) {
+		v.Line(0).Set("line 0")
+		t.True(v.Line(0).IsDirty())
+	})
+	v.Register.Rune(func(v *lines.View) {
+		v.Line(0).Set("rune 0")
+		t.True(v.Line(0).IsDirty())
+	}, 'a')
+	v.Register.Key(func(v *lines.View, m tcell.ModMask) {
+		v.Line(0).Set("key 0")
+		t.True(v.Line(0).IsDirty())
+	}, tcell.KeyUp)
+	go v.Listen()
+	<-v.NextEventProcessed
+	t.False(v.Line(0).IsDirty())
+	<-v.FireRuneEvent('a')
+	t.False(v.Line(0).IsDirty())
+	<-v.FireKeyEvent(tcell.KeyUp)
+	t.False(v.Line(0).IsDirty())
+}
+
+func (s *ALine) Pads_a_shrinking_line_with_blanks(t *T) {
+	v, long, short := s.fx.View(t, 1), "a longer line", "short line"
+	v.Register.Resize(func(v *lines.View) { v.Line(0).Set(long) })
+	v.Register.Rune(func(v *lines.View) { v.Line(0).Set(short) }, 'a')
+	go v.Listen()
+	<-v.NextEventProcessed
+	t.Eq(long, v.String())
+	<-v.FireRuneEvent('a')
+	t.Eq(short, v.LastScreen)
 }
 
 func TestALine(t *testing.T) {

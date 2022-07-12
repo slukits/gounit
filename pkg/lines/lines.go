@@ -155,9 +155,10 @@ func (v *View) Listen() error {
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			v.lib.Clear()
-			v.ensureLines()
+			v.synchronizeLinesSet()
 			v.Register.reportResize(v)
 			v.lib.Sync()
+			v.ll.clean()
 			v.Synced <- true
 		case *tcell.EventKey:
 			if v.Register.reportQuit(ev) {
@@ -184,8 +185,8 @@ func (v *View) ensureSynced() {
 	v.ll.clean()
 }
 
-// ensureLines adapts after a resize event the view's lines-slice.
-func (v *View) ensureLines() {
+// synchronizeLinesSet adapts after a resize event the view's lines-slice.
+func (v *View) synchronizeLinesSet() {
 	if len(v.ll) == v.Len() {
 		return
 	}
