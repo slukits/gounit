@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gdamore/tcell/v2"
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/pkg/lines"
 	"github.com/slukits/gounit/pkg/lines/testdata/fx"
@@ -66,7 +67,7 @@ func TestNewView(t *testing.T) {
 	Run(&NewView{}, t)
 }
 
-type View struct {
+type AView struct {
 	Suite
 	fx FX
 }
@@ -85,42 +86,42 @@ func (f *FX) View(t *T, maxEvt ...int) *fx.View {
 	return v
 }
 
-func (s *View) Init(t *I) {
+func (s *AView) Init(t *I) {
 	s.fx.Fixtures = &Fixtures{}
 	s.fx.DefaultLineCount = 25
 }
 
-func (s *View) SetUp(t *T) { s.fx.Set(t, fx.NewView(t)) }
+func (s *AView) SetUp(t *T) { s.fx.Set(t, fx.NewView(t)) }
 
-func (s *View) Provides_initial_resize_event(t *T) {
+func (s *AView) Provides_initial_resize_event(t *T) {
 	v, resizeListenerCalled := s.fx.View(t), false
-	v.Listeners.Resize = func(v *lines.View) {
+	v.Register.Resize(func(v *lines.View) {
 		resizeListenerCalled = true
-	}
+	})
 	v.Listen()
 	t.True(resizeListenerCalled)
 }
 
-func (s *View) Sim_provides_default_length(t *T) {
+func (s *AView) Sim_provides_default_length(t *T) {
 	v := s.fx.View(t)
-	v.Listeners.Resize = func(v *lines.View) {
+	v.Register.Resize(func(v *lines.View) {
 		t.Eq(s.fx.DefaultLineCount, v.Len())
-	}
+	})
 	v.Listen()
 }
 
-func (s *View) Provides_len_many_lines(t *T) {
+func (s *AView) Provides_len_many_lines(t *T) {
 	v, got := s.fx.View(t), 0
-	v.Listeners.Resize = func(v *lines.View) {
+	v.Register.Resize(func(v *lines.View) {
 		v.For(func(*lines.Line) { got++ })
-	}
+	})
 	v.Listen()
 	t.Eq(s.fx.DefaultLineCount, got)
 }
 
-func (s *View) Resize_adjust_length_accordingly(t *T) {
+func (s *AView) Resize_adjust_length_accordingly(t *T) {
 	v, exp, resizeCount := s.fx.View(t, 1), 20, 0
-	v.Listeners.Resize = func(v *lines.View) {
+	v.Register.Resize(func(v *lines.View) {
 		switch resizeCount {
 		case 0:
 			t.Eq(s.fx.DefaultLineCount, v.Len())
@@ -128,7 +129,7 @@ func (s *View) Resize_adjust_length_accordingly(t *T) {
 			t.Eq(exp, v.Len())
 		}
 		resizeCount++
-	}
+	})
 	go v.Listen()
 	<-v.NextEventProcessed // wait for initial resize to happen
 	v.SetNumberOfLines(exp)
@@ -136,9 +137,9 @@ func (s *View) Resize_adjust_length_accordingly(t *T) {
 	t.Eq(2, resizeCount)
 }
 
-func (s *View) Resize_adjusts_the_provided_lines(t *T) {
+func (s *AView) Resize_adjusts_the_provided_lines(t *T) {
 	v, expFirst, expSecond, resizeCount := s.fx.View(t, 3), 15, 20, 0
-	v.Listeners.Resize = func(v *lines.View) {
+	v.Register.Resize(func(v *lines.View) {
 		switch resizeCount {
 		case 0:
 			got := 0
@@ -158,7 +159,7 @@ func (s *View) Resize_adjusts_the_provided_lines(t *T) {
 			t.Eq(expSecond, got)
 		}
 		resizeCount++
-	}
+	})
 	go v.Listen()
 	<-v.NextEventProcessed
 	v.SetNumberOfLines(s.fx.DefaultLineCount)
@@ -170,10 +171,49 @@ func (s *View) Resize_adjusts_the_provided_lines(t *T) {
 	t.Eq(4, resizeCount)
 }
 
-func (s *View) Unregistered_rune_events_are_ignored(t *T) {
+func (s *AView) Reports_quit_event_and_ends_event_loop(t *T) {
+	quit := []int{int('q'), int(tcell.KeyCtrlC), int(tcell.KeyCtrlD)}
+	for i, k := range quit {
+		v, quitEvt, terminated := fx.NewView(t, 1), false, false
+		v.Register.Quit(func() { quitEvt = true })
+		go func() {
+			v.Listen()
+			terminated = true
+		}()
+		if i == 0 {
+			v.FireRuneEvent(rune(k))
+		} else {
+			v.FireKeyEvent(tcell.Key(k))
+		}
+		<-v.NextEventProcessed
+		t.True(quitEvt)
+		<-t.Timeout(1 * time.Millisecond) // listener processed before quit
+		t.True(terminated)
+		t.Eq(0, v.MaxEvents)
+	}
+}
+
+func (s *AView) Quits_event_loop_on_quit_event_without_listener(t *T) {
+	v, terminated := s.fx.View(t), true
+	go func() {
+		v.Listen()
+		terminated = true
+	}()
+	v.FireRuneEvent('q')
+	<-t.Timeout(1 * time.Millisecond)
+	t.True(terminated)
+}
+
+func (s *AView) Unregistered_events_are_ignored(t *T) {
 	v := s.fx.View(t)
 	go v.Listen()
-	v.FireRuneEvent('Z')
+	v.FireRuneEvent('a')
+	select {
+	case <-v.NextEventProcessed:
+		t.Error("unexpected event")
+	case <-t.Timeout(1 * time.Millisecond):
+	}
+	v.FireKeyEvent(tcell.KeyF11)
 	select {
 	case <-v.NextEventProcessed:
 		t.Error("unexpected event")
@@ -183,58 +223,84 @@ func (s *View) Unregistered_rune_events_are_ignored(t *T) {
 	t.Eq(0, v.MaxEvents)
 }
 
-func (s *View) Reports_quit_event_and_ends_event_loop(t *T) {
-	v, quitEvt, terminated := s.fx.View(t), false, false
-	v.Listeners.Quit = func() { quitEvt = true }
-	go func() {
-		v.Listen()
-		terminated = true
-	}()
-	v.FireRuneEvent('q')
+func (s *AView) Reports_registered_rune_and_key_events(t *T) {
+	v, shiftEnter, aRune := s.fx.View(t, 1), false, false
+	err := v.Register.Key(func(v *lines.View, m tcell.ModMask) {
+		if m == tcell.ModShift {
+			shiftEnter = true
+		}
+	}, tcell.KeyEnter)
+	go v.Listen()
+	t.FatalOn(err)
+	t.FatalOn(v.Register.Rune(func(v *lines.View) { aRune = true }, 'a'))
+	v.FireKeyEvent(tcell.KeyEnter, tcell.ModShift)
 	<-v.NextEventProcessed
-	t.True(quitEvt)
+	t.True(shiftEnter)
+	v.FireRuneEvent('a')
+	<-v.NextEventProcessed
+	t.True(aRune)
 	t.Eq(-1, v.MaxEvents)
-	<-t.Timeout(1 * time.Millisecond) // listener processed before quit
-	t.True(terminated)
 }
 
-func (s *View) Fails_if_registered_runes_change(t *T) {
-	v, err := s.fx.View(t), error(nil)
-	v.MaxEvents = 1
-	v.Triggers.QuitRunes = []rune{'q', 'Y'}
-	v.Listeners.Resize = func(v *lines.View) {
-		v.Triggers.QuitRunes = []rune{'q'}
+func (s *AView) Unregisters_nil_listener_events(t *T) {
+	v := s.fx.View(t)
+	defer v.Quit()
+	t.FatalOn(v.Register.Rune(func(*lines.View) {}, 'a'))
+	t.FatalOn(v.Register.Rune(nil, 'a'))
+	t.FatalOn(v.Register.Rune(func(*lines.View) {}, 'a'))
+	t.FatalOn(v.Register.Key(
+		func(*lines.View, tcell.ModMask) {}, tcell.KeyUp))
+	t.FatalOn(v.Register.Key(nil, tcell.KeyUp))
+	t.FatalOn(v.Register.Key(
+		func(*lines.View, tcell.ModMask) {}, tcell.KeyUp))
+}
+
+func (s *AView) Fails_to_register_overwriting_key_or_rune_events(t *T) {
+	v, fail := s.fx.View(t), []int{int('a'), int('q'), int(tcell.KeyUp),
+		int(tcell.KeyCtrlC), int(tcell.KeyCtrlD)}
+	defer v.Quit()
+	t.FatalOn(v.Register.Rune(func(*lines.View) {}, 'a'))
+	err := v.Register.Key(
+		func(*lines.View, tcell.ModMask) {}, tcell.KeyUp)
+	t.FatalOn(err)
+	for i, k := range fail {
+		switch i {
+		case 0, 1:
+			t.ErrIs(
+				v.Register.Rune(func(*lines.View) {}, rune(k)),
+				lines.RegisterErr,
+			)
+		default:
+			t.ErrIs(v.Register.Key(
+				func(*lines.View, tcell.ModMask) {}, tcell.Key(k)),
+				lines.RegisterErr,
+			)
+		}
 	}
-	go func() {
-		err = v.Listen()
-	}()
-	<-v.NextEventProcessed
-	v.FireRuneEvent('Y')
-	<-v.NextEventProcessed
-	t.ErrIs(err, lines.EventRunErr)
 }
 
-func TestView(t *testing.T) {
+func (s *AView) Reports_all_rune_events_to_runes_listener_til_removed(
+	t *T,
+) {
+	v, aRune, allRunes := s.fx.View(t, 1), false, false
+	v.Register.Rune(func(v *lines.View) { aRune = true }, 'a')
+	v.Register.Runes(func(v *lines.View, r rune) { allRunes = true })
+	go v.Listen()
+	v.FireRuneEvent('a')
+	<-v.NextEventProcessed
+	t.True(allRunes)
+	v.Register.Runes(nil)
+	v.FireRuneEvent('a')
+	<-v.NextEventProcessed
+	t.True(aRune)
+	t.Eq(-1, v.MaxEvents)
+}
+
+func TestAView(t *testing.T) {
 	t.Parallel()
-	Run(&View{}, t)
+	Run(&AView{}, t)
 }
 
 type DBG struct{ Suite }
-
-func (s *DBG) Fails_if_registered_runes_change(t *T) {
-	v, err := fx.NewView(t), error(nil)
-	v.MaxEvents = 1
-	v.Triggers.QuitRunes = []rune{'q', 'Y'}
-	v.Listeners.Resize = func(v *lines.View) {
-		v.Triggers.QuitRunes = []rune{'q'}
-	}
-	go func() {
-		err = v.Listen()
-	}()
-	<-v.NextEventProcessed
-	v.FireRuneEvent('Y')
-	<-v.NextEventProcessed
-	t.ErrIs(err, lines.EventRunErr)
-}
 
 func TestDBG(t *testing.T) { Run(&DBG{}, t) }

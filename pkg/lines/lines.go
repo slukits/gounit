@@ -5,40 +5,34 @@
 // Package lines provides a simple terminal-UI where the UI is
 // interpreted as an ordered set of lines.  Reported events are
 //
-// - up: user pressed k or cursor-up
+// - rune: user pressed a keyboard key which translates to a rune
 //
-// - down: user pressed j or cursor-down
-//
-// - enter: user pressed enter
-//
-// - escape: user pressed enter
+// - key: user pressed a keyboard key which doesn't translate to a
+//   single rune
 //
 // - quit: user pressed q, ctrl-d or ctrl-c
 //
 // - resize: for initial layout or user resizes the terminal window.
 //
-// Listeners are registered by setting corresponding properties of the
-// *Listeners* property.  Calling the *Listen*-Method starts the
-// event-loop with the mandatory resize-event and blocks until the quit
-// event is received.  A typical example:
+// Event listeners are registered using a view's *Register* property.
+// Calling the *Listen*-Method starts the event-loop with the mandatory
+// resize-event and blocks until the quit event is received ('q',
+// ctrl-c, ctrl-d).  A typical example:
 //
 //     lv := lines.NewView()
-//     lv.Listeners.Up = func(v *lines.View, mm lines.Modifiers) {
-//         v.Get(0).Set("received up event")
-//     }
-//     lv.Listeners.Resize = func(v *lines.View) {
+//     lv.Register.Resize(func(v *lines.View) {
 //         v.For(func(l *lines.Line) {
 //             l.Set(fmt.Sprintf("line %d", l.Idx+1))
 //         })
 //         lv.Get(0).Set(fmt.Sprintf("have %d lines", v.Len()))
-//     }
-//     // ... register other event-listeners ...
+//     })
+//     // ... register other event-listeners for ...
 //     lv.Listen() // block until quit
 package lines
 
 import (
 	"errors"
-	"strings"
+	"sync"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/slukits/ints"
@@ -56,15 +50,24 @@ type View struct {
 	evtRunes string
 	evtKeys  ints.Set
 
-	// Listeners holds a view's listeners which are informed about
-	// occurring events. (see type *Listeners*).  Changing this property
-	// after starting the event-loop will likely break event-handling.
-	Listeners
+	// Register holds a view's registered event listeners to which are
+	// occurring events reported. (see type *Register*).
+	Register ListenerRegister
+}
 
-	// Triggers associates rune or special-key inputs with view-events.
-	// See type *Triggers* for its defaults.  Changing this property
-	// after starting the event-loop will brake event-handling.
-	Triggers
+// ListenerRegister allows to wrap a Register-instance and replace it
+// with the wrapping which is useful for test-fixture creation (see
+// testdata/fx.View)
+type ListenerRegister interface {
+	Rune(func(*View), ...rune) error
+	Runes(func(*View, rune))
+	Key(func(*View, tcell.ModMask), ...tcell.Key) error
+	Resize(func(*View))
+	Quit(func())
+	reportRune(*View, rune)
+	reportKey(*View, tcell.Key, tcell.ModMask)
+	reportResize(*View)
+	reportQuit(*tcell.EventKey) bool
 }
 
 // NewView returns a new View instance or nil and an error in case
@@ -77,7 +80,7 @@ func NewView() (*View, error) {
 	if err := lib.Init(); err != nil {
 		return nil, err
 	}
-	return &View{lib: lib, Triggers: defaultTrigger}, nil
+	return &View{lib: lib, Register: newRegister()}, nil
 }
 
 // NewSim returns a new View instance wrapping tcell's simulation
@@ -89,7 +92,7 @@ func NewSim() (*View, tcell.SimulationScreen, error) {
 	if err := lib.Init(); err != nil {
 		return nil, nil, err
 	}
-	return &View{lib: lib, Triggers: defaultTrigger}, lib, nil
+	return &View{lib: lib, Register: newRegister()}, lib, nil
 }
 
 // Len returns the number of lines of a terminal screen.  Note len of
@@ -99,7 +102,7 @@ func (v *View) Len() int {
 	return h
 }
 
-// For calls ascending ordered for each line back.
+// For calls ascending ordered for each line of registered view back.
 func (v *View) For(cb func(*Line)) {
 	for _, l := range v.ll {
 		cb(l)
@@ -109,8 +112,6 @@ func (v *View) For(cb func(*Line)) {
 // Listen starts the view's event-loop listening for user-input and
 // blocks until a quit-event is received or *Quit* is called.
 func (v *View) Listen() error {
-
-	v.setupEventTriggers()
 
 	// BUG the following four lines needed to go into the resize event
 	// v.lib.Clear()
@@ -128,48 +129,22 @@ func (v *View) Listen() error {
 		case *tcell.EventResize:
 			v.lib.Clear()
 			v.ensureLines()
-			if v.Listeners.Resize != nil {
-				v.Listeners.Resize(v)
-			}
+			v.Register.reportResize(v)
 			v.lib.Sync()
 		case *tcell.EventKey:
-			if ev.Key() == tcell.KeyRune {
-				if strings.IndexRune(v.evtRunes, ev.Rune()) < 0 {
-					continue
-				}
-				if err := v.triggerRuneEvent(ev.Rune()); err != nil {
-					return v.err(err)
-				}
+			if v.Register.reportQuit(ev) {
+				v.Quit()
+				return nil
 			}
+			if ev.Key() == tcell.KeyRune {
+				v.Register.reportRune(v, ev.Rune())
+				continue
+			}
+			v.Register.reportKey(v, ev.Key(), ev.Modifiers())
 		default:
 			return nil
 		}
 	}
-}
-
-func (v *View) err(e error) error {
-	v.Quit()
-	return e
-}
-
-func (v *View) setupEventTriggers() {
-	v.evtRunes = string(v.Triggers.QuitRunes)
-	v.evtKeys.Add(toInt(v.Triggers.QuitKeys)...)
-}
-
-var EventRunErr = errors.New("registered runes changed")
-
-func (v *View) triggerRuneEvent(r rune) error {
-	switch v.Triggers.resolveRuneEventType(r) {
-	case quit:
-		if v.Listeners.Quit != nil {
-			v.Listeners.Quit()
-			v.Quit()
-		}
-	case none:
-		return EventRunErr
-	}
-	return nil
 }
 
 // ensureLines adapts after a resize event the view's lines-slice.
@@ -191,58 +166,167 @@ func (v *View) Quit() {
 	v.lib.Fini()
 }
 
-// Listeners implements a View-instance's Listeners property storing the
-// event-listeners for events provided by a View-instance.  NOTE
-// updating event-listeners after the event-loop has started  may lead
-// to unexpected behavior especially if a test-fixture View-instance is
-// used.
-type Listeners struct {
-
-	// Resize listener is called if an resize event happens.  After
-	// starting a view's event loop an initial resize event is
-	// mandatorily emitted.
-	Resize func(*View)
-
-	// Quit listener is called if an quit event occurred.  A quit event
-	// occurs iff on of a view's quit-event triggers was received (see
-	// *View.Triggers*).
-	Quit func()
+// Register implements a View-instance's Register property storing the
+// event-listeners for events provided by a View-instance.
+type Register struct {
+	keys     *sync.Mutex
+	kk       map[tcell.Key]func(*View, tcell.ModMask)
+	runes    *sync.Mutex
+	rr       map[rune]func(*View)
+	other    *sync.Mutex
+	resize   func(*View)
+	quit     func()
+	allRunes func(*View, rune)
 }
 
-var defaultTrigger = Triggers{
-	QuitRunes: []rune{'q'},
-	QuitKeys:  []tcell.Key{tcell.KeyCtrlC, tcell.KeyCtrlD},
+func newRegister() *Register {
+	return &Register{
+		keys:  &sync.Mutex{},
+		kk:    map[tcell.Key]func(*View, tcell.ModMask){},
+		runes: &sync.Mutex{},
+		rr:    map[rune]func(*View){},
+		other: &sync.Mutex{},
+	}
 }
 
-type evtType int8
+// RegisterErr is returned by Register.Rune and Register.Key if a
+// listener is registered for an already registered rune/key-event.
+var RegisterErr = errors.New("event listener overwrites existing")
 
-const (
-	none evtType = iota
-	quit
-)
+// Rune registers given listener for given runes failing iff one of the
+// runes is already registered or is the quit-rune.  In the later case
+// none of the runes is registered.  Setting rune listeners is
+// concurrency save.  If the listener is nil given runes are
+// unregistered.
+func (rg *Register) Rune(listener func(*View), rr ...rune) error {
+	rg.runes.Lock()
+	defer rg.runes.Unlock()
 
-// Triggers defines which rune/special-key inputs trigger which events.
-// A zero value has not runes or special-keys set.  Note no checks are
-// performed if different trigger-sets have the same runes/keys.  In this
-// case it is undefined which event is triggered.
-type Triggers struct {
+	if listener == nil {
+		for _, _r := range rr {
+			delete(rg.rr, _r)
+		}
+		return nil
+	}
 
-	// QuitRunes are the rune-inputs which trigger a quit event. They
-	// default to 'q' for a new created view.
-	QuitRunes []rune
-
-	// QuitKeys are the special-key-inputs which trigger a quit event.
-	// They default to ctrl-c and ctrl-d for a new created view.
-	QuitKeys []tcell.Key
-}
-
-func (tt *Triggers) resolveRuneEventType(r rune) evtType {
-	for _, _r := range tt.QuitRunes {
-		if _r == r {
-			return quit
+	for _, _r := range rr {
+		if _, ok := rg.rr[_r]; ok {
+			return RegisterErr
+		}
+		if _r == 'q' {
+			return RegisterErr
 		}
 	}
-	return none
+
+	for _, _r := range rr {
+		rg.rr[_r] = listener
+	}
+	return nil
+}
+
+func (rg *Register) Runes(listener func(*View, rune)) {
+	rg.other.Lock()
+	defer rg.other.Unlock()
+	rg.allRunes = listener
+}
+
+func (rg *Register) reportRune(v *View, r rune) {
+	rg.other.Lock()
+	if rg.allRunes != nil {
+		rg.allRunes(v, r)
+		rg.other.Unlock()
+		return
+	}
+	rg.other.Unlock()
+	rg.runes.Lock()
+	defer rg.runes.Unlock()
+	if _, ok := rg.rr[r]; !ok {
+		return
+	}
+	rg.rr[r](v)
+}
+
+// Key registers given listener for given keys failing iff one of the
+// keys is already registered or if they are the quit keys.  In the
+// later case none of the keys is registered.  Setting key listeners is
+// concurrency save.  If the listener is nil given keys are
+// unregistered.
+func (rg *Register) Key(
+	listener func(*View, tcell.ModMask), kk ...tcell.Key,
+) error {
+	rg.keys.Lock()
+	defer rg.keys.Unlock()
+
+	if listener == nil {
+		for _, k := range kk {
+			delete(rg.kk, k)
+		}
+		return nil
+	}
+
+	for _, k := range kk {
+		if _, ok := rg.kk[k]; ok {
+			return RegisterErr
+		}
+		if k == tcell.KeyCtrlC || k == tcell.KeyCtrlD {
+			return RegisterErr
+		}
+	}
+
+	for _, k := range kk {
+		rg.kk[k] = listener
+	}
+	return nil
+}
+
+func (rg *Register) reportKey(v *View, k tcell.Key, m tcell.ModMask) {
+	rg.keys.Lock()
+	defer rg.keys.Unlock()
+	if _, ok := rg.kk[k]; !ok {
+		return
+	}
+	rg.kk[k](v, m)
+}
+
+// Resize registers given listener for the resize event.
+func (rg *Register) Resize(listener func(*View)) {
+	rg.other.Lock()
+	defer rg.other.Unlock()
+	rg.resize = listener
+}
+
+func (rg *Register) reportResize(v *View) {
+	rg.other.Lock()
+	defer rg.other.Unlock()
+	if rg.resize == nil {
+		return
+	}
+	rg.resize(v)
+}
+
+// Quit registers given listener for the quit event which is triggered
+// by 'r'-rune, ctrl-c and ctrl-d.
+func (rg *Register) Quit(listener func()) {
+	rg.other.Lock()
+	defer rg.other.Unlock()
+	rg.quit = listener
+}
+
+func (rg *Register) reportQuit(ev *tcell.EventKey) bool {
+	rg.other.Lock()
+	defer rg.other.Unlock()
+	if ev.Key() == tcell.KeyRune && ev.Rune() != 'q' {
+		return false
+	}
+	if ev.Key() != tcell.KeyRune && ev.Key() != tcell.KeyCtrlC &&
+		ev.Key() != tcell.KeyCtrlD {
+		return false
+	}
+	if rg.quit == nil {
+		return true
+	}
+	rg.quit()
+	return true
 }
 
 type defaultFactory struct{}
@@ -263,11 +347,3 @@ type screenFactoryer interface {
 }
 
 var screenFactory screenFactoryer = &defaultFactory{}
-
-func toInt(kk []tcell.Key) []int {
-	ii := make([]int, len(kk))
-	for i, k := range kk {
-		ii[i] = int(k)
-	}
-	return ii
-}
