@@ -77,11 +77,9 @@ func New() (*Register, error) {
 	}
 	return &Register{
 		view:   view,
-		keys:   &sync.Mutex{},
 		kk:     map[tcell.Key]func(*View, tcell.ModMask){},
-		runes:  &sync.Mutex{},
 		rr:     map[rune]func(*View){},
-		other:  &sync.Mutex{},
+		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
 	}, nil
 }
@@ -97,11 +95,9 @@ func Sim() (*Register, tcell.SimulationScreen, error) {
 	}
 	return &Register{
 		view:   view,
-		keys:   &sync.Mutex{},
 		kk:     map[tcell.Key]func(*View, tcell.ModMask){},
-		runes:  &sync.Mutex{},
 		rr:     map[rune]func(*View){},
-		other:  &sync.Mutex{},
+		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
 	}, view.lib.(tcell.SimulationScreen), nil
 }

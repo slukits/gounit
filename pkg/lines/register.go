@@ -17,11 +17,9 @@ import (
 // update-events.  Registering of events is concurrency save.
 type Register struct {
 	view      *View
-	keys      *sync.Mutex
 	kk        map[tcell.Key]func(*View, tcell.ModMask)
-	runes     *sync.Mutex
 	rr        map[rune]func(*View)
-	other     *sync.Mutex
+	mutex     *sync.Mutex
 	resize    func(*View)
 	quit      func()
 	allRunes  func(*View, rune)
@@ -78,16 +76,16 @@ func (rg *Register) Listen() {
 // the event-loop by calling *Listen* will trigger a mandatory initial
 // resize event.
 func (rg *Register) Resize(listener func(*View)) {
-	rg.other.Lock()
-	defer rg.other.Unlock()
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
 	rg.resize = listener
 }
 
 // Quit registers given listener for the quit event which is triggered
 // by 'r'-rune, ctrl-c and ctrl-d.
 func (rg *Register) Quit(listener func()) {
-	rg.other.Lock()
-	defer rg.other.Unlock()
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
 	rg.quit = listener
 }
 
@@ -129,8 +127,8 @@ var RegisterErr = errors.New("event listener overwrites existing")
 // of the given runes.  If the listener is nil given runes are
 // unregistered.
 func (rg *Register) Rune(listener func(*View), rr ...rune) error {
-	rg.runes.Lock()
-	defer rg.runes.Unlock()
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
 
 	if listener == nil {
 		for _, _r := range rr {
@@ -161,8 +159,8 @@ func (rg *Register) Rune(listener func(*View), rr ...rune) error {
 // registration, i.e. calls listener for a last time with cancel set to
 // true.
 func (rg *Register) Runes(listener func(*View, rune)) {
-	rg.other.Lock()
-	defer rg.other.Unlock()
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
 	rg.allRunes = listener
 }
 
@@ -174,8 +172,8 @@ func (rg *Register) Runes(listener func(*View, rune)) {
 func (rg *Register) Key(
 	listener func(*View, tcell.ModMask), kk ...tcell.Key,
 ) error {
-	rg.keys.Lock()
-	defer rg.keys.Unlock()
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
 
 	if listener == nil {
 		for _, k := range kk {
@@ -233,15 +231,15 @@ func (rg *Register) report(ev tcell.Event) (quit bool) {
 }
 
 func (rg *Register) reportRune(v *View, r rune) {
-	rg.other.Lock()
+	rg.mutex.Lock()
 	if rg.allRunes != nil {
 		rg.allRunes(v, r)
-		rg.other.Unlock()
+		rg.mutex.Unlock()
 		return
 	}
-	rg.other.Unlock()
-	rg.runes.Lock()
-	defer rg.runes.Unlock()
+	rg.mutex.Unlock()
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
 	if _, ok := rg.rr[r]; !ok {
 		return
 	}
@@ -249,8 +247,8 @@ func (rg *Register) reportRune(v *View, r rune) {
 }
 
 func (rg *Register) reportKey(v *View, k tcell.Key, m tcell.ModMask) {
-	rg.keys.Lock()
-	defer rg.keys.Unlock()
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
 	if _, ok := rg.kk[k]; !ok {
 		return
 	}
@@ -259,8 +257,8 @@ func (rg *Register) reportKey(v *View, k tcell.Key, m tcell.ModMask) {
 
 // TODO: refac
 func (rg *Register) reportResize(v *View) {
-	rg.other.Lock()
-	defer rg.other.Unlock()
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
 	if rg.resize == nil {
 		return
 	}
@@ -268,8 +266,8 @@ func (rg *Register) reportResize(v *View) {
 }
 
 func (rg *Register) reportQuit(ev *tcell.EventKey) bool {
-	rg.other.Lock()
-	defer rg.other.Unlock()
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
 	if ev.Key() == tcell.KeyRune && ev.Rune() != 'q' {
 		return false
 	}
