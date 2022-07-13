@@ -2,38 +2,41 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-// Package lines provides a simple terminal-UI where the UI is
-// interpreted as an ordered set of lines.  lines hides event-handling
-// and screen-synchronization from its user.  Making the components of
-// a view concurrency save in terms that it can be manipulated while an
-// event is processed at the same time would add significant overhead
-// and complexity to the view.  To avoid this overhead and race
-// conditions this package was designed as follows.
+// Package lines provides a well tested, simple, easy to use terminal-UI
+// where the UI is interpreted as an ordered set of lines.  *lines*
+// hides event-polling and screen-synchronization from its user.  Making
+// the components of a view concurrency save in the sense that it can be
+// manipulated while an event is processed at the same time would add
+// significant overhead and complexity to the view.  To avoid this
+// overhead and race conditions this package was designed not around a
+// view/screen but around event-handling:
 //
 // reg := lines.New()
 //
 // will return a so called "listener register" which may be used to
-// register for events:
+// register call-back functions for events:
 //
-// reg.Resize(func(v *lines.View) { v.Lines.Get(0).Set("line 0") })
+// reg.Resize(func(v *lines.View) { v.LL().Get(0).Set("line 0") })
 //
-// the above line will effectively print "line 0" into the first line of
+// The above line will effectively print "line 0" into the first line of
 // a terminal once the initial resize-event was emitted after a call of
 //
 // reg.Listen()
 //
-// the later starts the event loop and blocks until a Quit-event was
+// The later starts the event loop and blocks until a Quit-event was
 // received or reg.QuitListening() was called.
 //
-// reg.Update(func(v *lines.View) { v.Lines.Get(0).Set("updated 0") })
+// reg.Update(func(v *lines.View) { v.LL().Get(0).Set("updated 0") })
 //
-// the Update method posts an update event into the event-loop and calls
-// given listener back once it is polled.  In order to react on user
-// input listeners may be registered for runes or special keys as they
-// are recognized and provided by the underlying *tcell* package
+// The Update method posts an update event into the event-loop and calls
+// given listener back once it is polled.  I.e. Update provides a
+// programmatically way to update the screen without user input. To
+// react on user input listeners may be registered for runes or special
+// keys as they are recognized and provided by the underlying *tcell*
+// package
 //
 // func help(v *lines.View, m tcell.ModMask) {
-//     v.Lines.Get(0).Set("some help-text in first line")
+//     v.LL().Get(0).Set("some help-text in first line")
 // }
 // reg.Key(help, tcell.KeyF1)
 // reg.Rune(help, 'h')
@@ -41,20 +44,23 @@
 // i.e. help is called back if the user presses either the F1 or the H
 // key.
 //
-// reg.Runes(func (v *lines.View, r rune) {
-//     v.Lines.Get(0).Set("received rune-input: "+string(r))
-// })
+// reg.Runes(func (v *lines.View, r rune, exit bool) {
+//     v.LL().Get(0).Set("received rune-input: "+string(r))
+// }, tcell.KeyESC)
 //
 // Runes suppresses all registered Rune-events and provides received
-// rune input to registered Runes-listener until a non-rune is received.
+// rune input to registered Runes-listener until provided special key is
+// received which is the escape key in the above example.  If given
+// special key is received the event-handler is called for a last time
+// having its exit argument set to true.
 //
 // reg.Quit(func() { fmt.Println("good by") })
 //
 // a Quit-listener is called iff a quit event is received which happens
-// if 'q', ctrl-c or ctrl-d is received.
+// by default if 'q', ctrl-c or ctrl-d is received.
 //
-// NOTE to avoid races a view must be only manipulated within an
-// event-listener and if the event-listener returns no further
+// NOTE to avoid race conditions a view must be only manipulated within
+// an event-listener and if the event-listener returns no further
 // manipulations must happen.  Simply never (!) keep a view instance
 // around.   If concurrent view-manipulations are done inside a listener
 // the listener is responsible that they are performed in a concurrency
