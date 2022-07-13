@@ -2,120 +2,113 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-// Package lines provides a simple non-concurrency save terminal-UI
-// where the UI is interpreted as an ordered set of lines.  Reported
-// events are
+// Package lines provides a simple terminal-UI where the UI is
+// interpreted as an ordered set of lines.  lines hides event-handling
+// and screen-synchronization from its user.  Making the components of
+// a view concurrency save in terms that it can be manipulated while an
+// event is processed at the same time would add significant overhead
+// and complexity to the view.  To avoid this overhead and race
+// conditions this package was designed as follows.
 //
-// - rune: user pressed a keyboard key which translates to a rune
+// reg := lines.New()
 //
-// - key: user pressed a keyboard key which doesn't translate to a
-//   single rune
+// will return a so called "listener register" which may be used to
+// register for events:
 //
-// - quit: user pressed q, ctrl-d or ctrl-c
+// reg.Resize(func(v *lines.View) { v.Lines.Get(0).Set("line 0") })
 //
-// - resize: for initial layout or user resizes the terminal window.
+// the above line will effectively print "line 0" into the first line of
+// a terminal once the initial resize-event was emitted after a call of
 //
-// Event listeners are registered using a view's *Register* property.
-// Calling the *Listen*-Method starts the event-loop with the mandatory
-// resize-event and blocks until the quit event is received ('q',
-// ctrl-c, ctrl-d) or *Quit* is called.  A typical example:
+// reg.Listen()
 //
-//     lv := lines.NewView()
-//     lv.Register.Resize(func(v *lines.View) {
-//         v.For(func(l *lines.Line) {
-//             l.Set(fmt.Sprintf("line %d", l.Idx+1))
-//         })
-//         lv.Get(0).Set(fmt.Sprintf("have %d lines", v.Len()))
-//     })
-//     // ... register other event-listeners for ...
-//     lv.Listen() // block until quit
+// the later starts the event loop and blocks until a Quit-event was
+// received or reg.QuitListening() was called.
 //
-// use
+// reg.Update(func(v *lines.View) { v.Lines.Get(0).Set("updated 0") })
 //
-//     lv.Register.Update(func(*linew.View) { // update call-back })
+// the Update method posts an update event into the event-loop and calls
+// given listener back once it is polled.  In order to react on user
+// input listeners may be registered for runes or special keys as they
+// are recognized and provided by the underlying *tcell* package
 //
-// to request an view-updating callback without an user-interaction.
+// func help(v *lines.View, m tcell.ModMask) {
+//     v.Lines.Get(0).Set("some help-text in first line")
+// }
+// reg.Key(help, tcell.KeyF1)
+// reg.Rune(help, 'h')
+//
+// i.e. help is called back if the user presses either the F1 or the H
+// key.
+//
+// reg.Runes(func (v *lines.View, r rune) {
+//     v.Lines.Get(0).Set("received rune-input: "+string(r))
+// })
+//
+// Runes suppresses all registered Rune-events and provides received
+// rune input to registered Runes-listener until a non-rune is received.
+//
+// reg.Quit(func() { fmt.Println("good by") })
+//
+// a Quit-listener is called iff a quit event is received which happens
+// if 'q', ctrl-c or ctrl-d is received.
 //
 // NOTE to avoid races a view must be only manipulated within an
 // event-listener and if the event-listener returns no further
-// manipulations must happen.  If concurrent view-manipulations are done
-// inside a listener the listener is responsible that they are performed
-// in a concurrency save way.
+// manipulations must happen.  Simply never (!) keep a view instance
+// around.   If concurrent view-manipulations are done inside a listener
+// the listener is responsible that they are performed in a concurrency
+// save way.
 package lines
 
 import (
-	"errors"
-	"fmt"
 	"sync"
-	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/slukits/ints"
 )
 
-// View provides a line-based terminal user-interface.  A zero view is
-// not ready to use.  *NewView* and *NewSim* create and initialize a new
-// view whereas the later creates a view with tcell's simulation-screen
-// for testing.  Typically you would set a new view's event-listeners
-// followed by a (blocking) call of *Listen* starting the event-loop.
-// Calling *Quit* stops the event-loop and releases resources.  NOTE a
-// view-instance is *NOT* concurrency save.  To avoid data races between
-// automated screen-synchronization and client-side view-modification
-// the following two rules must be followed:
-//
-// - After an event-listener returns (which is always followed by an
-//   automatic screen synchronization) no further view-manipulations
-//   from the client-side must occur.
-//
-// - Register an Update-listener to post an Update-event into the event
-//   loop.
-//
-// I.e. to avoid freezing the ui the registered listeners should only do
-// view manipulations which can be done instantly and return.  Consider
-// to put any io or cpu heavy tasks in their own go-routine which once
-// finished registers an Update whose view manipulation can be done
-// quickly then.
-type View struct {
-	lib       tcell.Screen
-	ll        lines
-	evtRunes  string
-	evtKeys   ints.Set
-	isPolling bool
-	errScr    *ErrScr
-
-	// Synced provides a message each time it is guaranteed that the
-	// potential effect of an event is on the screen.
-	Synced chan bool
-
-	// Register holds a view's registered event listeners to which are
-	// occurring events reported. (see type *Register*).
-	Register ListenerRegister
-
-	// Min indicates the minimal expected number of screen lines.  An
-	// error is displayed and resizes events a not reported to its
-	// listener if the screen-height is below Min.
-	Min int
+// New returns a listener register providing a view to its event
+// listeners or nil and an error in case tcell's screen-creation or its
+// initialization fails.
+func New() (*Register, error) {
+	view, err := newView()
+	if err != nil {
+		return nil, err
+	}
+	return &Register{
+		view:   view,
+		keys:   &sync.Mutex{},
+		kk:     map[tcell.Key]func(*View, tcell.ModMask){},
+		runes:  &sync.Mutex{},
+		rr:     map[rune]func(*View){},
+		other:  &sync.Mutex{},
+		Synced: make(chan bool, 1),
+	}, nil
 }
 
-// ListenerRegister allows to wrap a Register-instance and replace it
-// with the wrapping which is useful for test-fixture creation (see
-// testdata/fx.View)
-type ListenerRegister interface {
-	Rune(func(*View), ...rune) error
-	Runes(func(*View, rune))
-	Key(func(*View, tcell.ModMask), ...tcell.Key) error
-	Resize(func(*View))
-	Quit(func())
-	Update(func(*View)) error
-	reportRune(*View, rune)
-	reportKey(*View, tcell.Key, tcell.ModMask)
-	reportResize(*View)
-	reportQuit(*tcell.EventKey) bool
+// Sim returns a listener register providing a view with tcell's
+// simulation screen.  Since the wrapped tcell screen is private it is
+// returned as well to facilitate desired mock-ups.  Sim fails iff
+// tcell's screen-initialization fails.
+func Sim() (*Register, tcell.SimulationScreen, error) {
+	view, err := newSim()
+	if err != nil {
+		return nil, nil, err
+	}
+	return &Register{
+		view:   view,
+		keys:   &sync.Mutex{},
+		kk:     map[tcell.Key]func(*View, tcell.ModMask){},
+		runes:  &sync.Mutex{},
+		rr:     map[rune]func(*View){},
+		other:  &sync.Mutex{},
+		Synced: make(chan bool, 1),
+	}, view.lib.(tcell.SimulationScreen), nil
 }
 
-// NewView returns a new View instance or nil and an error in case
+// newView returns a new View instance or nil and an error in case
 // tcell's screen-creation or its initialization fails.
-func NewView() (*View, error) {
+func newView() (*View, error) {
 	lib, err := screenFactory.NewScreen()
 	if err != nil {
 		return nil, err
@@ -123,392 +116,19 @@ func NewView() (*View, error) {
 	if err := lib.Init(); err != nil {
 		return nil, err
 	}
-	return &View{lib: lib, Register: newRegister(lib),
-		Synced: make(chan bool, 1)}, nil
+	v := &View{lib: lib, Synced: make(chan bool, 1)}
+	v.ll = &Lines{vw: v}
+	return v, nil
 }
 
-// NewSim returns a new View instance wrapping tcell's simulation
-// screen for testing purposes.  Since the wrapped tcell screen is
-// private it is returned as well to facilitate desired mock-ups.
-// NewSim fails iff tcell's screen-initialization fails.
-func NewSim() (*View, tcell.SimulationScreen, error) {
+// newSim returns a new View instance wrapping tcell's simulation
+// screen for testing purposes.
+func newSim() (*View, error) {
 	lib := screenFactory.NewSimulationScreen("")
 	if err := lib.Init(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return &View{lib: lib, Register: newRegister(lib),
-		Synced: make(chan bool, 1)}, lib, nil
+	v := &View{lib: lib, Synced: make(chan bool, 1)}
+	v.ll = &Lines{vw: v}
+	return v, nil
 }
-
-// Len returns the number of lines of a terminal screen.  Note len of
-// the simulation screen defaults to 25.
-func (v *View) Len() int {
-	_, h := v.lib.Size()
-	return h
-}
-
-// IsPolling returns true if receiving view is in the event-loop.
-func (v *View) IsPolling() bool {
-	return v.isPolling
-}
-
-// For calls ascending ordered for each line of registered view back.
-func (v *View) For(cb func(*Line)) {
-	for _, l := range v.ll {
-		cb(l)
-	}
-}
-
-// ForScreen calls ascending ordered back for each line shown on the
-// screen.
-func (v *View) ForScreen(cb func(*Line)) {
-	for i := 0; i < v.Len(); i++ {
-		cb(v.ll[i])
-	}
-}
-
-func (v *View) ForN(n int, cb func(*Line)) {
-	if n <= 0 {
-		return
-	}
-	v.synchronizeLinesSet(n)
-	for i := 0; i < n; i++ {
-		cb(v.ll[i])
-	}
-}
-
-// Line returns line with given index or nil if no such line exists.
-func (v *View) Line(idx int) *Line {
-	if idx < 0 || idx >= len(v.ll) {
-		return nil
-	}
-	return v.ll[idx]
-}
-
-// Listen starts the view's event-loop listening for user-input and
-// blocks until a quit-event is received or *Quit* is called.
-func (v *View) Listen() error {
-
-	// BUG the following four lines needed to go into the resize event
-	// v.lib.Clear()
-	// if v.Listeners.Resize != nil {
-	//     v.Listeners.Resize(v)
-	// }
-
-	v.isPolling = true
-
-	for {
-
-		// Poll event (blocking as I understand)
-		ev := v.lib.PollEvent()
-
-		select {
-		case <-v.Synced:
-		default:
-		}
-
-		// Process event
-		switch ev := ev.(type) {
-		case *tcell.EventResize:
-			v.lib.Clear()
-			v.synchronizeLinesSet(v.Len())
-			if !v.isScreenToSmall() {
-				v.Register.reportResize(v)
-			}
-			v.ensureSynced(false)
-			v.Synced <- true
-		case *tcell.EventKey:
-			if v.Register.reportQuit(ev) {
-				v.Quit()
-				return nil
-			}
-			if ev.Key() == tcell.KeyRune {
-				v.Register.reportRune(v, ev.Rune())
-			} else {
-				v.Register.reportKey(v, ev.Key(), ev.Modifiers())
-			}
-			v.ensureSynced(true)
-			v.Synced <- true
-		case *updateEvent:
-			ev.listener(v)
-			v.ensureSynced(true)
-			v.Synced <- true
-		default:
-			return nil
-		}
-	}
-}
-
-const ErrScreenFmt = "minimum screen-height: %d"
-
-func (v *View) isScreenToSmall() bool {
-	toSmall := v.Len() < v.Min
-	if !toSmall {
-		if v.errScr != nil && v.errScr.Active {
-			v.errScr.Active = false
-		}
-		return false
-	}
-	if !v.ErrScreen().Active {
-		v.ErrScreen().Active = true
-	}
-
-	if v.ErrScreen().String() != fmt.Sprintf(ErrScreenFmt, v.Min) {
-		v.ErrScreen().Set(fmt.Sprintf(ErrScreenFmt, v.Min))
-	}
-	return true
-}
-
-func (v *View) ensureSynced(show bool) {
-	sync := func() {
-		if show {
-			v.lib.Show()
-		} else {
-			v.lib.Sync()
-		}
-	}
-	if v.errScr != nil {
-		if v.errScr.Active {
-			if v.errScr.isDirty {
-				v.errScr.sync()
-			}
-			sync()
-			return
-		}
-	}
-	if v.ll.isDirty() {
-		v.ll.sync()
-		sync()
-	}
-}
-
-// synchronizeLinesSet adapts after a resize event the view's lines-slice.
-func (v *View) synchronizeLinesSet(n int) {
-	if len(v.ll) >= n {
-		return
-	}
-	lower, m := len(v.ll), 0
-	for len(v.ll) < n {
-		v.ll = append(v.ll, &Line{
-			lib: v.lib,
-			Idx: lower + m})
-		m++
-	}
-}
-
-var ErrUpdateFmt = "can't post event: %w"
-
-type updateEvent struct {
-	when     time.Time
-	listener func(*View)
-}
-
-func (u *updateEvent) When() time.Time { return u.when }
-
-// Quit the event-loop, i.e. IsPolling will be false.
-func (v *View) Quit() {
-	v.isPolling = false
-	v.lib.Fini()
-	close(v.Synced)
-}
-
-// Register implements a View-instance's Register property storing the
-// event-listeners for events provided by a View-instance.
-type Register struct {
-	lib      tcell.Screen
-	keys     *sync.Mutex
-	kk       map[tcell.Key]func(*View, tcell.ModMask)
-	runes    *sync.Mutex
-	rr       map[rune]func(*View)
-	other    *sync.Mutex
-	resize   func(*View)
-	quit     func()
-	allRunes func(*View, rune)
-}
-
-func newRegister(lib tcell.Screen) *Register {
-	return &Register{
-		lib:   lib,
-		keys:  &sync.Mutex{},
-		kk:    map[tcell.Key]func(*View, tcell.ModMask){},
-		runes: &sync.Mutex{},
-		rr:    map[rune]func(*View){},
-		other: &sync.Mutex{},
-	}
-}
-
-// RegisterErr is returned by Register.Rune and Register.Key if a
-// listener is registered for an already registered rune/key-event.
-var RegisterErr = errors.New("event listener overwrites existing")
-
-// Rune registers given listener for given runes failing iff one of the
-// runes is already registered or is the quit-rune.  In the later case
-// none of the runes is registered.  Setting rune listeners is
-// concurrency save.  If the listener is nil given runes are
-// unregistered.
-func (rg *Register) Rune(listener func(*View), rr ...rune) error {
-	rg.runes.Lock()
-	defer rg.runes.Unlock()
-
-	if listener == nil {
-		for _, _r := range rr {
-			delete(rg.rr, _r)
-		}
-		return nil
-	}
-
-	for _, _r := range rr {
-		if _, ok := rg.rr[_r]; ok {
-			return RegisterErr
-		}
-		if _r == 'q' {
-			return RegisterErr
-		}
-	}
-
-	for _, _r := range rr {
-		rg.rr[_r] = listener
-	}
-	return nil
-}
-
-func (rg *Register) Runes(listener func(*View, rune)) {
-	rg.other.Lock()
-	defer rg.other.Unlock()
-	rg.allRunes = listener
-}
-
-func (rg *Register) reportRune(v *View, r rune) {
-	rg.other.Lock()
-	if rg.allRunes != nil {
-		rg.allRunes(v, r)
-		rg.other.Unlock()
-		return
-	}
-	rg.other.Unlock()
-	rg.runes.Lock()
-	defer rg.runes.Unlock()
-	if _, ok := rg.rr[r]; !ok {
-		return
-	}
-	rg.rr[r](v)
-}
-
-// Key registers given listener for given keys failing iff one of the
-// keys is already registered or if they are the quit keys.  In the
-// later case none of the keys is registered.  Setting key listeners is
-// concurrency save.  If the listener is nil given keys are
-// unregistered.
-func (rg *Register) Key(
-	listener func(*View, tcell.ModMask), kk ...tcell.Key,
-) error {
-	rg.keys.Lock()
-	defer rg.keys.Unlock()
-
-	if listener == nil {
-		for _, k := range kk {
-			delete(rg.kk, k)
-		}
-		return nil
-	}
-
-	for _, k := range kk {
-		if _, ok := rg.kk[k]; ok {
-			return RegisterErr
-		}
-		if k == tcell.KeyCtrlC || k == tcell.KeyCtrlD {
-			return RegisterErr
-		}
-	}
-
-	for _, k := range kk {
-		rg.kk[k] = listener
-	}
-	return nil
-}
-
-func (rg *Register) reportKey(v *View, k tcell.Key, m tcell.ModMask) {
-	rg.keys.Lock()
-	defer rg.keys.Unlock()
-	if _, ok := rg.kk[k]; !ok {
-		return
-	}
-	rg.kk[k](v, m)
-}
-
-// Resize registers given listener for the resize event.
-func (rg *Register) Resize(listener func(*View)) {
-	rg.other.Lock()
-	defer rg.other.Unlock()
-	rg.resize = listener
-}
-
-func (rg *Register) reportResize(v *View) {
-	rg.other.Lock()
-	defer rg.other.Unlock()
-	if rg.resize == nil {
-		return
-	}
-	rg.resize(v)
-}
-
-// Update posts a new event into the event loop which calls once it is
-// its turn given listener.  Update fails if the event-loop is full.
-// Update is an no-op if listener is nil.
-func (rg *Register) Update(listener func(*View)) error {
-	if listener == nil {
-		return nil
-	}
-	evt := &updateEvent{
-		when:     time.Now(),
-		listener: listener,
-	}
-	if err := rg.lib.PostEvent(evt); err != nil {
-		return fmt.Errorf(ErrUpdateFmt, err)
-	}
-	return nil
-}
-
-// Quit registers given listener for the quit event which is triggered
-// by 'r'-rune, ctrl-c and ctrl-d.
-func (rg *Register) Quit(listener func()) {
-	rg.other.Lock()
-	defer rg.other.Unlock()
-	rg.quit = listener
-}
-
-func (rg *Register) reportQuit(ev *tcell.EventKey) bool {
-	rg.other.Lock()
-	defer rg.other.Unlock()
-	if ev.Key() == tcell.KeyRune && ev.Rune() != 'q' {
-		return false
-	}
-	if ev.Key() != tcell.KeyRune && ev.Key() != tcell.KeyCtrlC &&
-		ev.Key() != tcell.KeyCtrlD {
-		return false
-	}
-	if rg.quit == nil {
-		return true
-	}
-	rg.quit()
-	return true
-}
-
-type defaultFactory struct{}
-
-func (f *defaultFactory) NewScreen() (tcell.Screen, error) {
-	return tcell.NewScreen()
-}
-
-func (f *defaultFactory) NewSimulationScreen(
-	s string,
-) tcell.SimulationScreen {
-	return tcell.NewSimulationScreen(s)
-}
-
-type screenFactoryer interface {
-	NewScreen() (tcell.Screen, error)
-	NewSimulationScreen(string) tcell.SimulationScreen
-}
-
-var screenFactory screenFactoryer = &defaultFactory{}

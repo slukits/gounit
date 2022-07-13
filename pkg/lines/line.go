@@ -8,26 +8,9 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-type lines []*Line
-
-func (ll *lines) isDirty() bool {
-	for _, l := range *ll {
-		if !l.dirty {
-			continue
-		}
-		return true
-	}
-	return false
-}
-
-func (ll *lines) sync() {
-	for _, l := range *ll {
-		if !l.dirty {
-			continue
-		}
-		l.sync()
-	}
-}
+// Zero is the zero line which has no functionality other than being
+// provided if a line with an out of bound index is requested.
+var Zero = &Line{}
 
 // Line represents a View's screen line.  A changed line content is
 // automatically synchronized with the screen.  Note changes of a line
@@ -37,6 +20,7 @@ type Line struct {
 	stale   string
 	content string
 	dirty   bool
+	typ     int
 
 	// Idx is the zero based line index corresponding with the screen
 	// line.
@@ -47,7 +31,7 @@ type Line struct {
 
 // Set updates the content of a line.
 func (l *Line) Set(content string) *Line {
-	if content == l.content {
+	if content == l.content || l.typ == 0 {
 		return l
 	}
 	if !l.dirty {
@@ -58,6 +42,27 @@ func (l *Line) Set(content string) *Line {
 	}
 	l.content = content
 	return l
+}
+
+// Get returns the currently set line content while stale if not zero is
+// the lines content on the screen.
+func (l *Line) Get() (current, stale string) {
+	return l.content, l.stale
+}
+
+// SetType sets a line's type which must be bigger than the
+// *DefaultType*.
+func (l *Line) SetType(t int) (ok bool) {
+	if t < DefaultType || l.typ == 0 {
+		return false
+	}
+	l.typ = t
+	return true
+}
+
+// Type returns a lines type.
+func (l *Line) Type() int {
+	return l.typ
 }
 
 func (l *Line) sync() {
@@ -87,5 +92,8 @@ func (l *Line) setLonger() {
 // IsDirty returns true if a line content has changed since the last
 // screen synchronization.
 func (l *Line) IsDirty() bool {
+	if l.typ == 0 {
+		return false
+	}
 	return l.dirty
 }
