@@ -5,8 +5,6 @@
 package lines
 
 import (
-	"sync"
-
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -14,7 +12,6 @@ type ErrScr struct {
 	lib     tcell.Screen
 	content string
 	isDirty bool
-	mutex   sync.Mutex
 	Active  bool
 	Style   tcell.Style
 }
@@ -27,20 +24,14 @@ func (v *View) ErrScreen() *ErrScr {
 }
 
 func (e *ErrScr) IsDirty() bool {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
 	return e.isDirty
 }
 
 func (e *ErrScr) String() string {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
 	return e.content
 }
 
 func (e *ErrScr) Set(s string) {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
 	if s == e.content {
 		return
 	}
@@ -51,8 +42,6 @@ func (e *ErrScr) Set(s string) {
 }
 
 func (e *ErrScr) sync() {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
 	e.isDirty = false
 	e.lib.Clear()
 	w, h := e.lib.Size()

@@ -46,11 +46,8 @@ import (
 // followed by a (blocking) call of *Listen* starting the event-loop.
 // Calling *Quit* stops the event-loop and releases resources.
 type View struct {
-	lib tcell.Screen
-	ll  lines
-	// protect ll in case a event-triggered screen-synchronizing happens
-	// while an increase in lines-count is requested.
-	lines     *sync.Mutex
+	lib       tcell.Screen
+	ll        lines
 	evtRunes  string
 	evtKeys   ints.Set
 	isPolling bool
@@ -96,8 +93,7 @@ func NewView() (*View, error) {
 		return nil, err
 	}
 	return &View{lib: lib, Register: newRegister(),
-		Synced: make(chan bool, 1),
-		lines:  &sync.Mutex{}}, nil
+		Synced: make(chan bool, 1)}, nil
 }
 
 // NewSim returns a new View instance wrapping tcell's simulation
@@ -110,8 +106,7 @@ func NewSim() (*View, tcell.SimulationScreen, error) {
 		return nil, nil, err
 	}
 	return &View{lib: lib, Register: newRegister(),
-		Synced: make(chan bool, 1),
-		lines:  &sync.Mutex{}}, lib, nil
+		Synced: make(chan bool, 1)}, lib, nil
 }
 
 // Len returns the number of lines of a terminal screen.  Note len of
@@ -128,8 +123,6 @@ func (v *View) IsPolling() bool {
 
 // For calls ascending ordered for each line of registered view back.
 func (v *View) For(cb func(*Line)) {
-	v.lines.Lock()
-	defer v.lines.Unlock()
 	for _, l := range v.ll {
 		cb(l)
 	}
@@ -138,16 +131,12 @@ func (v *View) For(cb func(*Line)) {
 // ForScreen calls ascending ordered back for each line shown on the
 // screen.
 func (v *View) ForScreen(cb func(*Line)) {
-	v.lines.Lock()
-	defer v.lines.Unlock()
 	for i := 0; i < v.Len(); i++ {
 		cb(v.ll[i])
 	}
 }
 
 func (v *View) ForN(n int, cb func(*Line)) {
-	v.lines.Lock()
-	defer v.lines.Unlock()
 	if n <= 0 {
 		return
 	}
@@ -159,8 +148,6 @@ func (v *View) ForN(n int, cb func(*Line)) {
 
 // Line returns line with given index or nil if no such line exists.
 func (v *View) Line(idx int) *Line {
-	v.lines.Lock()
-	defer v.lines.Unlock()
 	if idx < 0 || idx >= len(v.ll) {
 		return nil
 	}
@@ -254,8 +241,6 @@ func (v *View) ensureSynced(show bool) {
 			return
 		}
 	}
-	v.lines.Lock()
-	defer v.lines.Unlock()
 	if v.ll.isDirty() {
 		v.ll.sync()
 		sync()
@@ -270,9 +255,8 @@ func (v *View) synchronizeLinesSet(n int) {
 	lower, m := len(v.ll), 0
 	for len(v.ll) < n {
 		v.ll = append(v.ll, &Line{
-			lib:   v.lib,
-			mutex: &sync.Mutex{},
-			Idx:   lower + m})
+			lib: v.lib,
+			Idx: lower + m})
 		m++
 	}
 }

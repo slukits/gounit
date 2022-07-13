@@ -5,8 +5,6 @@
 package lines
 
 import (
-	"sync"
-
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -35,10 +33,7 @@ func (ll *lines) sync() {
 // automatically synchronized with the screen.  Note changes of a line
 // are not concurrency save.
 type Line struct {
-	lib tcell.Screen
-	// in case an event triggered screen-synchronization happens while a
-	// line's content is updated.
-	mutex   *sync.Mutex
+	lib     tcell.Screen
 	stale   string
 	content string
 	dirty   bool
@@ -52,8 +47,6 @@ type Line struct {
 
 // Set updates the content of a line.
 func (l *Line) Set(content string) *Line {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
 	if content == l.content {
 		return l
 	}
@@ -68,8 +61,6 @@ func (l *Line) Set(content string) *Line {
 }
 
 func (l *Line) sync() {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
 	l.dirty = false
 	if len(l.content) >= len(l.stale) {
 		l.setLonger()
