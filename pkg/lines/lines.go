@@ -2,8 +2,9 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-// Package lines provides a simple terminal-UI where the UI is
-// interpreted as an ordered set of lines.  Reported events are
+// Package lines provides a simple non-concurrency save terminal-UI
+// where the UI is interpreted as an ordered set of lines.  Reported
+// events are
 //
 // - rune: user pressed a keyboard key which translates to a rune
 //
@@ -17,7 +18,7 @@
 // Event listeners are registered using a view's *Register* property.
 // Calling the *Listen*-Method starts the event-loop with the mandatory
 // resize-event and blocks until the quit event is received ('q',
-// ctrl-c, ctrl-d).  A typical example:
+// ctrl-c, ctrl-d) or *Quit* is called.  A typical example:
 //
 //     lv := lines.NewView()
 //     lv.Register.Resize(func(v *lines.View) {
@@ -28,12 +29,25 @@
 //     })
 //     // ... register other event-listeners for ...
 //     lv.Listen() // block until quit
+//
+// use
+//
+//     lv.Register.Update(func(*linew.View) { // update call-back })
+//
+// to request an view-updating callback without an user-interaction.
+//
+// NOTE to avoid races a view must be only manipulated within an
+// event-listener and if the event-listener returns no further
+// manipulations must happen.  If concurrent view-manipulations are done
+// inside a listener the listener is responsible that they are performed
+// in a concurrency save way.
 package lines
 
 import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/slukits/ints"
@@ -44,7 +58,23 @@ import (
 // view whereas the later creates a view with tcell's simulation-screen
 // for testing.  Typically you would set a new view's event-listeners
 // followed by a (blocking) call of *Listen* starting the event-loop.
-// Calling *Quit* stops the event-loop and releases resources.
+// Calling *Quit* stops the event-loop and releases resources.  NOTE a
+// view-instance is *NOT* concurrency save.  To avoid data races between
+// automated screen-synchronization and client-side view-modification
+// the following two rules must be followed:
+//
+// - After an event-listener returns (which is always followed by an
+//   automatic screen synchronization) no further view-manipulations
+//   from the client-side must occur.
+//
+// - Register an Update-listener to post an Update-event into the event
+//   loop.
+//
+// I.e. to avoid freezing the ui the registered listeners should only do
+// view manipulations which can be done instantly and return.  Consider
+// to put any io or cpu heavy tasks in their own go-routine which once
+// finished registers an Update whose view manipulation can be done
+// quickly then.
 type View struct {
 	lib       tcell.Screen
 	ll        lines
@@ -76,6 +106,7 @@ type ListenerRegister interface {
 	Key(func(*View, tcell.ModMask), ...tcell.Key) error
 	Resize(func(*View))
 	Quit(func())
+	Update(func(*View)) error
 	reportRune(*View, rune)
 	reportKey(*View, tcell.Key, tcell.ModMask)
 	reportResize(*View)
@@ -92,7 +123,7 @@ func NewView() (*View, error) {
 	if err := lib.Init(); err != nil {
 		return nil, err
 	}
-	return &View{lib: lib, Register: newRegister(),
+	return &View{lib: lib, Register: newRegister(lib),
 		Synced: make(chan bool, 1)}, nil
 }
 
@@ -105,7 +136,7 @@ func NewSim() (*View, tcell.SimulationScreen, error) {
 	if err := lib.Init(); err != nil {
 		return nil, nil, err
 	}
-	return &View{lib: lib, Register: newRegister(),
+	return &View{lib: lib, Register: newRegister(lib),
 		Synced: make(chan bool, 1)}, lib, nil
 }
 
@@ -198,6 +229,10 @@ func (v *View) Listen() error {
 			}
 			v.ensureSynced(true)
 			v.Synced <- true
+		case *updateEvent:
+			ev.listener(v)
+			v.ensureSynced(true)
+			v.Synced <- true
 		default:
 			return nil
 		}
@@ -261,6 +296,15 @@ func (v *View) synchronizeLinesSet(n int) {
 	}
 }
 
+var ErrUpdateFmt = "can't post event: %w"
+
+type updateEvent struct {
+	when     time.Time
+	listener func(*View)
+}
+
+func (u *updateEvent) When() time.Time { return u.when }
+
 // Quit the event-loop, i.e. IsPolling will be false.
 func (v *View) Quit() {
 	v.isPolling = false
@@ -271,6 +315,7 @@ func (v *View) Quit() {
 // Register implements a View-instance's Register property storing the
 // event-listeners for events provided by a View-instance.
 type Register struct {
+	lib      tcell.Screen
 	keys     *sync.Mutex
 	kk       map[tcell.Key]func(*View, tcell.ModMask)
 	runes    *sync.Mutex
@@ -281,8 +326,9 @@ type Register struct {
 	allRunes func(*View, rune)
 }
 
-func newRegister() *Register {
+func newRegister(lib tcell.Screen) *Register {
 	return &Register{
+		lib:   lib,
 		keys:  &sync.Mutex{},
 		kk:    map[tcell.Key]func(*View, tcell.ModMask){},
 		runes: &sync.Mutex{},
@@ -404,6 +450,23 @@ func (rg *Register) reportResize(v *View) {
 		return
 	}
 	rg.resize(v)
+}
+
+// Update posts a new event into the event loop which calls once it is
+// its turn given listener.  Update fails if the event-loop is full.
+// Update is an no-op if listener is nil.
+func (rg *Register) Update(listener func(*View)) error {
+	if listener == nil {
+		return nil
+	}
+	evt := &updateEvent{
+		when:     time.Now(),
+		listener: listener,
+	}
+	if err := rg.lib.PostEvent(evt); err != nil {
+		return fmt.Errorf(ErrUpdateFmt, err)
+	}
+	return nil
 }
 
 // Quit registers given listener for the quit event which is triggered

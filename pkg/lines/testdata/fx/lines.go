@@ -219,6 +219,16 @@ func (r *RegisterWrapper) keyWrapper(
 	}
 }
 
+// Resize wraps given listener for MaxEvent-maintenance before it is
+// passed on to wrapped view-*Register* property.
+func (r *RegisterWrapper) Resize(listener func(*lines.View)) {
+	if listener == nil {
+		r.ListenerRegister.Resize(listener)
+		return
+	}
+	r.ListenerRegister.Resize(r.resizeWrapper(listener))
+}
+
 func (r *RegisterWrapper) resizeWrapper(
 	l func(*lines.View),
 ) func(*lines.View) {
@@ -231,21 +241,24 @@ func (r *RegisterWrapper) resizeWrapper(
 	}
 }
 
-// Resize wraps given listener for MaxEvent-maintenance before it is
+// Update wraps given listener for MaxEvent-maintenance before it is
 // passed on to wrapped view-*Register* property.
-func (r *RegisterWrapper) Resize(listener func(*lines.View)) {
+func (r *RegisterWrapper) Update(listener func(*lines.View)) error {
 	if listener == nil {
-		r.ListenerRegister.Resize(listener)
-		return
+		return r.ListenerRegister.Update(listener)
 	}
-	r.ListenerRegister.Resize(r.resizeWrapper(listener))
+	return r.ListenerRegister.Update(r.updateWrapper(listener))
 }
 
-func (r *RegisterWrapper) quitWrapper(l func()) func() {
-	return func() {
-		l()
-		r.vw.MaxEvents--
-		close(r.vw.NextEventProcessed)
+func (r *RegisterWrapper) updateWrapper(
+	l func(*lines.View),
+) func(*lines.View) {
+	return func(v *lines.View) {
+		l(v)
+		go func() {
+			<-v.Synced
+			r.decrementMaxEvents()
+		}()
 	}
 }
 
@@ -257,6 +270,14 @@ func (r *RegisterWrapper) Quit(listener func()) {
 		return
 	}
 	r.ListenerRegister.Quit(r.quitWrapper(listener))
+}
+
+func (r *RegisterWrapper) quitWrapper(l func()) func() {
+	return func() {
+		l()
+		r.vw.MaxEvents--
+		close(r.vw.NextEventProcessed)
+	}
 }
 
 func (r *RegisterWrapper) decrementMaxEvents() {

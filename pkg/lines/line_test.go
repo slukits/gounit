@@ -100,4 +100,11 @@ func TestALine(t *testing.T) {
 
 type DBG struct{ Suite }
 
+func (s *DBG) Posts_and_reports_update_event(t *T) {
+	v, update := fx.NewView(t), false
+	v.Register.Update(func(v *lines.View) { update = true })
+	v.Listen()
+	t.True(update)
+}
+
 func TestDBG(t *testing.T) { Run(&DBG{}, t) }

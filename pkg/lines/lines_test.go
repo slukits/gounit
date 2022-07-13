@@ -211,6 +211,13 @@ func (s *AView) Resize_adjusts_the_provided_screen_lines(t *T) {
 	t.Eq(4, resizeCount)
 }
 
+func (s *AView) Posts_and_reports_update_event(t *T) {
+	v, update := s.fx.View(t), false
+	v.Register.Update(func(v *lines.View) { update = true })
+	v.Listen()
+	t.True(update)
+}
+
 func (s *AView) Reports_quit_event_and_ends_event_loop(t *T) {
 	quit := []int{int('q'), int(tcell.KeyCtrlC), int(tcell.KeyCtrlD)}
 	for i, k := range quit {
