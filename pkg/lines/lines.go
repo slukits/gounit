@@ -2,14 +2,16 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-// Package lines provides a well tested, simple, easy to use terminal-UI
-// where the UI is interpreted as an ordered set of lines.  *lines*
-// hides event-polling and screen-synchronization from its user.  Making
-// the components of a view concurrency save in the sense that it can be
-// manipulated while an event is processed at the same time would add
-// significant overhead and complexity to the view.  To avoid this
-// overhead and race conditions this package was designed not around a
-// view/screen but around event-handling:
+// Package lines provides a well tested, robust against race conditions,
+// simple, easy to use terminal-UI where the UI is interpreted as an
+// ordered set of lines.  *lines* hides event-polling and
+// screen-synchronization from its user.  Making the components of a
+// view concurrency save in the sense that it can be manipulated by
+// several event-listeners while screen synchronization is processed at
+// the same time would add significant overhead and complexity to the
+// view.  To avoid this overhead and be still robust against race
+// conditions this package was designed not around a view/screen/window
+// but around event-handling:
 //
 // reg := lines.New()
 //
@@ -30,10 +32,10 @@
 //
 // The Update method posts an update event into the event-loop and calls
 // given listener back once it is polled.  I.e. Update provides a
-// programmatically way to update the screen without user input. To
-// react on user input listeners may be registered for runes or special
-// keys as they are recognized and provided by the underlying *tcell*
-// package
+// programmatically way to update the screen without user triggered
+// events. To react on user input listeners may be registered for runes
+// or special keys as they are recognized and provided by the underlying
+// *tcell* package
 //
 // func help(v *lines.View, m tcell.ModMask) {
 //     v.LL().Get(0).Set("some help-text in first line")
@@ -44,15 +46,21 @@
 // i.e. help is called back if the user presses either the F1 or the H
 // key.
 //
-// reg.Runes(func (v *lines.View, r rune, exit bool) {
-//     v.LL().Get(0).Set("received rune-input: "+string(r))
-// }, tcell.KeyESC)
+// reg.KeyBoard(func (v *lines.View, r rune, k tcell.Key) (stop bool) {
+//     if r != rune(0) {
+//         v.LL().Get(0).Set("received rune-input: "+string(r))
+//     }
+//     switch k {
+//     case tcell.KeyESC, tcell.KeyEnter:
+//         return true
+//     default:
+//         return false
+//     }
+// })
 //
-// Runes suppresses all registered Rune-events and provides received
-// rune input to registered Runes-listener until provided special key is
-// received which is the escape key in the above example.  If given
-// special key is received the event-handler is called for a last time
-// having its exit argument set to true.
+// KeyBoard suppresses all registered Rune- and Key-events (except for
+// the quit event) and provides received rune/key input to registered
+// Runes-listener until it returns true.
 //
 // reg.Quit(func() { fmt.Println("good by") })
 //
@@ -81,13 +89,16 @@ func New() (*Register, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Register{
+	reg := Register{
 		view:   view,
 		kk:     map[tcell.Key]func(*View, tcell.ModMask){},
 		rr:     map[rune]func(*View){},
 		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
-	}, nil
+		Keys:   DefaultKeys,
+	}
+	reg.Keys = DefaultKeys.copy(&reg)
+	return &reg, nil
 }
 
 // Sim returns a listener register providing a view with tcell's
@@ -99,13 +110,15 @@ func Sim() (*Register, tcell.SimulationScreen, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return &Register{
+	reg := Register{
 		view:   view,
 		kk:     map[tcell.Key]func(*View, tcell.ModMask){},
 		rr:     map[rune]func(*View){},
 		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
-	}, view.lib.(tcell.SimulationScreen), nil
+	}
+	reg.Keys = DefaultKeys.copy(&reg)
+	return &reg, view.lib.(tcell.SimulationScreen), nil
 }
 
 // newView returns a new View instance or nil and an error in case

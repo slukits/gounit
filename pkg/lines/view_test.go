@@ -10,7 +10,6 @@ import (
 
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/pkg/lines"
-	"github.com/slukits/gounit/pkg/lines/testdata/fx"
 )
 
 type AView struct {
@@ -25,7 +24,7 @@ func (s *AView) Init(t *I) {
 
 func (s *AView) SetUp(t *T) {
 	t.Parallel()
-	s.fx.Set(t, fx.New(t))
+	s.fx.Set(t, New(t))
 }
 
 func (s *AView) TearDown(t *T) { s.fx.Del(t) }
@@ -57,10 +56,10 @@ func (s *AView) Adjust_length_according_to_a_resize_event(t *T) {
 		}
 		resizeCount++
 	})
-	go rg.Listen()
-	<-rg.NextEventProcessed // wait for initial resize to happen
-	<-rg.SetNumberOfLines(exp)
+	rg.Listen()
+	rg.SetNumberOfLines(exp)
 	t.Eq(2, resizeCount)
+	t.False(rg.IsPolling())
 }
 
 func (s *AView) Adjusts_provided_screen_lines_at_resize_event(t *T) {
@@ -86,12 +85,12 @@ func (s *AView) Adjusts_provided_screen_lines_at_resize_event(t *T) {
 		}
 		resizeCount++
 	})
-	go rg.Listen()
-	<-rg.NextEventProcessed
-	<-rg.SetNumberOfLines(s.fx.DefaultLineCount)
-	<-rg.SetNumberOfLines(expFirst)
-	<-rg.SetNumberOfLines(expSecond)
+	rg.Listen()
+	rg.SetNumberOfLines(s.fx.DefaultLineCount)
+	rg.SetNumberOfLines(expFirst)
+	rg.SetNumberOfLines(expSecond)
 	t.Eq(4, resizeCount)
+	t.False(rg.IsPolling())
 }
 
 func (s *AView) Shows_an_error_if_resize_goes_below_min(t *T) {
@@ -102,10 +101,10 @@ func (s *AView) Shows_an_error_if_resize_goes_below_min(t *T) {
 			v.SetMin(20)
 		}
 	})
-	go rg.Listen()
-	<-rg.NextEventProcessed
-	rg.SetNumberOfLines(15) // since it errors it is not reported
-	<-rg.Synced
+	rg.Listen()
+	t.False(first)
+	rg.SetNumberOfLines(15) // not reported
+	t.True(rg.IsPolling())
 	rg.QuitListening()
 	t.Contains(rg.LastScreen, fmt.Sprintf(lines.ErrScreenFmt, 20))
 }
@@ -114,7 +113,3 @@ func TestAView(t *testing.T) {
 	t.Parallel()
 	Run(&AView{}, t)
 }
-
-type DBG struct{ Suite }
-
-func TestDBG(t *testing.T) { Run(&DBG{}, t) }

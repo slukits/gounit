@@ -1,6 +1,7 @@
 package lines_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,18 +11,42 @@ import (
 	"github.com/slukits/gounit/pkg/lines/testdata/fx"
 )
 
+func waitFor(t *T, c interface{}, mm ...string) {
+	msg := func() string {
+		if len(mm) == 0 {
+			return "timed out"
+		}
+		return fmt.Sprintf("timed out: %s", mm[0])
+	}
+	t.GoT().Helper()
+	switch c := c.(type) {
+	case chan struct{}:
+		select {
+		case <-c:
+		case <-t.Timeout(10 * time.Millisecond):
+			t.Fatalf(msg())
+		}
+	case chan bool:
+		select {
+		case <-c:
+		case <-t.Timeout(10 * time.Millisecond):
+			t.Fatalf(msg())
+		}
+	}
+}
+
 type NewRegister struct{ Suite }
 
 func (s *NewRegister) Fails_if_cell_s_screen_creation_fails(t *T) {
-	lines.SetScreenFactory(&fx.ScreenFactory{Fail: true})
+	lines.SetScreenFactory(&ScreenFactory{Fail: true})
 	_, err := lines.New()
-	t.ErrIs(err, fx.ScreenErr)
+	t.ErrIs(err, ScreenErr)
 }
 
 func (s *NewRegister) Fails_if_tcell_s_screen_init_fails(t *T) {
-	lines.SetScreenFactory(&fx.ScreenFactory{FailInit: true})
+	lines.SetScreenFactory(&ScreenFactory{FailInit: true})
 	_, err := lines.New()
-	t.ErrIs(err, fx.InitErr)
+	t.ErrIs(err, InitErr)
 }
 
 func (s *NewRegister) Succeeds_if_none_of_the_above(t *T) {
@@ -40,9 +65,9 @@ func (s *NewRegister) May_fail_in_graphical_test_environment(t *T) {
 }
 
 func (s *NewRegister) Sim_fails_if_tcell_s_sim_init_fails(t *T) {
-	lines.SetScreenFactory(&fx.ScreenFactory{FailInit: true})
+	lines.SetScreenFactory(&ScreenFactory{FailInit: true})
 	_, _, err := lines.Sim()
-	t.ErrIs(err, fx.InitErr)
+	t.ErrIs(err, InitErr)
 }
 
 func (s *NewRegister) Sim_succeeds_if_none_of_the_above(t *T) {
@@ -50,6 +75,26 @@ func (s *NewRegister) Sim_succeeds_if_none_of_the_above(t *T) {
 	_, lib, err := lines.Sim()
 	t.FatalOn(err)
 	lib.Fini()
+}
+
+func (s *NewRegister) Has_copy_of_default_keys_for_internal_events(
+	t *T,
+) {
+	lines.SetScreenFactory(lines.DefaultScreenFactory())
+	reg, _, err := lines.Sim()
+	t.FatalOn(err)
+	for _, e := range lines.InternalEvents {
+		kk := lines.DefaultKeys.KeysOf(e)
+		for _, k := range kk {
+			t.True(reg.Keys.HasKey(k))
+			t.Eq(e, reg.Keys.KeyEvent(k))
+		}
+		rr := lines.DefaultKeys.RunesOf(e)
+		for _, r := range rr {
+			t.True(reg.Keys.HasRune(r))
+			t.Eq(e, reg.Keys.RuneEvent(r))
+		}
+	}
 }
 
 func (s *NewRegister) Finalize(t *F) {
@@ -71,17 +116,17 @@ type FX struct {
 	DefaultLineCount int
 }
 
-func (f *FX) Reg(t *T, maxEvt ...int) *fx.Register {
+func (f *FX) Reg(t *T, maxEvt ...int) *Register {
 	if len(maxEvt) == 0 {
-		return f.Get(t).(*fx.Register)
+		return f.Get(t).(*Register)
 	}
-	rg := f.Get(t).(*fx.Register)
+	rg := f.Get(t).(*Register)
 	rg.Max = maxEvt[0]
 	return rg
 }
 
 func (f *FX) Del(t *T) interface{} {
-	rg, ok := f.Fixtures.Del(t).(*fx.Register)
+	rg, ok := f.Fixtures.Del(t).(*Register)
 	if !ok {
 		return nil
 	}
@@ -98,7 +143,7 @@ func (s *ARegister) Init(t *I) {
 
 func (s *ARegister) SetUp(t *T) {
 	t.Parallel()
-	s.fx.Set(t, fx.New(t))
+	s.fx.Set(t, New(t))
 }
 
 func (s *ARegister) TearDown(t *T) { s.fx.Del(t) }
@@ -115,13 +160,14 @@ func (s *ARegister) Stops_reporting_if_view_to_small(t *T) {
 	rg.Resize(func(v *lines.View) {
 		v.SetMin(30)
 	})
-	go rg.Listen()
-	<-rg.NextEventProcessed
+	rg.Listen()
+	t.Eq(1, rg.Max) // initial resize event
 	t.FatalOn(rg.Update(func(v *lines.View) { updates++ }))
-	<-rg.Synced
-	<-rg.SetNumberOfLines(35)
+	t.Eq(0, updates)
+	rg.SetNumberOfLines(35)
+	t.Eq(0, rg.Max) // second resize event
 	t.FatalOn(rg.Update(func(v *lines.View) { updates++ }))
-	<-rg.NextEventProcessed
+	t.Eq(1, updates)
 }
 
 func (s *ARegister) Stops_reporting_except_for_quit(t *T) {
@@ -129,40 +175,36 @@ func (s *ARegister) Stops_reporting_except_for_quit(t *T) {
 	rg.Resize(func(v *lines.View) {
 		v.SetMin(30)
 	})
-	go rg.Listen()
-	<-rg.NextEventProcessed
+	rg.Listen()
 	rg.FireRuneEvent('q')
-	<-rg.NextEventProcessed
 	t.False(rg.IsPolling())
 }
 
 func (s *ARegister) Posts_and_reports_update_event(t *T) {
-	rg, update := s.fx.Reg(t, 1), false
+	rg, update := s.fx.Reg(t), false
+	rg.Listen()
 	t.FatalOn(rg.Update(nil))
-	t.FatalOn(rg.Update(func(v *lines.View) { update = true }))
-	go rg.Listen()
-	<-rg.NextEventProcessed
-	rg.QuitListening()
+	t.FatalOn(rg.Update(func(v *lines.View) {
+		update = true
+	}))
 	t.True(update)
-	t.Eq(0, rg.Max) // i.e. only one event was reported
+	t.False(rg.IsPolling())
 }
 
-func (s *ARegister) Reports_a_update_event_with_now_timestamp(t *T) {
+func (s *ARegister) Reports_an_update_event_with_now_timestamp(t *T) {
 	rg, now, updateReported := s.fx.Reg(t, 0), time.Now(), false
-	go rg.Listen()
+	rg.Listen()
 	rg.Update(func(v *lines.View) {
 		updateReported = true
 		t.True(rg.Ev.When().After(now))
 	})
-	<-rg.NextEventProcessed
 	t.True(updateReported)
+	t.False(rg.IsPolling())
 }
-
 func (s *ARegister) Fails_posting_an_update_if_event_loop_full(t *T) {
 	rg, _, err := lines.Sim()
 	t.FatalOn(err)
 	block, failed := make(chan struct{}), false
-	// go rg.Listen()
 	rg.Update(func(v *lines.View) { <-block })
 	for i := 0; i < 100; i++ {
 		if err := rg.Update(func(v *lines.View) {}); err != nil {
@@ -176,57 +218,44 @@ func (s *ARegister) Fails_posting_an_update_if_event_loop_full(t *T) {
 }
 
 func (s *ARegister) Reports_quit_event_and_ends_event_loop(t *T) {
-	quit := []int{int('q'), int(tcell.KeyCtrlC), int(tcell.KeyCtrlD)}
+	quit := []int{0, int('q'), int(tcell.KeyCtrlC), int(tcell.KeyCtrlD)}
+	now := time.Now()
 	for i, k := range quit {
-		rg, quitEvt, terminated := fx.New(t, 1), false, false
-		rg.Quit(func() { quitEvt = true })
-		go func() {
-			rg.Listen()
-			terminated = true
-		}()
+		rg, quitEvt := New(t, 1), false
+		rg.Quit(func() {
+			if i == 0 {
+				t.True(rg.Ev.When().After(now))
+			}
+			quitEvt = true
+		})
+		rg.Listen()
 		if i == 0 {
+			rg.QuitListening()
+		} else if i == 1 {
 			rg.FireRuneEvent(rune(k))
 		} else {
 			rg.FireKeyEvent(tcell.Key(k))
 		}
-		<-rg.NextEventProcessed
 		t.True(quitEvt)
-		t.True(terminated)
 		t.Eq(0, rg.Max)
+		t.False(rg.IsPolling())
 	}
 }
 
 func (s *ARegister) Quits_event_loop_on_quit_event_without_listener(
 	t *T,
 ) {
-	rg, terminated := s.fx.Reg(t), make(chan struct{})
-	go func() {
-		rg.Listen()
-		close(terminated)
-	}()
-	rg.FireRuneEvent('q') // here we can not wait on the event!!
-	select {
-	case <-t.Timeout(10 * time.Millisecond):
-		t.Error("register listener doesn't seem to terminate")
-	case <-terminated:
-	}
+	rg := s.fx.Reg(t)
+	rg.Listen()
+	rg.FireRuneEvent('q')
+	t.False(rg.IsPolling())
 }
 
 func (s *ARegister) Does_not_report_unregistered_events(t *T) {
 	rg := s.fx.Reg(t)
-	go rg.Listen()
+	rg.Listen()
 	rg.FireRuneEvent('a')
-	select {
-	case <-rg.NextEventProcessed:
-		t.Error("unexpected event")
-	case <-t.Timeout(1 * time.Millisecond):
-	}
 	rg.FireKeyEvent(tcell.KeyF11)
-	select {
-	case <-rg.NextEventProcessed:
-		t.Error("unexpected event")
-	case <-t.Timeout(1 * time.Millisecond):
-	}
 	t.Eq(0, rg.Max)
 }
 
@@ -237,19 +266,18 @@ func (s *ARegister) Reports_registered_rune_and_key_events(t *T) {
 			shiftEnter = true
 		}
 	}, tcell.KeyEnter)
-	go rg.Listen()
 	t.FatalOn(err)
 	t.FatalOn(rg.Rune(func(v *lines.View) { aRune = true }, 'a'))
-	<-rg.FireKeyEvent(tcell.KeyEnter, tcell.ModShift)
+	rg.Listen()
+	rg.FireKeyEvent(tcell.KeyEnter, tcell.ModShift)
 	t.True(shiftEnter)
-	<-rg.FireRuneEvent('a')
+	rg.FireRuneEvent('a')
 	t.True(aRune)
 	t.Eq(-1, rg.Max)
 }
 
 func (s *ARegister) Unregisters_nil_listener_events(t *T) {
 	rg := s.fx.Reg(t)
-	defer rg.QuitListening()
 	t.FatalOn(rg.Rune(func(*lines.View) {}, 'a'))
 	t.FatalOn(rg.Rune(nil, 'a'))
 	t.FatalOn(rg.Rune(func(*lines.View) {}, 'a'))
@@ -291,13 +319,13 @@ func (s *ARegister) Reports_all_rune_events_to_runes_listener_til_removed(
 	rg, aRune, allRunes := s.fx.Reg(t, 1), false, false
 	rg.Rune(func(v *lines.View) { aRune = true }, 'a')
 	rg.Runes(func(v *lines.View, r rune) { allRunes = true })
-	go rg.Listen()
-	<-rg.FireRuneEvent('a')
+	rg.Listen()
+	rg.FireRuneEvent('a')
 	t.True(allRunes)
 	rg.Runes(nil)
-	<-rg.FireRuneEvent('a')
+	rg.FireRuneEvent('a')
 	t.True(aRune)
-	t.Eq(-1, rg.Max)
+	t.False(rg.IsPolling())
 }
 
 func TestARegister(t *testing.T) {

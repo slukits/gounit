@@ -10,7 +10,6 @@ import (
 	"github.com/gdamore/tcell/v2"
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/pkg/lines"
-	"github.com/slukits/gounit/pkg/lines/testdata/fx"
 )
 
 type TheZeroLine struct{ Suite }
@@ -48,7 +47,7 @@ func (s *ALine) Init(t *I) {
 
 func (s *ALine) SetUp(t *T) {
 	t.Parallel()
-	s.fx.Set(t, fx.New(t))
+	s.fx.Set(t, New(t))
 }
 
 func (s *ALine) TearDown(t *T) {
@@ -83,14 +82,13 @@ func (s *ALine) Can_have_its_type_changed(t *T) {
 }
 
 func (s *ALine) Updates_on_screen_with_content_changing_event(t *T) {
-	v, init, update := s.fx.Reg(t, 1), "line 0", "update 0"
-	v.Resize(func(v *lines.View) { v.LL().Line(0).Set(init) })
-	v.Rune(func(v *lines.View) { v.LL().Line(0).Set(update) }, 'u')
-	go v.Listen()
-	<-v.NextEventProcessed
-	t.Eq(init, v.String())
-	<-v.FireRuneEvent('u')
-	t.Eq(update, v.LastScreen)
+	rg, init, update := s.fx.Reg(t, 1), "line 0", "update 0"
+	rg.Resize(func(v *lines.View) { v.LL().Line(0).Set(init) })
+	rg.Rune(func(v *lines.View) { v.LL().Line(0).Set(update) }, 'u')
+	rg.Listen()
+	t.Eq(init, rg.String())
+	rg.FireRuneEvent('u')
+	t.Eq(update, rg.LastScreen)
 }
 
 func (s *ALine) Is_not_dirty_after_screen_synchronization(t *T) {
@@ -107,26 +105,27 @@ func (s *ALine) Is_not_dirty_after_screen_synchronization(t *T) {
 		v.LL().Line(0).Set("key 0")
 		t.True(v.LL().Line(0).IsDirty())
 	}, tcell.KeyUp)
-	go rg.Listen()
-	<-rg.NextEventProcessed
-	rg.Update(func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
-	<-rg.NextEventProcessed
-	<-rg.FireRuneEvent('a')
-	rg.Update(func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
-	<-rg.NextEventProcessed
-	<-rg.FireKeyEvent(tcell.KeyUp)
-	rg.Update(func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
-	<-rg.NextEventProcessed
+	rg.Listen()
+	err := rg.Update(
+		func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
+	t.FatalOn(err)
+	rg.FireRuneEvent('a')
+	err = rg.Update(
+		func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
+	t.FatalOn(err)
+	rg.FireKeyEvent(tcell.KeyUp)
+	err = rg.Update(
+		func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
+	t.FatalOn(err)
 }
 
 func (s *ALine) Pads_a_shrinking_line_with_blanks(t *T) {
 	rg, long, short := s.fx.Reg(t, 1), "a longer line", "short line"
 	rg.Resize(func(v *lines.View) { v.LL().Line(0).Set(long) })
 	rg.Rune(func(v *lines.View) { v.LL().Line(0).Set(short) }, 'a')
-	go rg.Listen()
-	<-rg.NextEventProcessed
+	rg.Listen()
 	t.Eq(long, rg.String())
-	<-rg.FireRuneEvent('a')
+	rg.FireRuneEvent('a')
 	t.Eq(short, rg.LastScreen)
 }
 

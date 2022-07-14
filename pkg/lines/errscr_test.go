@@ -10,7 +10,6 @@ import (
 
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/pkg/lines"
-	"github.com/slukits/gounit/pkg/lines/testdata/fx"
 )
 
 type AErrorScreen struct {
@@ -25,7 +24,7 @@ func (s *AErrorScreen) Init(t *I) {
 
 func (s *AErrorScreen) SetUp(t *T) {
 	t.Parallel()
-	s.fx.Set(t, fx.New(t))
+	s.fx.Set(t, New(t))
 }
 
 func (s *AErrorScreen) TearDown(t *T) { s.fx.Del(t) }

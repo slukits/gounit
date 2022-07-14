@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package fx
+package lines_test
 
 import (
 	"errors"
@@ -27,7 +27,8 @@ func (f *ScreenFactory) NewSimulationScreen(string) tcell.SimulationScreen {
 
 var InitErr = errors.New("mock: screen: failing initialization")
 
-// Screen mocks tcell's SimulationScreen implementation.
+// Screen mocks tcell's SimulationScreen implementation to mock-up its
+// possible creation/initialization-errors.
 type Screen struct{ Fail bool }
 
 // Init initializes the screen for use.
@@ -44,18 +45,18 @@ func (s *Screen) Init() error {
 // if any bytes were not fully understood.  Any bytes that are not
 // fully converted are discarded.
 func (s *Screen) InjectKeyBytes(buf []byte) bool {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // InjectKey injects a key event.  The rune is a UTF-8 rune, post
 // any translation.
 func (s *Screen) InjectKey(key tcell.Key, r rune, mod tcell.ModMask) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // InjectMouse injects a mouse event.
 func (s *Screen) InjectMouse(x int, y int, buttons tcell.ButtonMask, mod tcell.ModMask) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // SetSize resizes the underlying physical screen.  It also causes
@@ -64,7 +65,7 @@ func (s *Screen) InjectMouse(x int, y int, buttons tcell.ButtonMask, mod tcell.M
 // the old copied), so any prior value obtained with GetContents
 // won't be used anymore
 func (s *Screen) SetSize(width int, height int) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // GetContents returns screen contents as an array of
@@ -72,35 +73,35 @@ func (s *Screen) SetSize(width int, height int) {
 // physical contents will be used until the next time SetSize()
 // is called.
 func (s *Screen) GetContents() (cells []tcell.SimCell, width int, height int) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // GetCursor returns the cursor details.
 func (s *Screen) GetCursor() (x int, y int, visible bool) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Fini finalizes the screen also releasing resources.
 func (s *Screen) Fini() {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Clear erases the screen.  The contents of any screen buffers
 // will also be cleared.  This has the logical effect of
 // filling the screen with spaces, using the global default style.
 func (s *Screen) Clear() {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Fill fills the screen with the given character and style.
 func (s *Screen) Fill(_ rune, _ tcell.Style) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // SetCell is an older API, and will be removed.  Please use
 // SetContent instead; SetCell is implemented in terms of SetContent.
 func (s *Screen) SetCell(x int, y int, style tcell.Style, ch ...rune) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // GetContent returns the contents at the given location.  If the
@@ -111,7 +112,7 @@ func (s *Screen) SetCell(x int, y int, style tcell.Style, ch ...rune) {
 // in screen cells; most often this will be 1, but some East Asian
 // characters require two cells.
 func (s *Screen) GetContent(x int, y int) (mainc rune, combc []rune, style tcell.Style, width int) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // SetContent sets the contents of the given cell location.  If
@@ -128,40 +129,40 @@ func (s *Screen) GetContent(x int, y int) (mainc rune, combc []rune, style tcell
 // undefined effects.  Wide runes that are printed in the
 // last column will be replaced with a single width space on output.
 func (s *Screen) SetContent(x int, y int, mainc rune, combc []rune, style tcell.Style) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // SetStyle sets the default style to use when clearing the screen
 // or when StyleDefault is specified.  If it is also StyleDefault,
 // then whatever system/terminal default is relevant will be used.
 func (s *Screen) SetStyle(style tcell.Style) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // ShowCursor is used to display the cursor at a given location.
 // If the coordinates -1, -1 are given or are otherwise outside the
 // dimensions of the screen, the cursor will be hidden.
 func (s *Screen) ShowCursor(x int, y int) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // HideCursor is used to hide the cursor.  Its an alias for
 // ShowCursor(-1, -1).sim
 func (s *Screen) HideCursor() {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // SetCursorStyle is used to set the cursor style.  If the style
 // is not supported (or cursor styles are not supported at all),
 // then this will have no effect.
 func (s *Screen) SetCursorStyle(_ tcell.CursorStyle) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Size returns the screen size as width, height.  This changes in
 // response to a call to Clear or Flush.
 func (s *Screen) Size() (width int, height int) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // ChannelEvents is an infinite loop that waits for an event and
@@ -174,14 +175,14 @@ func (s *Screen) Size() (width int, height int) {
 //
 // NOTE: PollEvent should not be called while this method is running.
 func (s *Screen) ChannelEvents(ch chan<- tcell.Event, quit <-chan struct{}) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // PollEvent waits for events to arrive.  Main application loops
 // must spin on this to prevent the application from stalling.
 // Furthermore, this will return nil if the Screen is finalized.
 func (s *Screen) PollEvent() tcell.Event {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // HasPendingEvent returns true if PollEvent would return an event
@@ -190,14 +191,14 @@ func (s *Screen) PollEvent() tcell.Event {
 // The purpose of this function is to allow multiple events to be collected
 // at once, to minimize screen redraws.
 func (s *Screen) HasPendingEvent() bool {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // PostEvent tries to post an event into the event stream.  This
 // can fail if the event queue is full.  In that case, the event
 // is dropped, and ErrEventQFull is returned.
 func (s *Screen) PostEvent(ev tcell.Event) error {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Deprecated: PostEventWait is unsafe, and will be removed
@@ -212,29 +213,29 @@ func (s *Screen) PostEvent(ev tcell.Event) error {
 // For this reason, when using this function, the use of a
 // Goroutine is recommended to ensure no deadlock can occur.
 func (s *Screen) PostEventWait(ev tcell.Event) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // EnableMouse enables the mouse.  (If your terminal supports it.)
 // If no flags are specified, then all events are reported, if the
 // terminal supports them.
 func (s *Screen) EnableMouse(_ ...tcell.MouseFlags) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // DisableMouse disables the mouse.
 func (s *Screen) DisableMouse() {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // EnablePaste enables bracketed paste mode, if supported.
 func (s *Screen) EnablePaste() {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // DisablePaste disables bracketed paste mode.
 func (s *Screen) DisablePaste() {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // HasMouse returns true if the terminal (apparently) supports a
@@ -242,14 +243,14 @@ func (s *Screen) DisablePaste() {
 // a mouse/pointing device is present; a false return definitely
 // indicates no mouse support is available.
 func (s *Screen) HasMouse() bool {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Colors returns the number of colors.  All colors are assumed to
 // use the ANSI color map.  If a terminal is monochrome, it will
 // return 0.
 func (s *Screen) Colors() int {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Show makes all the content changes made using SetContent() visible
@@ -258,7 +259,7 @@ func (s *Screen) Colors() int {
 // It does so in the most efficient and least visually disruptive
 // manner possible.
 func (s *Screen) Show() {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Sync works like Show(), but it updates every visible cell on the
@@ -270,7 +271,7 @@ func (s *Screen) Show() {
 // (e.g. to clear up on screen corruption caused by some other program),
 // or during a resize event.
 func (s *Screen) Sync() {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // CharacterSet returns information about the character set.
@@ -279,7 +280,7 @@ func (s *Screen) Sync() {
 // we normally translate input/output to/from UTF-8, regardless of
 // what the user's environment is.
 func (s *Screen) CharacterSet() string {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // RegisterRuneFallback adds a fallback for runes that are not
@@ -302,7 +303,7 @@ func (s *Screen) CharacterSet() string {
 // It is recommended that replacement strings consist only of
 // 7-bit ASCII, since other characters may not display everywhere.
 func (s *Screen) RegisterRuneFallback(r rune, subst string) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // UnregisterRuneFallback unmaps a replacement.  It will unmap
@@ -312,7 +313,7 @@ func (s *Screen) RegisterRuneFallback(r rune, subst string) {
 // to "disable" the use of alternate characters that are supported
 // by your terminal except by changing the terminal database.
 func (s *Screen) UnregisterRuneFallback(r rune) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // CanDisplay returns true if the given rune can be displayed on
@@ -325,14 +326,14 @@ func (s *Screen) UnregisterRuneFallback(r rune) {
 // also return true if the terminal can replace the glyph with
 // one that is visually indistinguishable from the one requested.
 func (s *Screen) CanDisplay(r rune, checkFallbacks bool) bool {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Resize does nothing, since its generally not possible to
 // ask a screen to resize, but it allows the Screen to implement
 // the View interface.
 func (s *Screen) Resize(_ int, _ int, _ int, _ int) {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // HasKey returns true if the keyboard is believed to have the
@@ -344,23 +345,23 @@ func (s *Screen) Resize(_ int, _ int, _ int, _ int) {
 // menus, displayed hot-keys, etc.  Note that KeyRune (literal
 // runes) is always true.
 func (s *Screen) HasKey(_ tcell.Key) bool {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Suspend pauses input and output processing.  It also restores the
 // terminal settings to what they were when the application started.
 // This can be used to, for example, run a sub-shell.
 func (s *Screen) Suspend() error {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Resume resumes after Suspend().
 func (s *Screen) Resume() error {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 // Beep attempts to sound an OS-dependent audible alert and returns an error
 // when unsuccessful.
 func (s *Screen) Beep() error {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }

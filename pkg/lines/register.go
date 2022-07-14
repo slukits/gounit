@@ -31,18 +31,28 @@ type Register struct {
 
 	// Ev provides the currently reported tcell-event.
 	Ev tcell.Event
+
+	// Keys are the keys and runes which are used for "internal" event
+	// handling, e.g. the keys/runes for the quit event are q, ctrl-c
+	// and ctrl-d.  The key instance allows you to change these keys in
+	// a consistent way.  Keys default to *DefaultKeys*.
+	Keys *Keys
 }
 
 // IsPolling returns true if listener register is polling in the event
 // loop.
-func (rg *Register) IsPolling() bool { return rg.isPolling }
+func (rg *Register) IsPolling() bool {
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
+	return rg.isPolling
+}
 
 // Listen blocks and starts polling from the event loop reporting
 // received events to registered listeners.  Listen returns if either a
 // quit-event was received ('q', ctrl-c, ctrl-d input) or QuitListening
 // was called.
 func (rg *Register) Listen() {
-	rg.isPolling = true
+	rg.startPolling()
 	for {
 		ev := rg.view.lib.PollEvent()
 
@@ -54,6 +64,13 @@ func (rg *Register) Listen() {
 		switch ev := ev.(type) {
 		case nil: // event-loop ended
 			return
+		case *quitEvent:
+			rg.stopPolling()
+			if rg.quit != nil {
+				rg.Ev = ev
+				rg.quit()
+			}
+			rg.quitListening()
 		case *tcell.EventResize:
 			if rg.view.resize() {
 				rg.report(ev)
@@ -63,13 +80,26 @@ func (rg *Register) Listen() {
 		default:
 			quit := rg.report(ev)
 			if quit {
-				rg.QuitListening()
+				rg.stopPolling()
+				rg.quitListening()
 				return
 			}
 			rg.view.ensureSynced(true)
 			rg.Synced <- true
 		}
 	}
+}
+
+func (rg *Register) startPolling() {
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
+	rg.isPolling = true
+}
+
+func (rg *Register) stopPolling() {
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
+	rg.isPolling = false
 }
 
 // Resize registers given listener for the resize event.  Note starting
@@ -197,12 +227,27 @@ func (rg *Register) Key(
 	return nil
 }
 
-// QuitListening ends the event-loop, i.e. IsPolling will be false.
+// QuitListening posts a quit event ending the event-loop, i.e.
+// IsPolling will be false.
 func (rg *Register) QuitListening() {
-	rg.isPolling = false
+	if rg.isPolling {
+		rg.view.lib.PostEvent(&quitEvent{when: time.Now()})
+		return
+	}
+	rg.quitListening()
+}
+
+func (rg *Register) quitListening() {
 	rg.view.lib.Fini()
 	close(rg.Synced)
 }
+
+type quitEvent struct {
+	when     time.Time
+	listener func(*View)
+}
+
+func (u *quitEvent) When() time.Time { return u.when }
 
 func (rg *Register) report(ev tcell.Event) (quit bool) {
 	rg.Ev = ev
@@ -214,15 +259,15 @@ func (rg *Register) report(ev tcell.Event) (quit bool) {
 	}
 	switch ev := ev.(type) {
 	case *tcell.EventResize:
-		rg.reportResize(rg.view) // TODO: remove view arg
+		rg.reportResize()
 	case *tcell.EventKey:
 		if rg.reportQuit(ev) {
 			return true
 		}
 		if ev.Key() == tcell.KeyRune {
-			rg.reportRune(rg.view, ev.Rune()) // TODO: remove view arg
+			rg.reportRune(ev.Rune())
 		} else {
-			rg.reportKey(rg.view, ev.Key(), ev.Modifiers()) // TODO: remove view arg
+			rg.reportKey(ev.Key(), ev.Modifiers())
 		}
 	case *updateEvent:
 		ev.listener(rg.view)
@@ -230,10 +275,10 @@ func (rg *Register) report(ev tcell.Event) (quit bool) {
 	return false
 }
 
-func (rg *Register) reportRune(v *View, r rune) {
+func (rg *Register) reportRune(r rune) {
 	rg.mutex.Lock()
 	if rg.allRunes != nil {
-		rg.allRunes(v, r)
+		rg.allRunes(rg.view, r)
 		rg.mutex.Unlock()
 		return
 	}
@@ -243,26 +288,25 @@ func (rg *Register) reportRune(v *View, r rune) {
 	if _, ok := rg.rr[r]; !ok {
 		return
 	}
-	rg.rr[r](v)
+	rg.rr[r](rg.view)
 }
 
-func (rg *Register) reportKey(v *View, k tcell.Key, m tcell.ModMask) {
+func (rg *Register) reportKey(k tcell.Key, m tcell.ModMask) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	if _, ok := rg.kk[k]; !ok {
 		return
 	}
-	rg.kk[k](v, m)
+	rg.kk[k](rg.view, m)
 }
 
-// TODO: refac
-func (rg *Register) reportResize(v *View) {
+func (rg *Register) reportResize() {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	if rg.resize == nil {
 		return
 	}
-	rg.resize(v)
+	rg.resize(rg.view)
 }
 
 func (rg *Register) reportQuit(ev *tcell.EventKey) bool {

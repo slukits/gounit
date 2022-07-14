@@ -2,10 +2,12 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package fx
+package lines_test
 
 import (
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/slukits/gounit"
@@ -16,10 +18,24 @@ import (
 // useful features for testing like firing an event or getting the
 // current screen content as string.  Use *New* to create a new instance
 // of Register.
+// NOTE do not use a Register-instance concurrently.
+
+// NOTE Register-fixture's Listen-method is non-blocking and starts the
+// wrapped Register's event-loop in its own go-routine.  It is
+// guaranteed that all methods of an Register-fixture-instance which
+// trigger an event do not return before the event is processed and any
+// view manipulations are printed to the screen.  NOTE the above is only
+// true as long as you do not circumvent methods of this
+// Register-fixture-type by calling them directly on the wrapped
+// Register-instance.
 type Register struct {
 	*lines.Register
-	lib tcell.SimulationScreen
-	t   *gounit.T
+	lib        tcell.SimulationScreen
+	mutex      *sync.Mutex
+	reported   bool
+	haveResize bool
+	resized    bool
+	t          *gounit.T
 
 	// Max is the number of reported events after which the
 	// event-loop of a register-fixture is terminated.  Max is
@@ -27,17 +43,14 @@ type Register struct {
 	// listener is registered are not counted.
 	Max int
 
-	// NextEventProcessed receives a message after each event-listener
-	// call.  It is closed if the event-loop terminates after MaxEvents
-	// many events have been reported to event-listeners.  NOTE it is
-	// guaranteed that the message is sent *after* all lines-updates have
-	// made it to the screen.
-	NextEventProcessed chan struct{}
-
 	// LastScreen provides the screen content right before quitting
 	// listening.  NOTE it is guaranteed that that this snapshot is
 	// taken *after* all lines-updates have made it to the screen.
 	LastScreen string
+
+	// Timeout defines how long an event-triggering method waits for the
+	// event to be processed.  It defaults to 100ms.
+	Timeout time.Duration
 }
 
 // New creates a new Register test-fixture with additional features for
@@ -50,55 +63,103 @@ func New(t *gounit.T, max ...int) *Register {
 	reg, lib, err := lines.Sim()
 	t.FatalOn(err)
 	fx := Register{Register: reg, lib: lib, t: t,
-		NextEventProcessed: make(chan struct{}, 1)}
+		mutex: &sync.Mutex{}, Timeout: 100 * time.Millisecond}
 	if len(max) > 0 {
 		fx.Max = max[0]
 	}
 	return &fx
 }
 
+func (rg *Register) falsifyReported() {
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
+	rg.reported = false
+}
+
+func (rg *Register) setReported() {
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
+	rg.reported = true
+}
+
+func (rg *Register) hasBeenReported() bool {
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
+	return rg.reported
+}
+
 // SetNumberOfLines fires a resize event setting the screen lines to
 // given number.  Note if an resize event listener is registered we can
-// directly wait on returned channel.
-func (rg *Register) SetNumberOfLines(n int) chan struct{} {
+// directly wait on returned channel.  SetNumberOfLines posts a resize
+// event and returns after this event has been processed.
+func (rg *Register) SetNumberOfLines(n int) {
 	rg.t.GoT().Helper()
 	w, _ := rg.lib.Size()
 	rg.lib.SetSize(w, n)
+	rg.falsifyReported()
 	rg.t.FatalOn(rg.lib.PostEvent(tcell.NewEventResize(w, n)))
-	return rg.NextEventProcessed
+	select {
+	case <-rg.Register.Synced:
+	case <-rg.t.Timeout(rg.Timeout):
+		rg.t.Fatalf("set number of lines: sync timed out")
+	}
+	if rg.hasBeenReported() {
+		rg.decrementMaxEvents()
+	}
 }
 
-// FireRuneEvent dispatches given run-key-press event.  Note modifier
-// keys are ignored for rune-triggered key-events.  Note if an event
-// listener is registered for this rune we can directly wait on returned
-// channel.
-func (rg *Register) FireRuneEvent(r rune) chan struct{} {
+// FireRuneEvent posts given run-key-press event and returns after this
+// event has been processed.  Note modifier keys are ignored for
+// rune-triggered key-events.
+func (rg *Register) FireRuneEvent(r rune) {
+	rg.falsifyReported()
 	rg.lib.InjectKey(tcell.KeyRune, r, tcell.ModNone)
-	return rg.NextEventProcessed
+	select {
+	case <-rg.Register.Synced:
+	case <-rg.t.Timeout(rg.Timeout):
+		rg.t.Fatalf("fire key: sync timed out")
+	}
+	if rg.hasBeenReported() {
+		rg.decrementMaxEvents()
+	}
 }
 
-// FireKeyEvent dispatches given special-key-press event.  Note if an
-// event listener is registered for this key we can directly wait on
-// returned channel.
-func (rg *Register) FireKeyEvent(
-	k tcell.Key, m ...tcell.ModMask,
-) chan struct{} {
+// FireKeyEvent posts given special-key-press event and returns after
+// this event has been processed.
+func (rg *Register) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) {
+	rg.falsifyReported()
 	if len(m) == 0 {
 		rg.lib.InjectKey(k, 0, tcell.ModNone)
 	} else {
 		rg.lib.InjectKey(k, 0, m[0])
 	}
-	return rg.NextEventProcessed
+	select {
+	case <-rg.Register.Synced:
+	case <-rg.t.Timeout(rg.Timeout):
+		rg.t.Fatalf("fire key: sync timed out")
+	}
+	if rg.hasBeenReported() {
+		rg.decrementMaxEvents()
+	}
 }
 
 // Listen posts the initial resize event and calls the wrapped
-// register's Listen-method.
+// register's Listen-method in a new go-routine.  Listen returns after
+// the initial resize has completed.
 func (rg *Register) Listen() {
 	rg.t.GoT().Helper()
+	rg.falsifyReported()
 	err := rg.lib.PostEvent(tcell.NewEventResize(rg.lib.Size()))
 	rg.t.FatalOn(err)
-	rg.Register.Listen()
-	close(rg.NextEventProcessed)
+	go rg.Register.Listen()
+	select {
+	case <-rg.Register.Synced:
+	case <-rg.t.Timeout(rg.Timeout):
+		rg.t.Fatalf("listen: sync timed out")
+	}
+	if rg.hasBeenReported() {
+		rg.decrementMaxEvents()
+	}
 }
 
 // String returns the test-screen's content as string with line breaks
@@ -143,19 +204,34 @@ func cellIdx(x, y, w int) int {
 	return y*w + x
 }
 
-// QuitListening stops wrapped Register's event loop and closes the
-// *NextEventProcessed* channel.
+// QuitListening stops wrapped Register's event loop.  This method does
+// not return before Register.IsPolling() returns false.
 func (rg *Register) QuitListening() {
 	rg.LastScreen = rg.String()
+	polling := rg.IsPolling()
 	rg.Register.QuitListening()
+	if !polling {
+		return
+	}
+	select {
+	case <-rg.Register.Synced:
+	case <-rg.t.Timeout(rg.Timeout):
+		rg.t.Fatalf("quit listening: sync timed out")
+	}
 }
 
 // Resize wraps given listener for MaxEvent-maintenance before it is
-// passed on to wrapped view-*Register* property.
+// passed on to the wrapped view-*Register* property.
 func (rg *Register) Resize(listener func(*lines.View)) {
 	if listener == nil {
+		if rg.haveResize {
+			rg.haveResize = false
+		}
 		rg.Register.Resize(listener)
 		return
+	}
+	if !rg.haveResize {
+		rg.haveResize = true
 	}
 	rg.Register.Resize(rg.resizeWrapper(listener))
 }
@@ -165,36 +241,40 @@ func (rg *Register) resizeWrapper(
 ) func(*lines.View) {
 	return func(v *lines.View) {
 		l(v)
-		go func() {
-			<-rg.Register.Synced
-			rg.decrementMaxEvents()
-		}()
+		rg.setReported()
 	}
 }
 
 // Update wraps given listener for MaxEvent-maintenance before it is
-// passed on to wrapped view-*Register* property.
+// passed on to the wrapped *Register*'s Update method.  The later posts an
+// event in case the listener is not nil; Update doesn't return before
+// this event is processed.
 func (rg *Register) Update(listener func(*lines.View)) error {
 	if listener == nil {
 		return rg.Register.Update(listener)
 	}
-	return rg.Register.Update(rg.updateWrapper(listener))
-}
-
-func (rg *Register) updateWrapper(
-	l func(*lines.View),
-) func(*lines.View) {
-	return func(v *lines.View) {
-		l(v)
-		go func() {
-			<-rg.Register.Synced
-			rg.decrementMaxEvents()
-		}()
+	dropped := true
+	l := func(v *lines.View) {
+		dropped = false
+		listener(v)
 	}
+	err := rg.Register.Update(l)
+	if err != nil {
+		return err
+	}
+	select {
+	case <-rg.Register.Synced:
+	case <-rg.t.Timeout(rg.Timeout):
+		rg.t.Fatalf("update wrapper: sync timed out")
+	}
+	if !dropped {
+		rg.decrementMaxEvents()
+	}
+	return nil
 }
 
 // Quit wraps given listener for MaxEvent-maintenance before it is
-// passed on to wrapped view-*Register* property.
+// passed on to the wrapped *Register* property.
 func (rg *Register) Quit(listener func()) {
 	if listener == nil {
 		rg.Register.Quit(listener)
@@ -224,15 +304,12 @@ func (rg *Register) runeWrapper(
 ) func(*lines.View) {
 	return func(v *lines.View) {
 		l(v)
-		go func() {
-			<-rg.Register.Synced
-			rg.decrementMaxEvents()
-		}()
+		rg.setReported()
 	}
 }
 
 // Runes wraps given listener for MaxEvent-maintenance before its passed
-// on to wrapped Register instance.
+// on to the wrapped Register instance.
 func (rg *Register) Runes(listener func(*lines.View, rune)) {
 	if listener == nil {
 		rg.Register.Runes(listener)
@@ -246,15 +323,12 @@ func (rg *Register) runesWrapper(
 ) func(*lines.View, rune) {
 	return func(v *lines.View, r rune) {
 		l(v, r)
-		go func() {
-			<-rg.Register.Synced
-			rg.decrementMaxEvents()
-		}()
+		rg.setReported()
 	}
 }
 
 // Key wraps given listener for MaxEvent-maintenance before it is
-// passed on to wrapped view-*Register* property.
+// passed on to the wrapped view-*Register* property.
 func (rg *Register) Key(
 	listener func(*lines.View, tcell.ModMask), kk ...tcell.Key,
 ) error {
@@ -269,10 +343,7 @@ func (rg *Register) keyWrapper(
 ) func(*lines.View, tcell.ModMask) {
 	return func(v *lines.View, m tcell.ModMask) {
 		l(v, m)
-		go func() {
-			<-rg.Register.Synced
-			rg.decrementMaxEvents()
-		}()
+		rg.setReported()
 	}
 }
 
@@ -280,15 +351,11 @@ func (rg *Register) decrementMaxEvents() {
 	rg.Max--
 	if rg.Max < 0 {
 		rg.QuitListening()
-		<-rg.Register.Synced // wait for closing to finish
+		select {
+		case <-rg.Register.Synced:
+		case <-rg.t.Timeout(10 * time.Millisecond):
+			rg.t.Fatalf("quit listening: sync timed out")
+		}
 		return
-	}
-	rg.informAboutProcessedEvent()
-}
-
-func (rg *Register) informAboutProcessedEvent() {
-	select {
-	case rg.NextEventProcessed <- struct{}{}:
-	default:
 	}
 }
