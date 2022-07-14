@@ -46,16 +46,12 @@
 // i.e. help is called back if the user presses either the F1 or the H
 // key.
 //
-// reg.KeyBoard(func (v *lines.View, r rune, k tcell.Key) (stop bool) {
+// reg.Keyboard(func (v *lines.View, r rune, k tcell.Key) {
 //     if r != rune(0) {
 //         v.LL().Get(0).Set("received rune-input: "+string(r))
+//         return
 //     }
-//     switch k {
-//     case tcell.KeyESC, tcell.KeyEnter:
-//         return true
-//     default:
-//         return false
-//     }
+//     reg.Keyboard(nil)
 // })
 //
 // KeyBoard suppresses all registered Rune- and Key-events (except for

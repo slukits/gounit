@@ -93,12 +93,15 @@ func (rg *Register) hasBeenReported() bool {
 // event and returns after this event has been processed.
 func (rg *Register) SetNumberOfLines(n int) {
 	rg.t.GoT().Helper()
+	if !rg.IsPolling() {
+		rg.t.Fatal("fire key: not polling")
+	}
 	w, _ := rg.lib.Size()
 	rg.lib.SetSize(w, n)
 	rg.falsifyReported()
 	rg.t.FatalOn(rg.lib.PostEvent(tcell.NewEventResize(w, n)))
 	select {
-	case <-rg.Register.Synced:
+	case <-rg.Synced:
 	case <-rg.t.Timeout(rg.Timeout):
 		rg.t.Fatalf("set number of lines: sync timed out")
 	}
@@ -111,12 +114,16 @@ func (rg *Register) SetNumberOfLines(n int) {
 // event has been processed.  Note modifier keys are ignored for
 // rune-triggered key-events.
 func (rg *Register) FireRuneEvent(r rune) {
+	rg.t.GoT().Helper()
+	if !rg.IsPolling() {
+		rg.t.Fatal("fire rune: not polling")
+	}
 	rg.falsifyReported()
 	rg.lib.InjectKey(tcell.KeyRune, r, tcell.ModNone)
 	select {
-	case <-rg.Register.Synced:
+	case <-rg.Synced:
 	case <-rg.t.Timeout(rg.Timeout):
-		rg.t.Fatalf("fire key: sync timed out")
+		rg.t.Fatalf("fire rune: sync timed out")
 	}
 	if rg.hasBeenReported() {
 		rg.decrementMaxEvents()
@@ -126,6 +133,10 @@ func (rg *Register) FireRuneEvent(r rune) {
 // FireKeyEvent posts given special-key-press event and returns after
 // this event has been processed.
 func (rg *Register) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) {
+	rg.t.GoT().Helper()
+	if !rg.IsPolling() {
+		rg.t.Fatal("fire key: not polling")
+	}
 	rg.falsifyReported()
 	if len(m) == 0 {
 		rg.lib.InjectKey(k, 0, tcell.ModNone)
@@ -133,7 +144,7 @@ func (rg *Register) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) {
 		rg.lib.InjectKey(k, 0, m[0])
 	}
 	select {
-	case <-rg.Register.Synced:
+	case <-rg.Synced:
 	case <-rg.t.Timeout(rg.Timeout):
 		rg.t.Fatalf("fire key: sync timed out")
 	}
@@ -152,7 +163,7 @@ func (rg *Register) Listen() {
 	rg.t.FatalOn(err)
 	go rg.Register.Listen()
 	select {
-	case <-rg.Register.Synced:
+	case <-rg.Synced:
 	case <-rg.t.Timeout(rg.Timeout):
 		rg.t.Fatalf("listen: sync timed out")
 	}
@@ -249,6 +260,10 @@ func (rg *Register) resizeWrapper(
 // event in case the listener is not nil; Update doesn't return before
 // this event is processed.
 func (rg *Register) Update(listener func(*lines.View)) error {
+	rg.t.GoT().Helper()
+	if !rg.IsPolling() {
+		rg.t.Fatal("update: not polling")
+	}
 	if listener == nil {
 		return rg.Register.Update(listener)
 	}
@@ -307,21 +322,23 @@ func (rg *Register) runeWrapper(
 	}
 }
 
-// Runes wraps given listener for MaxEvent-maintenance before its passed
+// Keyboard wraps given listener for MaxEvent-maintenance before its passed
 // on to the wrapped Register instance.
-func (rg *Register) Runes(listener func(*lines.View, rune)) {
+func (rg *Register) Keyboard(
+	listener func(*lines.View, rune, tcell.Key, tcell.ModMask),
+) {
 	if listener == nil {
-		rg.Register.Runes(listener)
+		rg.Register.Keyboard(listener)
 		return
 	}
-	rg.Register.Runes(rg.runesWrapper(listener))
+	rg.Register.Keyboard(rg.keyboardWrapper(listener))
 }
 
-func (rg *Register) runesWrapper(
-	l func(*lines.View, rune),
-) func(*lines.View, rune) {
-	return func(v *lines.View, r rune) {
-		l(v, r)
+func (rg *Register) keyboardWrapper(
+	l func(*lines.View, rune, tcell.Key, tcell.ModMask),
+) func(*lines.View, rune, tcell.Key, tcell.ModMask) {
+	return func(v *lines.View, r rune, k tcell.Key, m tcell.ModMask) {
+		l(v, r, k, m)
 		rg.setReported()
 	}
 }

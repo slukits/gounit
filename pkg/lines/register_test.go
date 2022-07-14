@@ -145,13 +145,23 @@ func (s *ARegister) Stops_reporting_if_view_to_small(t *T) {
 }
 
 func (s *ARegister) Stops_reporting_except_for_quit(t *T) {
-	rg := s.fx.Reg(t, 1)
+	rg := s.fx.Reg(t, 2)
+	rg.Timeout = 5 * time.Minute
 	rg.Resize(func(v *lines.View) {
 		v.SetMin(30)
 	})
 	rg.Listen()
 	rg.FireRuneEvent('q')
 	t.False(rg.IsPolling())
+	rg, quit := New(t, 2), false
+	rg.Resize(func(v *lines.View) {
+		v.SetMin(30)
+	})
+	rg.Quit(func() { quit = true })
+	rg.Listen()
+	rg.FireRuneEvent('q')
+	t.False(rg.IsPolling())
+	t.True(quit)
 }
 
 func (s *ARegister) Posts_and_reports_update_event(t *T) {
@@ -263,6 +273,9 @@ func (s *ARegister) Unregisters_nil_listener_events(t *T) {
 		func(*lines.View, tcell.ModMask) {}, tcell.KeyUp))
 }
 
+// TODO: become clear if internally handled events shadow user defined
+// ones, if they should be done both or if event registration should
+// fail if it conflicts with an internally handled event.
 func (s *ARegister) Fails_to_register_overwriting_key_or_rune_events(
 	t *T,
 ) {
@@ -288,18 +301,62 @@ func (s *ARegister) Fails_to_register_overwriting_key_or_rune_events(
 	}
 }
 
-func (s *ARegister) Reports_all_rune_events_to_runes_listener_til_removed(
+func (s *ARegister) Reporting_keyboard_shadows_other_input_listener(
 	t *T,
 ) {
-	rg, aRune, allRunes := s.fx.Reg(t, 1), false, false
-	rg.Rune(func(v *lines.View) { aRune = true }, 'a')
-	rg.Runes(func(v *lines.View, r rune) { allRunes = true })
+	rg, rn, key, kb := s.fx.Reg(t, 1), false, false, 0
+	rg.Rune(func(v *lines.View) { rn = true }, 'a')
+	rg.Key(func(v *lines.View, mm tcell.ModMask) {
+		key = true
+	}, tcell.KeyUp)
+	rg.Keyboard(func(
+		v *lines.View, r rune, k tcell.Key, m tcell.ModMask,
+	) {
+		if r == 'a' {
+			kb++
+		}
+		if k == tcell.KeyUp {
+			kb++
+		}
+	})
 	rg.Listen()
 	rg.FireRuneEvent('a')
-	t.True(allRunes)
-	rg.Runes(nil)
+	rg.FireKeyEvent(tcell.KeyUp)
+	t.False(rn)
+	t.False(key)
+	t.Eq(2, kb)
+	t.False(rg.IsPolling())
+}
+
+func (s *ARegister) Reporting_keyboard_shadows_all_but_quit(t *T) {
+	rg, kb := s.fx.Reg(t, 1), false
+	rg.Keyboard(func(
+		v *lines.View, r rune, k tcell.Key, m tcell.ModMask,
+	) {
+		kb = true
+		rg.Keyboard(nil)
+	})
+	rg.Listen()
+	rg.FireKeyEvent(tcell.KeyCtrlC)
+	t.False(rg.IsPolling())
+	t.False(kb)
+}
+
+func (s *ARegister) Stops_reporting_keyboard_if_removed(t *T) {
+	rg, rn, kb := s.fx.Reg(t, 1), false, false
+	rg.Rune(func(v *lines.View) { rn = true }, 'a')
+	rg.Keyboard(func(
+		v *lines.View, r rune, k tcell.Key, m tcell.ModMask,
+	) {
+		t.Eq('a', r)
+		kb = true
+		rg.Keyboard(nil)
+	})
+	rg.Listen()
 	rg.FireRuneEvent('a')
-	t.True(aRune)
+	rg.FireRuneEvent('a')
+	t.True(kb)
+	t.True(rn)
 	t.False(rg.IsPolling())
 }
 

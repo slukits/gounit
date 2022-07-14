@@ -22,7 +22,7 @@ type Register struct {
 	mutex     *sync.Mutex
 	resize    func(*View)
 	quit      func()
-	allRunes  func(*View, rune)
+	keyboard  func(*View, rune, tcell.Key, tcell.ModMask)
 	isPolling bool
 
 	// Synced sends a message after a the screen synchronization
@@ -182,16 +182,14 @@ func (rg *Register) Rune(listener func(*View), rr ...rune) error {
 	return nil
 }
 
-// Runes suppresses all registers Rune-events and reports rune input
-// events to given listener only until a non-rune is inserted.
-// TODO: add to the listener a cancel argument and to the Runes-method a
-// tcell.Key argument defining the key which ends the Runes
-// registration, i.e. calls listener for a last time with cancel set to
-// true.
-func (rg *Register) Runes(listener func(*View, rune)) {
+// Keyboard listener shadows all other rune/key listeners until it is
+// removed by Keyboard(nil).
+func (rg *Register) Keyboard(
+	listener func(*View, rune, tcell.Key, tcell.ModMask),
+) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
-	rg.allRunes = listener
+	rg.keyboard = listener
 }
 
 // Key registers provided listener for each of the given key's input
@@ -252,21 +250,36 @@ func (rg *Register) report(ev tcell.Event) (quit bool) {
 	rg.Ev = ev
 	if rg.view.ToSmall() {
 		if ev, ok := ev.(*tcell.EventKey); ok {
-			return rg.reportQuit(ev)
+			if rg.isQuitEvent(ev) {
+				if listener := rg.quitListener(ev); listener != nil {
+					listener()
+				}
+				return true
+			}
 		}
 		return false
 	}
 	switch ev := ev.(type) {
 	case *tcell.EventResize:
-		rg.reportResize()
+		if listener := rg.resizeListener(); listener != nil {
+			listener(rg.view)
+		}
 	case *tcell.EventKey:
-		if rg.reportQuit(ev) {
+		if rg.isQuitEvent(ev) {
+			if listener := rg.quitListener(ev); listener != nil {
+				listener()
+			}
 			return true
 		}
-		if ev.Key() == tcell.KeyRune {
-			rg.reportRune(ev.Rune())
-		} else {
-			rg.reportKey(ev.Key(), ev.Modifiers())
+		if listener := rg.kbListener(); listener != nil {
+			listener(rg.view, ev.Rune(), ev.Key(), ev.Modifiers())
+			return false
+		}
+		if listener := rg.runeListener(ev.Rune()); listener != nil {
+			listener(rg.view)
+		}
+		if listener := rg.keyListener(ev.Key()); listener != nil {
+			listener(rg.view, ev.Modifiers())
 		}
 	case *updateEvent:
 		ev.listener(rg.view)
@@ -274,43 +287,33 @@ func (rg *Register) report(ev tcell.Event) (quit bool) {
 	return false
 }
 
-func (rg *Register) reportRune(r rune) {
-	rg.mutex.Lock()
-	if rg.allRunes != nil {
-		rg.allRunes(rg.view, r)
-		rg.mutex.Unlock()
-		return
-	}
-	rg.mutex.Unlock()
+func (rg *Register) kbListener() func(
+	*View, rune, tcell.Key, tcell.ModMask,
+) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
-	if _, ok := rg.rr[r]; !ok {
-		return
-	}
-	rg.rr[r](rg.view)
+	return rg.keyboard
 }
 
-func (rg *Register) reportKey(k tcell.Key, m tcell.ModMask) {
+func (rg *Register) runeListener(r rune) func(*View) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
-	if _, ok := rg.kk[k]; !ok {
-		return
-	}
-	rg.kk[k](rg.view, m)
+	return rg.rr[r]
 }
 
-func (rg *Register) reportResize() {
+func (rg *Register) keyListener(k tcell.Key) func(*View, tcell.ModMask) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
-	if rg.resize == nil {
-		return
-	}
-	rg.resize(rg.view)
+	return rg.kk[k]
 }
 
-func (rg *Register) reportQuit(ev *tcell.EventKey) bool {
+func (rg *Register) resizeListener() func(*View) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
+	return rg.resize
+}
+
+func (rg *Register) isQuitEvent(ev *tcell.EventKey) bool {
 	if ev.Key() == tcell.KeyRune && ev.Rune() != 'q' {
 		return false
 	}
@@ -318,9 +321,11 @@ func (rg *Register) reportQuit(ev *tcell.EventKey) bool {
 		ev.Key() != tcell.KeyCtrlD {
 		return false
 	}
-	if rg.quit == nil {
-		return true
-	}
-	rg.quit()
 	return true
+}
+
+func (rg *Register) quitListener(ev *tcell.EventKey) func() {
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
+	return rg.quit
 }
