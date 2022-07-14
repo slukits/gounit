@@ -8,7 +8,6 @@ import (
 	"github.com/gdamore/tcell/v2"
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/pkg/lines"
-	"github.com/slukits/gounit/pkg/lines/testdata/fx"
 )
 
 func waitFor(t *T, c interface{}, mm ...string) {
@@ -50,7 +49,7 @@ func (s *NewRegister) Fails_if_tcell_s_screen_init_fails(t *T) {
 }
 
 func (s *NewRegister) Succeeds_if_none_of_the_above(t *T) {
-	lines.SetScreenFactory(&fx.ScreenFactory{})
+	lines.SetScreenFactory(&ScreenFactory{})
 	_, err := lines.New()
 	t.FatalOn(err)
 }
