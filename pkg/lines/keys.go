@@ -23,7 +23,6 @@ var InternalEvents = []EventMask{QuitEvent, UpEvent, DownEvent}
 // way.  A *Register* instance is always with a copy of the
 // *DefaultKeys* Keys-instance initialized.
 type Keys struct {
-	reg   *Register
 	keys  map[tcell.Key]EventMask
 	runes map[rune]EventMask
 }

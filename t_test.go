@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/slukits/gounit"
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/testdata/fx"
 )
@@ -27,10 +26,10 @@ import (
 
 func Test_T_instance_logs_to_suite_s_logger(t *testing.T) {
 	testSuite := &fx.TestSuiteLogging{Exp: "Log", ExpFmt: "Fmt"}
-	if "" != testSuite.Logs {
+	if testSuite.Logs != "" {
 		t.Fatal("expected initially an empty log")
 	}
-	gounit.Run(testSuite, t)
+	Run(testSuite, t)
 	if testSuite.Logs != "LogFmt" && testSuite.Logs != "FmtLog" {
 		t.Errorf("expected test-suite log: LogFmt or FmtLog; got: %s",
 			testSuite.Logs)
@@ -66,7 +65,7 @@ func (s *T_Instance) Times_out_after_given_duration(t *T) {
 	d := 2 * time.Millisecond
 	start := time.Now()
 	<-t.Timeout(d)
-	t.True(d.Milliseconds() <= time.Now().Sub(start).Milliseconds())
+	t.True(d <= time.Since(start))
 }
 
 func TestTInstance(t *testing.T) {
@@ -128,7 +127,7 @@ func (s *AssertionTests) For_falsehood(t *T) {
 		False: func(t *T) bool { return t.False(true) },
 		Fails: func(t *T) string {
 			t.False(true)
-			return gounit.FalseErr
+			return FalseErr
 		},
 		Overwrite: func(t *T, ow string) { t.False(true, ow) },
 		FmtOverwrite: func(t *T, fmt, s string) {
@@ -136,7 +135,7 @@ func (s *AssertionTests) For_falsehood(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertFalsehood", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
@@ -156,7 +155,7 @@ func (s *AssertionTests) For_equality(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertEquality", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
@@ -170,7 +169,7 @@ func (s *AssertionTests) For_inequality(t *T) {
 		False: func(t *T) bool { return t.Neq(42, 42) },
 		Fails: func(t *T) string {
 			t.Neq(struct{ A int }{42}, struct{ A int }{42})
-			return gounit.NeqErr
+			return NeqErr
 		},
 		Overwrite: func(t *T, ow string) { t.Neq(1, 1, ow) },
 		FmtOverwrite: func(t *T, fmt, s string) {
@@ -178,14 +177,14 @@ func (s *AssertionTests) For_inequality(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertInequality", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
 }
 
 func (s *AssertionTests) For_containing(t *T) {
-	expErr := fmt.Sprintf(gounit.ContainsErr, "a\n", "\nb")
+	expErr := fmt.Sprintf(ContainsErr, "a\n", "\nb")
 	suite := &fx.TestAssertion{
 		True:  func(t *T) bool { return t.Contains("a", "a") },
 		False: func(t *T) bool { return t.Contains("a", "b") },
@@ -199,14 +198,14 @@ func (s *AssertionTests) For_containing(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertPanics", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
 }
 
 func (s *AssertionTests) For_matched(t *T) {
-	expErr := fmt.Sprintf(gounit.MatchedErr, "b", "a")
+	expErr := fmt.Sprintf(MatchedErr, "b", "a")
 	suite := &fx.TestAssertion{
 		True:  func(t *T) bool { return t.Matched("a", "a") },
 		False: func(t *T) bool { return t.Matched("a", "b") },
@@ -220,14 +219,14 @@ func (s *AssertionTests) For_matched(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertMatched", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
 }
 
 func (s *AssertionTests) For_space_matched(t *T) {
-	expErr := fmt.Sprintf(gounit.MatchedErr, "b", "a")
+	expErr := fmt.Sprintf(MatchedErr, "b", "a")
 	suite := &fx.TestAssertion{
 		True: func(t *T) bool {
 			return t.SpaceMatched("a b", []string{"a", "b"})
@@ -247,14 +246,14 @@ func (s *AssertionTests) For_space_matched(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertSpaceMatched", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
 }
 
 func (s *AssertionTests) For_star_matched(t *T) {
-	expErr := fmt.Sprintf(gounit.MatchedErr, "(?s)b", "a")
+	expErr := fmt.Sprintf(MatchedErr, "(?s)b", "a")
 	suite := &fx.TestAssertion{
 		True: func(t *T) bool {
 			return t.StarMatched("a b", []string{"a\nb"})
@@ -274,7 +273,7 @@ func (s *AssertionTests) For_star_matched(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertStarMatched", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
@@ -286,7 +285,7 @@ func (s *AssertionTests) For_error(t *T) {
 		False: func(t *T) bool { return t.Err(nil) },
 		Fails: func(t *T) string {
 			t.Err(nil)
-			return gounit.ErrErr
+			return ErrErr
 		},
 		Overwrite: func(t *T, ow string) { t.Err(nil, ow) },
 		FmtOverwrite: func(t *T, fmt, s string) {
@@ -294,7 +293,7 @@ func (s *AssertionTests) For_error(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertError", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
@@ -308,7 +307,7 @@ func (s *AssertionTests) For_error_is(t *T) {
 		False: func(t *T) bool { return t.ErrIs(err, errors.New("")) },
 		Fails: func(t *T) string {
 			t.ErrIs(nil, nil)
-			return gounit.ErrIsErr
+			return ErrIsErr
 		},
 		Overwrite: func(t *T, ow string) { t.ErrIs(nil, nil, ow) },
 		FmtOverwrite: func(t *T, fmt, s string) {
@@ -316,7 +315,7 @@ func (s *AssertionTests) For_error_is(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertErrorIs", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
@@ -329,7 +328,7 @@ func (s *AssertionTests) For_error_matched(t *T) {
 		False: func(t *T) bool { return t.ErrMatched(err, "42") },
 		Fails: func(t *T) string {
 			t.ErrMatched(nil, "")
-			return gounit.ErrMatchedErr
+			return ErrMatchedErr
 		},
 		Overwrite: func(t *T, ow string) { t.ErrMatched(nil, "", ow) },
 		FmtOverwrite: func(t *T, fmt, s string) {
@@ -337,7 +336,7 @@ func (s *AssertionTests) For_error_matched(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertErrorIs", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
@@ -349,7 +348,7 @@ func (s *AssertionTests) For_panicking(t *T) {
 		False: func(t *T) bool { return t.Panics(func() {}) },
 		Fails: func(t *T) string {
 			t.Panics(func() {})
-			return gounit.PanicsErr
+			return PanicsErr
 		},
 		Overwrite: func(t *T, ow string) { t.Panics(func() {}, ow) },
 		FmtOverwrite: func(t *T, fmt, s string) {
@@ -357,7 +356,7 @@ func (s *AssertionTests) For_panicking(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertPanics", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
@@ -385,7 +384,7 @@ func (s *AssertionTests) For_within(t *T) {
 		},
 		Fails: func(t *T) string {
 			<-t.Within(newTs(1), cond)
-			return gounit.WithinErr
+			return WithinErr
 		},
 		Overwrite: func(t *T, ow string) {
 			<-t.Within(newTs(1), cond, ow)
@@ -395,7 +394,7 @@ func (s *AssertionTests) For_within(t *T) {
 		},
 	}
 	if !t.GoT().Run("AssertWithin", func(_t *testing.T) {
-		gounit.Run(suite, _t)
+		Run(suite, _t)
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}

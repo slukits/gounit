@@ -25,7 +25,7 @@ import (
 func Test_a_suite_s_tests_are_run(t *testing.T) {
 	t.Parallel()
 	testSuite := &fx.TestAllSuiteTestsAreRun{Exp: "A_test has been run"}
-	if "" != testSuite.Logs {
+	if testSuite.Logs != "" {
 		t.Fatal("expected initially an empty log")
 	}
 	gounit.Run(testSuite, t)
@@ -75,7 +75,7 @@ func (s *run) Executes_tear_down_after_a_canceled_test(t *gounit.T) {
 	suite := &fx.TestTearDownAfterCancel{}
 	t.True(suite.Logs == "")
 	gounit.Run(suite, t.GoT())
-	t.True("12345" == suite.Logs)
+	t.True(suite.Logs == "12345")
 }
 
 func (s *run) Executes_init_before_any_other_test(t *gounit.T) {
@@ -140,7 +140,7 @@ func (s *suite) Canceler_implementation_overwrites_cancellation(
 	}) {
 		t.GoT().Fatalf("expected TestTearDown-suite to not fail")
 	}
-	t.True(10 == len(suite.Got))
+	t.True(len(suite.Got) == 10)
 }
 
 func TestSuite(t *testing.T) {

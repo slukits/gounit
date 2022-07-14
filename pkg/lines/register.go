@@ -147,9 +147,9 @@ type updateEvent struct {
 
 func (u *updateEvent) When() time.Time { return u.when }
 
-// RegisterErr is returned by Register.Rune and Register.Key if a
+// ErrRegister is returned by Register.Rune and Register.Key if a
 // listener is registered for an already registered rune/key-event.
-var RegisterErr = errors.New("event listener overwrites existing")
+var ErrRegister = errors.New("event listener overwrites existing")
 
 // Rune registers provided listener for each of the given rune's input
 // events.  Rune fails if for one of the runes already a listener is
@@ -169,10 +169,10 @@ func (rg *Register) Rune(listener func(*View), rr ...rune) error {
 
 	for _, _r := range rr {
 		if _, ok := rg.rr[_r]; ok {
-			return RegisterErr
+			return ErrRegister
 		}
 		if _r == 'q' {
-			return RegisterErr
+			return ErrRegister
 		}
 	}
 
@@ -214,10 +214,10 @@ func (rg *Register) Key(
 
 	for _, k := range kk {
 		if _, ok := rg.kk[k]; ok {
-			return RegisterErr
+			return ErrRegister
 		}
 		if k == tcell.KeyCtrlC || k == tcell.KeyCtrlD {
-			return RegisterErr
+			return ErrRegister
 		}
 	}
 
@@ -243,8 +243,7 @@ func (rg *Register) quitListening() {
 }
 
 type quitEvent struct {
-	when     time.Time
-	listener func(*View)
+	when time.Time
 }
 
 func (u *quitEvent) When() time.Time { return u.when }

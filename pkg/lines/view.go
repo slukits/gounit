@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/slukits/ints"
 )
 
 // View provides a line-based terminal user-interface.  A view instances
@@ -16,13 +15,10 @@ import (
 // not meant to be created or kept around outside an event listener
 // callback operation.
 type View struct {
-	lib       tcell.Screen
-	ll        *Lines
-	evtRunes  string
-	evtKeys   ints.Set
-	isPolling bool
-	errScr    *ErrScr
-	min       int
+	lib    tcell.Screen
+	ll     *Lines
+	errScr *ErrScr
+	min    int
 
 	// Synced provides a message each time it is guaranteed that the
 	// potential effect of an event is on the screen.

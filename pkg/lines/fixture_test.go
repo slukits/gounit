@@ -34,7 +34,6 @@ type Register struct {
 	mutex      *sync.Mutex
 	reported   bool
 	haveResize bool
-	resized    bool
 	t          *gounit.T
 
 	// Max is the number of reported events after which the

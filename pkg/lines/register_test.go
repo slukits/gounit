@@ -1,7 +1,6 @@
 package lines_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -10,42 +9,18 @@ import (
 	"github.com/slukits/gounit/pkg/lines"
 )
 
-func waitFor(t *T, c interface{}, mm ...string) {
-	msg := func() string {
-		if len(mm) == 0 {
-			return "timed out"
-		}
-		return fmt.Sprintf("timed out: %s", mm[0])
-	}
-	t.GoT().Helper()
-	switch c := c.(type) {
-	case chan struct{}:
-		select {
-		case <-c:
-		case <-t.Timeout(10 * time.Millisecond):
-			t.Fatalf(msg())
-		}
-	case chan bool:
-		select {
-		case <-c:
-		case <-t.Timeout(10 * time.Millisecond):
-			t.Fatalf(msg())
-		}
-	}
-}
-
 type NewRegister struct{ Suite }
 
 func (s *NewRegister) Fails_if_cell_s_screen_creation_fails(t *T) {
 	lines.SetScreenFactory(&ScreenFactory{Fail: true})
 	_, err := lines.New()
-	t.ErrIs(err, ScreenErr)
+	t.ErrIs(err, ErrScreen)
 }
 
 func (s *NewRegister) Fails_if_tcell_s_screen_init_fails(t *T) {
 	lines.SetScreenFactory(&ScreenFactory{FailInit: true})
 	_, err := lines.New()
-	t.ErrIs(err, InitErr)
+	t.ErrIs(err, ErrInit)
 }
 
 func (s *NewRegister) Succeeds_if_none_of_the_above(t *T) {
@@ -66,7 +41,7 @@ func (s *NewRegister) May_fail_in_graphical_test_environment(t *T) {
 func (s *NewRegister) Sim_fails_if_tcell_s_sim_init_fails(t *T) {
 	lines.SetScreenFactory(&ScreenFactory{FailInit: true})
 	_, _, err := lines.Sim()
-	t.ErrIs(err, InitErr)
+	t.ErrIs(err, ErrInit)
 }
 
 func (s *NewRegister) Sim_succeeds_if_none_of_the_above(t *T) {
@@ -228,11 +203,12 @@ func (s *ARegister) Reports_quit_event_and_ends_event_loop(t *T) {
 			quitEvt = true
 		})
 		rg.Listen()
-		if i == 0 {
+		switch i {
+		case 0:
 			rg.QuitListening()
-		} else if i == 1 {
+		case 1:
 			rg.FireRuneEvent(rune(k))
-		} else {
+		default:
 			rg.FireKeyEvent(tcell.Key(k))
 		}
 		t.True(quitEvt)
@@ -301,12 +277,12 @@ func (s *ARegister) Fails_to_register_overwriting_key_or_rune_events(
 		case 0, 1:
 			t.ErrIs(
 				rg.Rune(func(*lines.View) {}, rune(k)),
-				lines.RegisterErr,
+				lines.ErrRegister,
 			)
 		default:
 			t.ErrIs(rg.Key(
 				func(*lines.View, tcell.ModMask) {}, tcell.Key(k)),
-				lines.RegisterErr,
+				lines.ErrRegister,
 			)
 		}
 	}

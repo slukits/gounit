@@ -10,22 +10,27 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-var ScreenErr = errors.New("mock: screen: failing creation")
+// ErrScreen is the error returned by the mocked screen creation.
+var ErrScreen = errors.New("mock: screen: failing creation")
 
+// ScreenFactory for the mocked screen creation/initialization.
 type ScreenFactory struct{ Fail, FailInit bool }
 
+// NewScreen mock tcell's screen creation.
 func (f *ScreenFactory) NewScreen() (tcell.Screen, error) {
 	if f.Fail {
-		return nil, ScreenErr
+		return nil, ErrScreen
 	}
 	return &Screen{Fail: f.FailInit}, nil
 }
 
+// NewSimulationScreen mock tcell's simulation screen creation.
 func (f *ScreenFactory) NewSimulationScreen(string) tcell.SimulationScreen {
 	return &Screen{Fail: f.FailInit}
 }
 
-var InitErr = errors.New("mock: screen: failing initialization")
+// ErrInit is the error returned by the mocked screen initialization.
+var ErrInit = errors.New("mock: screen: failing initialization")
 
 // Screen mocks tcell's SimulationScreen implementation to mock-up its
 // possible creation/initialization-errors.
@@ -34,7 +39,7 @@ type Screen struct{ Fail bool }
 // Init initializes the screen for use.
 func (s *Screen) Init() error {
 	if s.Fail {
-		return InitErr
+		return ErrInit
 	}
 	return nil
 }
