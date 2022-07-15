@@ -57,16 +57,16 @@ func (s *NewRegister) Has_copy_of_default_keys_for_internal_events(
 	lines.SetScreenFactory(lines.DefaultScreenFactory())
 	reg, _, err := lines.Sim()
 	t.FatalOn(err)
-	for _, e := range lines.InternalEvents {
-		kk := lines.DefaultKeys.KeysOf(e)
+	for _, e := range lines.InternalFeatures {
+		kk := lines.DefaultFeatures.KeysOf(e)
 		for _, k := range kk {
-			t.True(reg.Keys.HasKey(k))
-			t.Eq(e, reg.Keys.KeyEvent(k))
+			t.True(reg.Features.HasKey(k.Key, k.Mod))
+			t.Eq(e, reg.Features.KeyEvent(k.Key, k.Mod))
 		}
-		rr := lines.DefaultKeys.RunesOf(e)
+		rr := lines.DefaultFeatures.RunesOf(e)
 		for _, r := range rr {
-			t.True(reg.Keys.HasRune(r))
-			t.Eq(e, reg.Keys.RuneEvent(r))
+			t.True(reg.Features.HasRune(r))
+			t.Eq(e, reg.Features.RuneEvent(r))
 		}
 	}
 }

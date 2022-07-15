@@ -76,7 +76,7 @@
 //
 //     reg.Keyboard(func (v *lines.View, r rune, k tcell.Key, m tcell.ModMask) {
 //         if r != rune(0) {
-//             v.Message().Set("received rune-input: "+string(r))
+//             v.Message().Styledf(Centered, "received rune-input: %c", r)
 //             return
 //         }
 //         reg.Keyboard(nil)
@@ -162,14 +162,14 @@ func New() (*Register, error) {
 		return nil, err
 	}
 	reg := Register{
-		view:   view,
-		kk:     map[tcell.Key]func(*View, tcell.ModMask){},
-		rr:     map[rune]func(*View){},
-		mutex:  &sync.Mutex{},
-		Synced: make(chan bool, 1),
-		Keys:   DefaultFeatures,
+		view:     view,
+		kk:       map[tcell.Key]func(*View, tcell.ModMask){},
+		rr:       map[rune]func(*View){},
+		mutex:    &sync.Mutex{},
+		Synced:   make(chan bool, 1),
+		Features: DefaultFeatures,
 	}
-	reg.Keys = DefaultFeatures.Copy()
+	reg.Features = DefaultFeatures.Copy()
 	return &reg, nil
 }
 
@@ -189,7 +189,7 @@ func Sim() (*Register, tcell.SimulationScreen, error) {
 		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
 	}
-	reg.Keys = DefaultFeatures.Copy()
+	reg.Features = DefaultFeatures.Copy()
 	return &reg, view.lib.(tcell.SimulationScreen), nil
 }
 

@@ -32,11 +32,12 @@ type Register struct {
 	// Ev provides the currently reported tcell-event.
 	Ev tcell.Event
 
-	// Keys are the keys and runes which are used for "internal" event
-	// handling, e.g. the keys/runes for the quit event are q, ctrl-c
-	// and ctrl-d.  The key instance allows you to change these keys in
-	// a consistent way.  Keys default to *DefaultKeys*.
-	Keys *Keys
+	// Features are the keys and runes which are used for "internal"
+	// event handling, e.g. the keys/runes for the quit event are q,
+	// ctrl-c and ctrl-d.  The Features instance allows you to add and
+	// remove features and manipulate their event-keys in a consistent
+	// way.  Features default to *DefaultFeatures*.
+	Features *Features
 }
 
 // IsPolling returns true if listener register is polling in the event
@@ -73,6 +74,7 @@ func (rg *Register) Listen() {
 			rg.quitListening()
 		case *tcell.EventResize:
 			if rg.view.resize() {
+				// TODO: make report cancelable after a set timeout.
 				rg.report(ev)
 			}
 			rg.view.ensureSynced(false)
