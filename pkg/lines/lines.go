@@ -2,73 +2,149 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-// Package lines provides a well tested, robust against race conditions,
-// simple, easy to use terminal-UI where the UI is interpreted as an
-// ordered set of lines.  *lines* hides event-polling and
-// screen-synchronization from its user.  Making the components of a
-// view concurrency save in the sense that it can be manipulated by
-// several event-listeners while screen synchronization is processed at
-// the same time would add significant overhead and complexity to the
-// view.  To avoid this overhead and be still robust against race
-// conditions this package was designed not around a view/screen/window
-// but around event-handling:
+// Package lines provides an unopinionated, well tested and documented,
+// robust against race conditions, simple, easy to use terminal-UI.  The
+// terminal is interpreted as an ordered set of lines which you in the
+// future might even can split into columns and rows.  Its
+// implementation is motivated by my experience with other small
+// ui-libraries which try to make it convenient to implement an ui.
+// Often enough these libraries impose unwanted behavior to its user
+// which is difficult to bypass, i.e. the convenience gets lost.  And
+// also often enough I encountered "strange behavior", i.e. it seems
+// kinda difficult to get right.  Especially when it comes to concurrent
+// usage.
 //
-// reg := lines.New()
+// *lines* only imposes three things to its user which you might want to
+// consider before you decide for it.
+//
+// Firstly the keys ctrl-c and ctrl-d quit the application. Always.
+//
+// Secondly *lines* wraps the package tcell which does the heavy lifting
+// on the terminal side.  I didn't make the effort wrap the constants
+// and types which are defined by tcell and are used for event-handling
+// and styling.  I.e. you will have to make yourself acquainted with
+// tcell's *Key* constants its *ModeMap* constants, its *AttrMask*
+// constants, its *Style* type and color handling as needed.
+//
+// Thirdly an architectural choice.  A typical ui-library has generally
+// two functions: providing user input events and a display one can
+// print/draw to.  The later is in *lines* represented by the type
+// *View* thus I will use the term "view" to refer to a terminal screen
+// or emulator.  One of go's killer features is concurrency.  Using an
+// view concurrently is either prone to rase conditions or adds
+// considerable complexity and overhead to a view's implementation if it
+// were to be concurrency save.  To avoid both I decided to design
+// *lines* around the event-handling and not around the view which seems
+// to be more common.  I.e.
+//
+//     reg := lines.New()
 //
 // will return a so called "listener register" which may be used to
 // register call-back functions for events:
 //
-// reg.Resize(func(v *lines.View) { v.LL().Get(0).Set("line 0") })
+//     reg.Resize(func(v *lines.View) {
+//         v.LL().Get(0).Set("line 0")
+//     })
 //
 // The above line will effectively print "line 0" into the first line of
 // a terminal once the initial resize-event was emitted after a call of
 //
-// reg.Listen()
+//     reg.Listen()
 //
 // The later starts the event loop and blocks until a Quit-event was
 // received or reg.QuitListening() was called.
 //
-// reg.Update(func(v *lines.View) { v.LL().Get(0).Set("updated 0") })
+//     reg.Update(func(v *lines.View) {
+//         v.LL().Get(0).Set("updated 0")
+//     })
 //
 // The Update method posts an update event into the event-loop and calls
 // given listener back once it is polled.  I.e. Update provides a
-// programmatically way to update the screen without user triggered
+// programmatically way to update the view without user triggered
 // events. To react on user input listeners may be registered for runes
 // or special keys as they are recognized and provided by the underlying
 // *tcell* package
 //
-// func help(v *lines.View, m tcell.ModMask) {
-//     v.LL().Get(0).Set("some help-text in first line")
-// }
-// reg.Key(help, tcell.KeyF1)
-// reg.Rune(help, 'h')
+//     func help(v *lines.View) {
+//         v.Statusbar().Set("some help-text in the statusbar")
+//     }
+//     reg.Key(tcell.KeyF1, 0, help)
+//     reg.Rune('H', help)
 //
-// i.e. help is called back if the user presses either the F1 or the H
+// I.e. *help* is called back if the user presses either the F1 or the H
 // key.
 //
-// reg.Keyboard(func (v *lines.View, r rune, k tcell.Key) {
-//     if r != rune(0) {
-//         v.LL().Get(0).Set("received rune-input: "+string(r))
-//         return
+//     reg.Keyboard(func (v *lines.View, r rune, k tcell.Key, m tcell.ModMask) {
+//         if r != rune(0) {
+//             v.Message().Set("received rune-input: "+string(r))
+//             return
+//         }
+//         reg.Keyboard(nil)
+//     })
+//
+// KeyBoard suppresses all registered Rune- and Key-events (except -
+// remember :) - for the quit event) and provides received rune/key
+// input to registered Keyboard-listener until it is removed.
+//
+//     reg.Quit(func() { fmt.Println("good by") })
+//
+// A Quit-listener is called if a quit event is received which happens
+// by default if 'q', ctrl-c or ctrl-d is received.  Note you can remove
+// the 'q'-rune from the quit-event handling.
+//
+// The underlying *tcell* library's event-loop already provides an
+// serialization mechanism which is leveraged to make this package
+// robust against race conditions.  If you can resist the temptation to
+// keep a view around outside an event-handler and make sure that all
+// manipulations of a view are finished when the event-listener returns
+// then a View is concurrency save by design.  If you want in response
+// to an event manipulate a view from more than one go-routine *you*
+// must take care that it is done in a concurrency save way which is
+// very difficult if you have not studied the implementation of the
+// view.  If you have cpu/io-heavy operations whose result should go to
+// the screen then send them of in their own go routine which at the end
+// registers an update event which once called back prints its findings
+// to the view.  Note registering event-listeners, i.e. the
+// Register-type, *is* implemented concurrency save! E.g.:
+//
+//     // can not be run in the go-playground since reg.Listen() is blocking
+//
+//     import "github.com/slukits/lines"
+//
+//     func countTextFilesOnMyComputer() {
+//         n := func() int {
+//              // actual implementation which defaults for the sake
+//              // of an executable example to
+//              return 42
+//         }()
+//         reg.Update(func(v *View) {
+//             v.Statusbar().Setf("found %d files", n)
+//         })
 //     }
-//     reg.Keyboard(nil)
-// })
 //
-// KeyBoard suppresses all registered Rune- and Key-events (except for
-// the quit event) and provides received rune/key input to registered
-// Runes-listener until it returns true.
+//     func countTextFilesListener(v *View) {
+//         // NOTE the view does not leave the listener!
+//         go countTextFilesOnMyComputer()
+//         v.Statusbar().Set("counting text files").Busy()
+//     }
 //
-// reg.Quit(func() { fmt.Println("good by") })
+//     func main() {
+//         reg := lines.New()
+//         reg.Key(tcell.KeyF5, 0, countTextFilesListener)
+//         reg.Listen()
+//     }
 //
-// a Quit-listener is called iff a quit event is received which happens
-// by default if 'q', ctrl-c or ctrl-d is received.
+// assuming an appropriate actual implementation this program will print
+// the text-files count to the statusbar in a non-blocking
+// race-condition free manner once a user presses F5.
 //
-// NOTE to avoid race conditions a view must be only manipulated within
-// an event-listener and if the event-listener returns no further
-// manipulations must happen.  Simply never (!) keep a view instance
-// around.   If concurrent view-manipulations are done inside a listener
-// the listener is responsible that they are performed in a concurrency
-// save way.
+// If you can live with these three aspects everything else is optional
+// and at your service as needed. E.g. as long as you don't call
+// Statusbar on a view, a view doesn't have a statusbar.  If you call
+// Statusbar you get one with useable defaults.  If you don't like these
+// defaults you can change them ...
+//
+// Features
 package lines
 
 import (
@@ -91,9 +167,9 @@ func New() (*Register, error) {
 		rr:     map[rune]func(*View){},
 		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
-		Keys:   DefaultKeys,
+		Keys:   DefaultFeatures,
 	}
-	reg.Keys = DefaultKeys.copy(&reg)
+	reg.Keys = DefaultFeatures.Copy()
 	return &reg, nil
 }
 
@@ -113,7 +189,7 @@ func Sim() (*Register, tcell.SimulationScreen, error) {
 		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
 	}
-	reg.Keys = DefaultKeys.copy(&reg)
+	reg.Keys = DefaultFeatures.Copy()
 	return &reg, view.lib.(tcell.SimulationScreen), nil
 }
 
