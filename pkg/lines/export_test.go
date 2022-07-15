@@ -1,6 +1,8 @@
 package lines
 
-import "github.com/gdamore/tcell/v2"
+import (
+	"github.com/gdamore/tcell/v2"
+)
 
 type ScreenFactoryer = screenFactoryer
 
@@ -19,3 +21,9 @@ func DefaultScreenFactory() ScreenFactoryer {
 func ExtractLib(v *View) tcell.Screen { return v.lib }
 
 func GetLib(rg *Register) tcell.Screen { return rg.view.lib }
+
+// FxKeys creates a *Keys*-fixture leveraging *DefaultFeatures* for the
+// "quitter".
+func FxKeys() *Listeners {
+	return newListener(DefaultFeatures)
+}

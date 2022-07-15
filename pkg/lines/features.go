@@ -65,6 +65,18 @@ func (ff *Features) modifiable() bool {
 	return ok
 }
 
+// KeyQuits returns true if given key is associated with the
+// quit-feature.
+func (ff *Features) KeyQuits(k tcell.Key) bool {
+	return ff.keys[tcell.ModNone][k] == FtQuit
+}
+
+// RuneQuits return true if given rune is associated with the
+// quit-feature.
+func (ff *Features) RuneQuits(r rune) bool {
+	return ff.runes[r] == FtQuit
+}
+
 // Copy creates a new Features instance initialized with the features of
 // receiving Features instance.
 func (ff *Features) Copy() *Features {
@@ -171,4 +183,18 @@ func (kk *Features) KeyEvent(k tcell.Key, m tcell.ModMask) Feature {
 // if not registered.
 func (kk *Features) RuneEvent(r rune) Feature {
 	return kk.runes[r]
+}
+
+// isQuitterClosure returns a function reporting if a given key/rune is
+// associated with the quit event.
+func isQuitterClosure(ff *Features) func(k tcell.Key, r rune) bool {
+	return func(k tcell.Key, r rune) bool {
+		if r != rune(0) && ff.RuneQuits(r) {
+			return true
+		}
+		if k != tcell.KeyNUL && ff.KeyQuits(k) {
+			return true
+		}
+		return false
+	}
 }
