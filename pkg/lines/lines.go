@@ -7,39 +7,44 @@
 // terminal is interpreted as an ordered set of lines which you in the
 // future might even can split into columns and rows.  Its
 // implementation is motivated by my experience with other small
-// ui-libraries which try to make it convenient to implement an ui.
-// Often enough these libraries impose unwanted behavior to its user
-// which is difficult to bypass, i.e. the convenience gets lost.  And
-// also often enough I encountered "strange behavior", i.e. it seems
-// kinda difficult to get right.  Especially when it comes to concurrent
-// usage.
+// ui-libraries which try to make it convenient to implement quickly an
+// ui.
 //
-// *lines* only imposes three things to its user which you might want to
+// lines only imposes two things to its user which you might want to
 // consider before you decide for it.
 //
 // Firstly the keys ctrl-c and ctrl-d quit the application. Always.
 //
-// Secondly *lines* wraps the package tcell which does the heavy lifting
-// on the terminal side.  I didn't make the effort wrap the constants
+// Secondly lines wraps the package tcell which does the heavy lifting
+// on the terminal side.  I didn't make the effort to wrap the constants
 // and types which are defined by tcell and are used for event-handling
 // and styling.  I.e. you will have to make yourself acquainted with
-// tcell's *Key* constants its *ModeMap* constants, its *AttrMask*
-// constants, its *Style* type and color handling as needed.
+// tcell's Key constants its ModeMap constants, its AttrMask constants,
+// its Style type and Color handling as needed.
 //
-// Thirdly an architectural choice.  A typical ui-library has generally
-// two functions:
+// Everything else is at your service if you request it otherwise its
+// not in you way.  For example if you don't ask for a message-bar you
+// dont have one.  If you ask for a message bar you get one with
+// reasonable defaults.  If you don't like these defaults you can change
+// them...
+//
+// Events
+//
+// A typical ui-library has generally two functions:
 //
 // - providing user input events
 //
 // - a screen/display/window/view one can print/draw to.
 //
-// In lines the View type represents the instance where you write your
-// output to hence I will use further on the term view.  One of go's
-// killer features is concurrency.  Using a view concurrently is either
-// prone to rase conditions or adds considerable complexity and overhead
-// to a view's implementation if it were to be concurrency save.  To
-// avoid both I decided to design *lines* around the event-handling and
-// not around the view which seems to be more common.  I.e.
+// In lines the terminal-screen is accessed through a provided
+// environment instance to event-listeners.  One of go's killer features
+// is concurrency.  Using a view concurrently is either prone to rase
+// conditions or adds considerable complexity and overhead to a view's
+// implementation if it were to be concurrency save.  To avoid both I
+// decided to design lines around event-handling and not around the view
+// which seems to be more common.  I.e.
+//
+//     import "github.com/slukits/lines"
 //
 //     ee := lines.New()
 //
@@ -49,26 +54,63 @@
 //     ee.Resize(func(e *lines.Env) { e.LL().Get(0).Set("line 0") })
 //
 // The above line will effectively print "line 0" into the first line of
-// a terminal once the initial resize-event was emitted after a call of
+// a terminal once the initial resize-event was emitted (and with every
+// further resize event if not changed) after a call of
 //
 //     ee.Listen()
 //
 // The later starts the event loop and blocks until a Quit-event was
-// received or ee.QuitListening() was called.  Note a lines.Env (short
-// for environment) instance is provided with every event-listener
-// callback.  Env embeds the View-type, i.e. has all methods of the View
-// plus some aspects for the communication between the event-lister and
-// the reporting Events-instance, i.e. e.StopBubbling().
+// received or ee.QuitListening() was called.  Never ever pass an Env
+// instance to an other go-routine.  If you do it anyway your program is
+// most likely to crash because after a listener returns its environment
+// is rendered useless, i.e. method calls on it will likely provide you
+// with a nil pointer exception.  If you want concurrency use:
 //
 //     ee.Update(func(e *lines.Env) {
 //         e.LL().Get(0).Set("updated 0")
 //     })
 //
-// The Update method posts an update event into the event-loop and calls
-// given listener back once it is polled.  I.e. Update provides a
-// programmatically way to update the view without user triggered
-// events. To react on user input listeners may be registered for runes
-// or special keys as they are recognized and provided by the underlying
+// The Update method posts an update event into the event-loop which
+// calls given listener back once it is polled.  I.e. Update provides a
+// programmatically way to update the view without user input.  With
+// this feature we can send cpu/io-heavy operation of in their own
+// go-routine and this go-routine once done registers an update event to
+// inform the user about its findings:
+//
+//     // can not be run in the go-playground since ee.Listen() is blocking
+//
+//     import "github.com/slukits/lines"
+//
+//     func countTextFilesOnMyComputer(ee *Events) {
+//         n := func() int {
+//              // actual implementation which defaults for the sake
+//              // of an executable example to
+//              return 42
+//         }()
+//         ee.Update(func(e *lines.Env) {
+//             e.Statusbar().Setf("found %d files", n)
+//         })
+//     }
+//
+//     func countTextFilesListener(e *lines.Env) {
+//         // NOTE the Env-instance is not passed on to the go routine!
+//         // But a property provided by e you can pass on.
+//         go countTextFilesOnMyComputer(e.EE)
+//         e.Statusbar().Set("counting text files").Busy()
+//     }
+//
+//     func main() {
+//         ee := lines.New()
+//         ee.Key(tcell.KeyF5, 0, countTextFilesListener)
+//         ee.Listen()
+//     }
+//
+// The rule of thump is here: environment properties you can safely pass
+// on to a go routine; return values of environment methods you can't if
+// you want to avoid race conditions.
+//
+// To react on user input listeners may be registered for runes or
+// special keys as they are recognized and provided by the underlying
 // *tcell* package
 //
 //     func help(e *lines.Env) {
@@ -99,60 +141,52 @@
 // by default if 'q', ctrl-c or ctrl-d is received.  Note you can remove
 // the 'q'-rune from the quit-event handling (but not ctrl-c or ctrl-d).
 //
-// The underlying *tcell* library's event-loop already provides an
-// serialization mechanism which is leveraged to make this package
-// robust against race conditions.  If you can resist the temptation to
-// let an Env-instance leave a listener's implementation and make sure
-// that all manipulations of a view are finished when the event-listener
-// returns then a view is concurrency save by design.  If you want in
-// response to an event manipulate a view from more than one go-routine
-// *you* must take care that it is done in a concurrency save way which
-// is very difficult if you have not studied the implementation of the
-// view.  If you have cpu/io-heavy operations whose result should go to
-// the screen then send them of in their own go routine (without the
-// Env-instance) which at the end registers an update event which once
-// called back prints its findings to the view.  Note registering
-// event-listeners, i.e. the Events-type, *is* implemented concurrency
-// save! E.g.:
+// Listeners
 //
-//     // can not be run in the go-playground since ee.Listen() is blocking
+// Events encapsulates Listeners where we have registered listeners for
+// "global" events in the previous section.  With
 //
-//     import "github.com/slukits/lines"
+//     ll := NewListeners(nil)
 //
-//     func countTextFilesOnMyComputer() {
-//         n := func() int {
-//              // actual implementation which defaults for the sake
-//              // of an executable example to
-//              return 42
-//         }()
-//         ee.Update(func(e *lines.Env) {
-//             e.Statusbar().Setf("found %d files", n)
-//         })
-//     }
+// you can create your own Listeners-instance and register for events as
+// we did before.  To make use of ll we can map this set of
+// event-listener registrations to an environment *Component*.  Most
+// things which are returned by environment methods are components, e.g.
 //
-//     func countTextFilesListener(e *lines.Env) {
-//         // NOTE the Env-instance does not leave the listener!
-//         go countTextFilesOnMyComputer()
-//         e.Statusbar().Set("counting text files").Busy()
-//     }
+//    e.MessageBar().Listeners = ll
 //
-//     func main() {
-//         ee := lines.New()
-//         ee.Key(tcell.KeyF5, 0, countTextFilesListener)
-//         ee.Listen()
-//     }
-//
-// assuming an appropriate actual implementation this program will print
-// the text-files count to the statusbar in a non-blocking
-// race-condition free manner once a user presses F5.
-//
-// If you can live with these three aspects everything else is optional
-// and at your service as needed. E.g. as long as you don't call
-// Statusbar on a view, a view doesn't have a statusbar.  If you call
-// Statusbar you get one with useable defaults.  If you don't like these
-// defaults you can change them ...
+// Now we have set our listeners to the environment component message
+// bar which still only waists memory because our message bar can't
+// receive the focus.  Remember: you only get what you ask for.  To make
+// the above actually do something we need last but not least make use
+// of Features.
 //
 // Features
+//
+// In order to use features like focusing or scrolling we need to turn
+// these features on.  lines could try to be smart and reason "if you
+// want to receive key-events on the message bar the environment must
+// have the feature focusing turned on".  Since turning focusing on
+// changes the activated key-bindings as well as the layout and behavior
+// of your application --- none of which you have asked for --- you need
+// to ask for it
+//
+//     e.Features.Add(
+//         FtFocusNext, rune(0), tcell.KeyTab, tcell.ModNone)
+//     e.Features.Add(
+//         FtFocusNext, rune(0), tcell.KeyTab, tcell.ModShift)
+//
+// Now the environment has "focusing" turned on and the message bar can
+// receive the focus which activates its event listeners. Don't worry
+// there are predefined feature sets with common defaults to keep
+// things easy for you.  E.g.
+//
+//     e.LL().Features = NewFeatures(Focusing, Scrolling)
+//
+// will bind the page up/down keys to scroll up and down and the tab-key
+// like above to focus lines of the currently focused component
+// providing (screen) lines.  See the documentation of the Features-type
+// to learn how to change the defaults of features sets.
 package lines
 
 import (
