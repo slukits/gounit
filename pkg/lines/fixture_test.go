@@ -230,15 +230,15 @@ func (ee *Events) QuitListening() {
 // Update passes given listener on to embedded Events to wait for the
 // event to be processed.  Are wrapped Events not polling it is started
 // (ee.Listen()).
-func (ee *Events) Update(listener func(*lines.Screen)) error {
+func (ee *Events) Update(l lines.Listener) error {
 	ee.t.GoT().Helper()
 	if !ee.IsPolling() {
 		ee.Listen()
 	}
-	if listener == nil {
-		return ee.Events.Update(listener)
+	if l == nil {
+		return ee.Events.Update(l)
 	}
-	err := ee.Events.Update(listener)
+	err := ee.Events.Update(l)
 	if err == nil {
 		select {
 		case <-ee.Synced:

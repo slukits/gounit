@@ -8,6 +8,10 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
+// ErrScr is an overlaying screen providing the whole screen for
+// reporting an error (motivated by reporting an error for a to small
+// screen) without loosing the screen content at the time when an error
+// screen is requested.
 type ErrScr struct {
 	lib     tcell.Screen
 	content string
@@ -16,6 +20,9 @@ type ErrScr struct {
 	Style   tcell.Style
 }
 
+// ErrScreen returns an overlaying (if activated) error-screen allowing
+// to report errors without loosing the screen content at the time the
+// error screen is requested
 func (v *Screen) ErrScreen() *ErrScr {
 	if v.errScr == nil {
 		v.errScr = &ErrScr{lib: v.lib}
@@ -23,14 +30,17 @@ func (v *Screen) ErrScreen() *ErrScr {
 	return v.errScr
 }
 
+// IsDirty returns true if an error-screen's content was modified.
 func (e *ErrScr) IsDirty() bool {
 	return e.isDirty
 }
 
+// String returns an error-screens content.
 func (e *ErrScr) String() string {
 	return e.content
 }
 
+// Set sets an error-screen's content
 func (e *ErrScr) Set(s string) {
 	if s == e.content {
 		return

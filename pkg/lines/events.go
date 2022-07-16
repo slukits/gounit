@@ -19,7 +19,7 @@ type Events struct {
 	scr       *Screen
 	mutex     *sync.Mutex
 	ll        *Listeners
-	resize    func(*Screen)
+	resize    Listener
 	quit      func()
 	isPolling bool
 	reported  func()
@@ -113,10 +113,10 @@ func (rg *Events) Reported(listener func()) {
 // Resize registers given listener for the resize event.  Note starting
 // the event-loop by calling *Listen* will trigger a mandatory initial
 // resize event.
-func (rg *Events) Resize(listener func(*Screen)) {
+func (rg *Events) Resize(l Listener) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
-	rg.resize = listener
+	rg.resize = l
 }
 
 // Quit registers given listener for the quit event which is triggered
@@ -131,13 +131,13 @@ func (rg *Events) Quit(listener func()) {
 // its turn given listener.  Update fails if the event-loop is full
 // returned error will wrap tcell's *PostEven* error.  Update is an
 // no-op if listener is nil.
-func (rg *Events) Update(listener func(*Screen)) error {
-	if listener == nil {
+func (rg *Events) Update(l Listener) error {
+	if l == nil {
 		return nil
 	}
 	evt := &updateEvent{
 		when:     time.Now(),
-		listener: listener,
+		listener: l,
 	}
 	if err := rg.scr.lib.PostEvent(evt); err != nil {
 		return fmt.Errorf(ErrUpdateFmt, err)
@@ -150,7 +150,7 @@ var ErrUpdateFmt = "can't post event: %w"
 
 type updateEvent struct {
 	when     time.Time
-	listener func(*Screen)
+	listener Listener
 }
 
 func (u *updateEvent) When() time.Time { return u.when }
@@ -190,34 +190,36 @@ type quitEvent struct {
 
 func (u *quitEvent) When() time.Time { return u.when }
 
-func (rg *Events) report(ev tcell.Event) (quit bool) {
-	rg.Ev = ev
-	if rg.scr.ToSmall() {
-		return rg.reportToSmall(ev)
+func (ee *Events) report(ev tcell.Event) (quit bool) {
+	ee.Ev = ev
+	if ee.scr.ToSmall() {
+		return ee.reportToSmall(ev)
 	}
 	switch ev := ev.(type) {
 	case *tcell.EventResize:
-		if listener := rg.resizeListener(); listener != nil {
-			listener(rg.scr)
-			rg.reportReported()
+		if listener := ee.resizeListener(); listener != nil {
+			env := ee.env(ev)
+			listener(env)
+			ee.reportReported(env)
 		}
 	case *tcell.EventKey:
-		return rg.reportKeyEvent(ev)
+		return ee.reportKeyEvent(ev)
 	case *updateEvent:
-		ev.listener(rg.scr)
-		rg.reportReported()
+		env := ee.env(ev)
+		ev.listener(env)
+		ee.reportReported(env)
 	}
 	return false
 }
 
 // reportToSmall handles reporting an event in case the view is to
 // small, i.e. only reports the quit-event.
-func (rg *Events) reportToSmall(ev tcell.Event) bool {
+func (ee *Events) reportToSmall(ev tcell.Event) bool {
 	if ev, ok := ev.(*tcell.EventKey); ok {
-		if rg.isQuitEvent(ev) {
-			if listener := rg.quitListener(ev); listener != nil {
+		if ee.isQuitEvent(ev) {
+			if listener := ee.quitListener(ev); listener != nil {
 				listener()
-				rg.reportReported()
+				ee.reportReported(nil)
 			}
 			return true
 		}
@@ -225,35 +227,49 @@ func (rg *Events) reportToSmall(ev tcell.Event) bool {
 	return false
 }
 
-func (rg *Events) reportKeyEvent(ev *tcell.EventKey) bool {
-	if rg.isQuitEvent(ev) {
-		if listener := rg.quitListener(ev); listener != nil {
+func (ee *Events) reportKeyEvent(ev *tcell.EventKey) bool {
+	if ee.isQuitEvent(ev) {
+		if listener := ee.quitListener(ev); listener != nil {
 			listener()
-			rg.reportReported()
+			ee.reportReported(nil)
 		}
 		return true
 	}
-	if kbl := rg.ll.KBListener(); kbl != nil {
-		kbl(rg.scr, ev.Rune(), ev.Key(), ev.Modifiers())
-		rg.reportReported()
+	if kbl := ee.ll.KBListener(); kbl != nil {
+		env := ee.env(ev)
+		kbl(env, ev.Rune(), ev.Key(), ev.Modifiers())
+		ee.reportReported(env)
 		return false
 	}
-	if l, ok := rg.ll.RuneListenerOf(ev.Rune()); ok {
-		l(rg.scr)
-		rg.reportReported()
+	if l, ok := ee.ll.RuneListenerOf(ev.Rune()); ok {
+		env := ee.env(ev)
+		l(env)
+		ee.reportReported(env)
 	}
-	if l, ok := rg.ll.KeyListenerOf(ev.Key(), ev.Modifiers()); ok {
-		l(rg.scr)
-		rg.reportReported()
+	if l, ok := ee.ll.KeyListenerOf(ev.Key(), ev.Modifiers()); ok {
+		env := ee.env(ev)
+		l(env)
+		ee.reportReported(env)
 	}
 	return false
+}
+
+func (ee *Events) env(ev tcell.Event) *Env {
+	return &Env{
+		scr: ee.scr,
+		EE:  ee,
+		Evn: ev,
+	}
 }
 
 // reportReported is for testing purposes reporting back each time an
 // event was reported allowing the Events-fixture-implementation to
 // count reported events and end the event-loop automatically after a
 // certain amount of reported events.
-func (rg *Events) reportReported() {
+func (rg *Events) reportReported(env *Env) {
+	if env != nil {
+		env.reset()
+	}
 	if l := rg.reportedListener(); l != nil {
 		l()
 	}
@@ -265,7 +281,7 @@ func (rg *Events) reportedListener() func() {
 	return rg.reported
 }
 
-func (rg *Events) resizeListener() func(*Screen) {
+func (rg *Events) resizeListener() Listener {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	return rg.resize

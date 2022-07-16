@@ -124,36 +124,36 @@ func (s *events) TearDown(t *T) { s.fx.Del(t) }
 
 func (s *events) Reports_initial_resize_event(t *T) {
 	ee, resizeListenerCalled := s.fx.EE(t), false
-	ee.Resize(func(v *lines.Screen) { resizeListenerCalled = true })
+	ee.Resize(func(v *lines.Env) { resizeListenerCalled = true })
 	ee.Listen()
 	t.True(resizeListenerCalled)
 }
 
 func (s *events) Stops_reporting_if_view_to_small(t *T) {
 	ee, updates := s.fx.EE(t, 2), 0
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		v.SetMin(30)
 	})
 	ee.Listen()
 	t.Eq(1, ee.Max) // initial resize event
-	t.FatalOn(ee.Update(func(v *lines.Screen) { updates++ }))
+	t.FatalOn(ee.Update(func(v *lines.Env) { updates++ }))
 	t.Eq(0, updates)
 	ee.SetNumberOfLines(35)
 	t.Eq(0, ee.Max) // second resize event
-	t.FatalOn(ee.Update(func(v *lines.Screen) { updates++ }))
+	t.FatalOn(ee.Update(func(v *lines.Env) { updates++ }))
 	t.Eq(1, updates)
 }
 
 func (s *events) Stops_reporting_except_for_quit(t *T) {
 	ee := s.fx.EE(t, 2)
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		v.SetMin(30)
 	})
 	ee.Listen()
 	ee.FireRuneEvent('q')
 	t.False(ee.IsPolling())
 	ee, quit := New(t, 2), false
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		v.SetMin(30)
 	})
 	ee.Quit(func() { quit = true })
@@ -166,7 +166,7 @@ func (s *events) Stops_reporting_except_for_quit(t *T) {
 func (s *events) Posts_and_reports_update_event(t *T) {
 	ee, update := s.fx.EE(t), false
 	t.FatalOn(ee.Update(nil))
-	t.FatalOn(ee.Update(func(v *lines.Screen) {
+	t.FatalOn(ee.Update(func(v *lines.Env) {
 		update = true
 	}))
 	t.True(update)
@@ -175,7 +175,7 @@ func (s *events) Posts_and_reports_update_event(t *T) {
 
 func (s *events) Reports_an_update_event_with_now_timestamp(t *T) {
 	ee, now, updateReported := s.fx.EE(t, 0), time.Now(), false
-	ee.Update(func(v *lines.Screen) {
+	ee.Update(func(v *lines.Env) {
 		updateReported = true
 		t.True(ee.Ev.When().After(now))
 	})
@@ -186,9 +186,9 @@ func (s *events) Fails_posting_an_update_if_event_loop_full(t *T) {
 	ee, _, err := lines.Sim()
 	t.FatalOn(err)
 	block, failed := make(chan struct{}), false
-	ee.Update(func(v *lines.Screen) { <-block })
+	ee.Update(func(v *lines.Env) { <-block })
 	for i := 0; i < 100; i++ {
-		if err := ee.Update(func(v *lines.Screen) {}); err != nil {
+		if err := ee.Update(func(v *lines.Env) {}); err != nil {
 			failed = true
 			break
 		}
@@ -241,12 +241,12 @@ func (s *events) Reporting_keyboard_shadows_other_input_listener(
 	t *T,
 ) {
 	ee, rn, key, kb := s.fx.EE(t, 1), false, false, 0
-	t.FatalOn(ee.Rune('a', func(v *lines.Screen) { rn = true }))
-	t.FatalOn(ee.Key(tcell.KeyUp, 0, func(v *lines.Screen) {
+	t.FatalOn(ee.Rune('a', func(v *lines.Env) { rn = true }))
+	t.FatalOn(ee.Key(tcell.KeyUp, 0, func(v *lines.Env) {
 		key = true
 	}))
 	ee.Keyboard(func(
-		v *lines.Screen, r rune, k tcell.Key, m tcell.ModMask,
+		v *lines.Env, r rune, k tcell.Key, m tcell.ModMask,
 	) {
 		if r == 'a' {
 			kb++
@@ -266,7 +266,7 @@ func (s *events) Reporting_keyboard_shadows_other_input_listener(
 func (s *events) Reporting_keyboard_shadows_all_but_quit(t *T) {
 	ee, kb := s.fx.EE(t, 1), false
 	ee.Keyboard(func(
-		v *lines.Screen, r rune, k tcell.Key, m tcell.ModMask,
+		v *lines.Env, r rune, k tcell.Key, m tcell.ModMask,
 	) {
 		kb = true
 		ee.Keyboard(nil)
@@ -278,9 +278,9 @@ func (s *events) Reporting_keyboard_shadows_all_but_quit(t *T) {
 
 func (s *events) Stops_reporting_keyboard_if_removed(t *T) {
 	ee, rn, kb := s.fx.EE(t, 1), false, false
-	ee.Rune('a', func(v *lines.Screen) { rn = true })
+	ee.Rune('a', func(v *lines.Env) { rn = true })
 	ee.Keyboard(func(
-		v *lines.Screen, r rune, k tcell.Key, m tcell.ModMask,
+		v *lines.Env, r rune, k tcell.Key, m tcell.ModMask,
 	) {
 		t.Eq('a', r)
 		kb = true

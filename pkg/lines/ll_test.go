@@ -30,7 +30,7 @@ func (s *Lines) TearDown(t *T) { s.fx.Del(t) }
 
 func (s *Lines) Has_initially_view_len_many_lines(t *T) {
 	ee := s.fx.EE(t)
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		t.Eq(v.Len(), v.LL().Len())
 		got := 0
 		v.LL().For(func(l *lines.Line) { got++ })
@@ -41,7 +41,7 @@ func (s *Lines) Has_initially_view_len_many_lines(t *T) {
 
 func (s *Lines) First_screen_line_defaults_to_zero(t *T) {
 	ee := s.fx.EE(t)
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		t.Eq(0, v.LL().FirstScreenLine())
 	})
 	ee.Listen()
@@ -49,7 +49,7 @@ func (s *Lines) First_screen_line_defaults_to_zero(t *T) {
 
 func (s *Lines) Ignores_first_screen_line_update_if_out_of_bound(t *T) {
 	ee := s.fx.EE(t)
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		t.Eq(5, v.LL().SetFirstScreenLine(5).FirstScreenLine())
 		t.Eq(5, v.LL().SetFirstScreenLine(-1).FirstScreenLine())
 		t.Eq(5, v.LL().SetFirstScreenLine(42).FirstScreenLine())
@@ -61,7 +61,7 @@ func (s *Lines) Provides_all_screen_lines_from_the_first_screen_line(
 	t *T,
 ) {
 	ee := s.fx.EE(t)
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		exp := 0
 		v.LL().ForScreen(func(l *lines.Line) {
 			t.Eq(exp, l.Idx)
@@ -79,7 +79,7 @@ func (s *Lines) Provides_all_screen_lines_from_the_first_screen_line(
 
 func (s *Lines) Provides_zero_line_for_out_of_bound_requests(t *T) {
 	ee := s.fx.EE(t)
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		t.True(lines.Zero == v.LL().Line(s.fx.DefaultLineCount))
 	})
 	ee.Listen()
@@ -87,7 +87,7 @@ func (s *Lines) Provides_zero_line_for_out_of_bound_requests(t *T) {
 
 func (s *Lines) Are_Increased_as_requested(t *T) {
 	ee, exp := s.fx.EE(t), 42
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		got := 0
 		v.LL().ForN(-1, func(l *lines.Line) { got++ })
 		t.Eq(0, got)

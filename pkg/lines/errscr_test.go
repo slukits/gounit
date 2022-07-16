@@ -30,24 +30,24 @@ func (s *AErrorScreen) SetUp(t *T) {
 func (s *AErrorScreen) TearDown(t *T) { s.fx.Del(t) }
 
 func (s *AErrorScreen) Is_dirty_after_updated(t *T) {
-	rg := s.fx.EE(t)
-	rg.Resize(func(v *lines.Screen) {
-		v.ErrScreen().Set("")
-		t.False(v.ErrScreen().IsDirty())
-		v.ErrScreen().Set("22")
-		t.True(v.ErrScreen().IsDirty())
+	ee := s.fx.EE(t)
+	ee.Resize(func(e *lines.Env) {
+		e.ErrScreen().Set("")
+		t.False(e.ErrScreen().IsDirty())
+		e.ErrScreen().Set("22")
+		t.True(e.ErrScreen().IsDirty())
 	})
-	rg.Listen()
+	ee.Listen()
 }
 
 // TODO: add formatting directives to an error-screen, e.g. "centered"
 func (s *AErrorScreen) A_100_percent(t *T) {
-	rg := s.fx.EE(t)
-	rg.Resize(func(v *lines.Screen) {
+	ee := s.fx.EE(t)
+	ee.Resize(func(v *lines.Env) {
 		v.ErrScreen().Set(strings.Repeat("a", 108))
 		v.ErrScreen().Active = true
 	})
-	rg.Listen()
+	ee.Listen()
 }
 
 func TestAErrorScreen(t *testing.T) {

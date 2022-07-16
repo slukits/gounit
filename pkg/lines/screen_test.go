@@ -31,7 +31,7 @@ func (s *AScreen) TearDown(t *T) { s.fx.Del(t) }
 
 func (s *AScreen) Sim_has_default_length(t *T) {
 	ee := s.fx.EE(t)
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		t.Eq(s.fx.DefaultLineCount, v.Len())
 	})
 	ee.Listen()
@@ -39,7 +39,7 @@ func (s *AScreen) Sim_has_default_length(t *T) {
 
 func (s *AScreen) Displays_an_error_if_len_to_small(t *T) {
 	ee := s.fx.EE(t)
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		v.SetMin(30)
 	})
 	ee.Listen()
@@ -47,7 +47,7 @@ func (s *AScreen) Displays_an_error_if_len_to_small(t *T) {
 
 func (s *AScreen) Adjust_length_according_to_a_resize_event(t *T) {
 	ee, exp, resizeCount := s.fx.EE(t, 1), 20, 0
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		switch resizeCount {
 		case 0:
 			t.Eq(s.fx.DefaultLineCount, v.Len())
@@ -63,7 +63,7 @@ func (s *AScreen) Adjust_length_according_to_a_resize_event(t *T) {
 
 func (s *AScreen) Adjusts_provided_screen_lines_at_resize_event(t *T) {
 	ee, expFirst, expSecond, resizeCount := s.fx.EE(t, 3), 15, 30, 0
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		switch resizeCount {
 		case 0:
 			got := 0
@@ -93,7 +93,7 @@ func (s *AScreen) Adjusts_provided_screen_lines_at_resize_event(t *T) {
 
 func (s *AScreen) Shows_an_error_if_resize_goes_below_min(t *T) {
 	ee, first := s.fx.EE(t, 1), true
-	ee.Resize(func(v *lines.Screen) {
+	ee.Resize(func(v *lines.Env) {
 		if first {
 			first = false
 			v.SetMin(20)

@@ -26,7 +26,7 @@ func (s *Screen) Len() int {
 	return h
 }
 
-// LL returns the receiving screens's lines-set.
+// LL returns the screens's currently focused lines-set.
 func (s *Screen) LL() *Lines { return s.ll }
 
 // SetMin defines the minimal expected number of screen lines.  An error
@@ -40,8 +40,8 @@ func (s *Screen) SetMin(m int) {
 	s.minErr()
 }
 
-// ToSmall returns true if a set minimal number of lines is greater than
-// the available screen height.
+// ToSmall returns true if a set minimal number of screen lines is
+// greater than the available screen lines.
 func (s *Screen) ToSmall() bool { return s.Len() < s.min }
 
 func (s *Screen) resize() (ok bool) {
