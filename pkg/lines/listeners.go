@@ -30,7 +30,24 @@ type Listeners struct {
 	kb         KBListener
 }
 
-func NewListeners(ff *Features) *Listeners {
+// IsQuitter provides the information which runes/keys may not be used
+// for listener registration since they are used for quitting.
+type IsQuitter interface {
+	// RuneQuits returns true iff given rune (event) quits event loop
+	// listening.
+	RuneQuits(rune) bool
+	// KeyQuits returns true iff given key (event without modifier)
+	// quits event loop listening.
+	KeyQuits(tcell.Key) bool
+}
+
+// NewListener creates a new listener instance whereas given is-quitter
+// defines the runes and keys which are registered for quitting the
+// listening to the event-loop.  If IsQuitter is nil DefaultFeatures is
+// used.  Note Features implements IsQuitter interface which is need to
+// produces corresponding errors when registering rune/key listeners
+// with the same runes/keys that are registered for quitting.
+func NewListeners(ff IsQuitter) *Listeners {
 	return &Listeners{
 		isQuitting: isQuitterClosure(ff),
 		mutex:      &sync.Mutex{},

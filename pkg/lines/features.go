@@ -187,7 +187,7 @@ func (kk *Features) RuneEvent(r rune) Feature {
 
 // isQuitterClosure returns a function reporting if a given key/rune is
 // associated with the quit event.
-func isQuitterClosure(ff *Features) func(k tcell.Key, r rune) bool {
+func isQuitterClosure(ff IsQuitter) func(k tcell.Key, r rune) bool {
 	return func(k tcell.Key, r rune) bool {
 		if r != rune(0) && ff.RuneQuits(r) {
 			return true
