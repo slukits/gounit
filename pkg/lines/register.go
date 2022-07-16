@@ -22,6 +22,7 @@ type Events struct {
 	resize    func(*View)
 	quit      func()
 	isPolling bool
+	reported  func()
 
 	// Synced sends a message after a the screen synchronization
 	// following a reported event.
@@ -102,6 +103,11 @@ func (rg *Events) stopPolling() {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	rg.isPolling = false
+}
+
+// Reported calls back if an event was reported for logging and testing.
+func (rg *Events) Reported(listener func()) {
+	rg.reported = listener
 }
 
 // Resize registers given listener for the resize event.  Note starting
@@ -187,42 +193,76 @@ func (u *quitEvent) When() time.Time { return u.when }
 func (rg *Events) report(ev tcell.Event) (quit bool) {
 	rg.Ev = ev
 	if rg.view.ToSmall() {
-		if ev, ok := ev.(*tcell.EventKey); ok {
-			if rg.isQuitEvent(ev) {
-				if listener := rg.quitListener(ev); listener != nil {
-					listener()
-				}
-				return true
-			}
-		}
-		return false
+		return rg.reportToSmall(ev)
 	}
 	switch ev := ev.(type) {
 	case *tcell.EventResize:
 		if listener := rg.resizeListener(); listener != nil {
 			listener(rg.view)
+			rg.reportReported()
 		}
 	case *tcell.EventKey:
+		return rg.reportKeyEvent(ev)
+	case *updateEvent:
+		ev.listener(rg.view)
+		rg.reportReported()
+	}
+	return false
+}
+
+// reportToSmall handles reporting an event in case the view is to
+// small, i.e. only reports the quit-event.
+func (rg *Events) reportToSmall(ev tcell.Event) bool {
+	if ev, ok := ev.(*tcell.EventKey); ok {
 		if rg.isQuitEvent(ev) {
 			if listener := rg.quitListener(ev); listener != nil {
 				listener()
+				rg.reportReported()
 			}
 			return true
 		}
-		if kbl := rg.ll.KBListener(); kbl != nil {
-			kbl(rg.view, ev.Rune(), ev.Key(), ev.Modifiers())
-			return
-		}
-		if l, ok := rg.ll.RuneListenerOf(ev.Rune()); ok {
-			l(rg.view)
-		}
-		if l, ok := rg.ll.KeyListenerOf(ev.Key(), ev.Modifiers()); ok {
-			l(rg.view)
-		}
-	case *updateEvent:
-		ev.listener(rg.view)
 	}
 	return false
+}
+
+func (rg *Events) reportKeyEvent(ev *tcell.EventKey) bool {
+	if rg.isQuitEvent(ev) {
+		if listener := rg.quitListener(ev); listener != nil {
+			listener()
+			rg.reportReported()
+		}
+		return true
+	}
+	if kbl := rg.ll.KBListener(); kbl != nil {
+		kbl(rg.view, ev.Rune(), ev.Key(), ev.Modifiers())
+		rg.reportReported()
+		return false
+	}
+	if l, ok := rg.ll.RuneListenerOf(ev.Rune()); ok {
+		l(rg.view)
+		rg.reportReported()
+	}
+	if l, ok := rg.ll.KeyListenerOf(ev.Key(), ev.Modifiers()); ok {
+		l(rg.view)
+		rg.reportReported()
+	}
+	return false
+}
+
+// reportReported is for testing purposes reporting back each time an
+// event was reported allowing the Events-fixture-implementation to
+// count reported events and end the event-loop automatically after a
+// certain amount of reported events.
+func (rg *Events) reportReported() {
+	if l := rg.reportedListener(); l != nil {
+		l()
+	}
+}
+
+func (rg *Events) reportedListener() func() {
+	rg.mutex.Lock()
+	defer rg.mutex.Unlock()
+	return rg.reported
 }
 
 func (rg *Events) resizeListener() func(*View) {
@@ -232,6 +272,7 @@ func (rg *Events) resizeListener() func(*View) {
 }
 
 func (rg *Events) isQuitEvent(ev *tcell.EventKey) bool {
+	// TODO: use Features to determine the quit event.
 	if ev.Key() == tcell.KeyRune && ev.Rune() != 'q' {
 		return false
 	}

@@ -222,7 +222,11 @@ func (s *ARegister) Reports_quit_event_and_ends_event_loop(t *T) {
 			rg.FireKeyEvent(tcell.Key(k))
 		}
 		t.True(quitEvt)
-		t.Eq(0, rg.Max)
+		if i == 0 {
+			t.Eq(1, rg.Max)
+		} else {
+			t.Eq(0, rg.Max)
+		}
 		t.False(rg.IsPolling())
 	}
 }

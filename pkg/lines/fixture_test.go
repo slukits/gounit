@@ -29,11 +29,12 @@ import (
 // Events-instance.
 type Events struct {
 	*lines.Events
-	lib        tcell.SimulationScreen
-	mutex      *sync.Mutex
-	reported   bool
-	haveResize bool
-	t          *gounit.T
+	lib           tcell.SimulationScreen
+	mutex         *sync.Mutex
+	reported      bool
+	haveResize    bool
+	autoTerminate bool
+	t             *gounit.T
 
 	// Max is the number of reported events after which the
 	// event-loop of a register-fixture is terminated.  Max is
@@ -51,10 +52,17 @@ type Events struct {
 	Timeout time.Duration
 }
 
+func decrement(ee *Events) func() {
+	return func() {
+		ee.Max--
+	}
+}
+
 // New creates a new Register test-fixture with additional features for
 // testing.  If a positive number n is given the event-loop is
 // automatically terminated after this amount of events have been
-// reported.  Is no number of max-events given the event-loop stops
+// reported.  Is a negative number given the loop will not be stopped
+// automatically.  Is no number of max-events given the event-loop stops
 // after the first reported event.
 func New(t *gounit.T, max ...int) *Events {
 	t.GoT().Helper()
@@ -62,28 +70,18 @@ func New(t *gounit.T, max ...int) *Events {
 	t.FatalOn(err)
 	fx := Events{Events: reg, lib: lib, t: t,
 		mutex: &sync.Mutex{}, Timeout: 100 * time.Millisecond}
+	if len(max) == 0 {
+		fx.autoTerminate = true
+		fx.Reported(decrement(&fx))
+	}
 	if len(max) > 0 {
+		if max[0] >= 0 {
+			fx.autoTerminate = true
+			fx.Reported(decrement(&fx))
+		}
 		fx.Max = max[0]
 	}
 	return &fx
-}
-
-func (rg *Events) falsifyReported() {
-	rg.mutex.Lock()
-	defer rg.mutex.Unlock()
-	rg.reported = false
-}
-
-func (rg *Events) setReported() {
-	rg.mutex.Lock()
-	defer rg.mutex.Unlock()
-	rg.reported = true
-}
-
-func (rg *Events) hasBeenReported() bool {
-	rg.mutex.Lock()
-	defer rg.mutex.Unlock()
-	return rg.reported
 }
 
 // SetNumberOfLines fires a resize event setting the screen lines to
@@ -97,16 +95,13 @@ func (rg *Events) SetNumberOfLines(n int) {
 	}
 	w, _ := rg.lib.Size()
 	rg.lib.SetSize(w, n)
-	rg.falsifyReported()
 	rg.t.FatalOn(rg.lib.PostEvent(tcell.NewEventResize(w, n)))
 	select {
 	case <-rg.Synced:
 	case <-rg.t.Timeout(rg.Timeout):
 		rg.t.Fatalf("set number of lines: sync timed out")
 	}
-	if rg.hasBeenReported() {
-		rg.decrementMaxEvents()
-	}
+	rg.checkTermination()
 }
 
 // FireRuneEvent posts given run-key-press event and returns after this
@@ -117,16 +112,13 @@ func (rg *Events) FireRuneEvent(r rune) {
 	if !rg.IsPolling() {
 		rg.t.Fatal("fire rune: not polling")
 	}
-	rg.falsifyReported()
 	rg.lib.InjectKey(tcell.KeyRune, r, tcell.ModNone)
 	select {
 	case <-rg.Synced:
 	case <-rg.t.Timeout(rg.Timeout):
 		rg.t.Fatalf("fire rune: sync timed out")
 	}
-	if rg.hasBeenReported() {
-		rg.decrementMaxEvents()
-	}
+	rg.checkTermination()
 }
 
 // FireKeyEvent posts given special-key-press event and returns after
@@ -136,7 +128,6 @@ func (rg *Events) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) {
 	if !rg.IsPolling() {
 		rg.t.Fatal("fire key: not polling")
 	}
-	rg.falsifyReported()
 	if len(m) == 0 {
 		rg.lib.InjectKey(k, 0, tcell.ModNone)
 	} else {
@@ -147,9 +138,7 @@ func (rg *Events) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) {
 	case <-rg.t.Timeout(rg.Timeout):
 		rg.t.Fatalf("fire key: sync timed out")
 	}
-	if rg.hasBeenReported() {
-		rg.decrementMaxEvents()
-	}
+	rg.checkTermination()
 }
 
 // Listen posts the initial resize event and calls the wrapped
@@ -157,7 +146,6 @@ func (rg *Events) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) {
 // the initial resize has completed.
 func (rg *Events) Listen() {
 	rg.t.GoT().Helper()
-	rg.falsifyReported()
 	err := rg.lib.PostEvent(tcell.NewEventResize(rg.lib.Size()))
 	rg.t.FatalOn(err)
 	go rg.Events.Listen()
@@ -166,8 +154,20 @@ func (rg *Events) Listen() {
 	case <-rg.t.Timeout(rg.Timeout):
 		rg.t.Fatalf("listen: sync timed out")
 	}
-	if rg.hasBeenReported() {
-		rg.decrementMaxEvents()
+	rg.checkTermination()
+}
+
+func (ee *Events) checkTermination() {
+	if !ee.autoTerminate {
+		return
+	}
+	if ee.Max < 0 {
+		ee.QuitListening()
+		select {
+		case <-ee.Synced:
+		case <-ee.t.Timeout(ee.Timeout):
+			ee.t.Fatalf("quit listening: sync timed out")
+		}
 	}
 }
 
@@ -216,41 +216,15 @@ func cellIdx(x, y, w int) int {
 // QuitListening stops wrapped Register's event loop.  This method does
 // not return before  Events.IsPolling() returns false.
 func (rg *Events) QuitListening() {
-	rg.LastScreen = rg.String()
-	polling := rg.IsPolling()
-	rg.Events.QuitListening()
-	if !polling {
+	if !rg.IsPolling() {
 		return
 	}
+	rg.LastScreen = rg.String()
+	rg.Events.QuitListening()
 	select {
-	case <-rg.Events.Synced:
+	case <-rg.Synced:
 	case <-rg.t.Timeout(rg.Timeout):
 		rg.t.Fatalf("quit listening: sync timed out")
-	}
-}
-
-// Resize wraps given listener for MaxEvent-maintenance before it is
-// passed on to the wrapped view-*Register* property.
-func (rg *Events) Resize(listener func(*lines.View)) {
-	if listener == nil {
-		if rg.haveResize {
-			rg.haveResize = false
-		}
-		rg.Events.Resize(listener)
-		return
-	}
-	if !rg.haveResize {
-		rg.haveResize = true
-	}
-	rg.Events.Resize(rg.resizeWrapper(listener))
-}
-
-func (rg *Events) resizeWrapper(
-	l func(*lines.View),
-) func(*lines.View) {
-	return func(v *lines.View) {
-		l(v)
-		rg.setReported()
 	}
 }
 
@@ -266,109 +240,14 @@ func (rg *Events) Update(listener func(*lines.View)) error {
 	if listener == nil {
 		return rg.Events.Update(listener)
 	}
-	dropped := true
-	l := func(v *lines.View) {
-		dropped = false
-		listener(v)
-	}
-	err := rg.Events.Update(l)
-	if err != nil {
-		return err
-	}
-	select {
-	case <-rg.Events.Synced:
-	case <-rg.t.Timeout(rg.Timeout):
-		rg.t.Fatalf("update wrapper: sync timed out")
-	}
-	if !dropped {
-		rg.decrementMaxEvents()
-	}
-	return nil
-}
-
-// Quit wraps given listener for MaxEvent-maintenance before it is
-// passed on to the wrapped *Register* property.
-func (rg *Events) Quit(listener func()) {
-	if listener == nil {
-		rg.Events.Quit(listener)
-		return
-	}
-	rg.Events.Quit(rg.quitWrapper(listener))
-}
-
-func (rg *Events) quitWrapper(l func()) func() {
-	return func() {
-		l()
-		rg.Max--
-	}
-}
-
-// Rune wraps given listener for MaxEvent-maintenance before it is
-// passed on to wrapped view-*Register* property.
-func (rg *Events) Rune(r rune, listener func(*lines.View)) error {
-	if listener == nil {
-		return rg.Events.Rune(r, listener)
-	}
-	return rg.Events.Rune(r, rg.runeWrapper(listener))
-}
-
-func (rg *Events) runeWrapper(
-	l func(*lines.View),
-) func(*lines.View) {
-	return func(v *lines.View) {
-		l(v)
-		rg.setReported()
-	}
-}
-
-// Keyboard wraps given listener for MaxEvent-maintenance before its passed
-// on to the wrapped Register instance.
-func (rg *Events) Keyboard(
-	listener func(*lines.View, rune, tcell.Key, tcell.ModMask),
-) {
-	if listener == nil {
-		rg.Events.Keyboard(listener)
-		return
-	}
-	rg.Events.Keyboard(rg.keyboardWrapper(listener))
-}
-
-func (rg *Events) keyboardWrapper(
-	l func(*lines.View, rune, tcell.Key, tcell.ModMask),
-) func(*lines.View, rune, tcell.Key, tcell.ModMask) {
-	return func(v *lines.View, r rune, k tcell.Key, m tcell.ModMask) {
-		l(v, r, k, m)
-		rg.setReported()
-	}
-}
-
-// Key wraps given listener for MaxEvent-maintenance before it is
-// passed on to the wrapped view-*Register* property.
-func (rg *Events) Key(
-	k tcell.Key, m tcell.ModMask, listener lines.Listener,
-) error {
-	if listener == nil {
-		return rg.Events.Key(k, m, listener)
-	}
-	return rg.Events.Key(k, m, rg.keyWrapper(listener))
-}
-
-func (rg *Events) keyWrapper(l lines.Listener) lines.Listener {
-	return func(v *lines.View) {
-		l(v)
-		rg.setReported()
-	}
-}
-
-func (rg *Events) decrementMaxEvents() {
-	rg.Max--
-	if rg.Max < 0 {
-		rg.QuitListening()
+	err := rg.Events.Update(listener)
+	if err == nil {
 		select {
-		case <-rg.Events.Synced:
-		case <-rg.t.Timeout(10 * time.Millisecond):
-			rg.t.Fatalf("quit listening: sync timed out")
+		case <-rg.Synced:
+		case <-rg.t.Timeout(rg.Timeout):
+			rg.t.Fatalf("update wrapper: sync timed out")
 		}
-		return
+		rg.checkTermination()
 	}
+	return err
 }
