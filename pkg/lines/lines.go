@@ -163,8 +163,7 @@ func New() (*Register, error) {
 	}
 	reg := Register{
 		view:     view,
-		kk:       map[tcell.Key]func(*View, tcell.ModMask){},
-		rr:       map[rune]func(*View){},
+		ll:       NewListeners(DefaultFeatures),
 		mutex:    &sync.Mutex{},
 		Synced:   make(chan bool, 1),
 		Features: DefaultFeatures,
@@ -184,8 +183,7 @@ func Sim() (*Register, tcell.SimulationScreen, error) {
 	}
 	reg := Register{
 		view:   view,
-		kk:     map[tcell.Key]func(*View, tcell.ModMask){},
-		rr:     map[rune]func(*View){},
+		ll:     NewListeners(DefaultFeatures),
 		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
 	}

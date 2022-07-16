@@ -306,11 +306,11 @@ func (rg *Register) quitWrapper(l func()) func() {
 
 // Rune wraps given listener for MaxEvent-maintenance before it is
 // passed on to wrapped view-*Register* property.
-func (rg *Register) Rune(listener func(*lines.View), rr ...rune) error {
+func (rg *Register) Rune(r rune, listener func(*lines.View)) error {
 	if listener == nil {
-		return rg.Register.Rune(listener, rr...)
+		return rg.Register.Rune(r, listener)
 	}
-	return rg.Register.Rune(rg.runeWrapper(listener), rr...)
+	return rg.Register.Rune(r, rg.runeWrapper(listener))
 }
 
 func (rg *Register) runeWrapper(
@@ -346,19 +346,17 @@ func (rg *Register) keyboardWrapper(
 // Key wraps given listener for MaxEvent-maintenance before it is
 // passed on to the wrapped view-*Register* property.
 func (rg *Register) Key(
-	listener func(*lines.View, tcell.ModMask), kk ...tcell.Key,
+	k tcell.Key, m tcell.ModMask, listener lines.Listener,
 ) error {
 	if listener == nil {
-		return rg.Register.Key(listener, kk...)
+		return rg.Register.Key(k, m, listener)
 	}
-	return rg.Register.Key(rg.keyWrapper(listener), kk...)
+	return rg.Register.Key(k, m, rg.keyWrapper(listener))
 }
 
-func (rg *Register) keyWrapper(
-	l func(*lines.View, tcell.ModMask),
-) func(*lines.View, tcell.ModMask) {
-	return func(v *lines.View, m tcell.ModMask) {
-		l(v, m)
+func (rg *Register) keyWrapper(l lines.Listener) lines.Listener {
+	return func(v *lines.View) {
+		l(v)
 		rg.setReported()
 	}
 }

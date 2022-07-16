@@ -84,7 +84,7 @@ func (s *ALine) Can_have_its_type_changed(t *T) {
 func (s *ALine) Updates_on_screen_with_content_changing_event(t *T) {
 	rg, init, update := s.fx.Reg(t, 1), "line 0", "update 0"
 	rg.Resize(func(v *lines.View) { v.LL().Line(0).Set(init) })
-	rg.Rune(func(v *lines.View) { v.LL().Line(0).Set(update) }, 'u')
+	rg.Rune('u', func(v *lines.View) { v.LL().Line(0).Set(update) })
 	rg.Listen()
 	t.Eq(init, rg.String())
 	rg.FireRuneEvent('u')
@@ -97,14 +97,14 @@ func (s *ALine) Is_not_dirty_after_screen_synchronization(t *T) {
 		v.LL().Line(0).Set("line 0")
 		t.True(v.LL().Line(0).IsDirty())
 	})
-	rg.Rune(func(v *lines.View) {
+	rg.Rune('a', func(v *lines.View) {
 		v.LL().Line(0).Set("rune 0")
 		t.True(v.LL().Line(0).IsDirty())
-	}, 'a')
-	rg.Key(func(v *lines.View, m tcell.ModMask) {
+	})
+	rg.Key(tcell.KeyUp, 0, func(v *lines.View) {
 		v.LL().Line(0).Set("key 0")
 		t.True(v.LL().Line(0).IsDirty())
-	}, tcell.KeyUp)
+	})
 	rg.Listen()
 	err := rg.Update(
 		func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
@@ -122,7 +122,7 @@ func (s *ALine) Is_not_dirty_after_screen_synchronization(t *T) {
 func (s *ALine) Pads_a_shrinking_line_with_blanks(t *T) {
 	rg, long, short := s.fx.Reg(t, 1), "a longer line", "short line"
 	rg.Resize(func(v *lines.View) { v.LL().Line(0).Set(long) })
-	rg.Rune(func(v *lines.View) { v.LL().Line(0).Set(short) }, 'a')
+	rg.Rune('a', func(v *lines.View) { v.LL().Line(0).Set(short) })
 	rg.Listen()
 	t.Eq(long, rg.String())
 	rg.FireRuneEvent('a')

@@ -236,79 +236,14 @@ func (s *ARegister) Quits_event_loop_on_quit_event_without_listener(
 	t.False(rg.IsPolling())
 }
 
-func (s *ARegister) Does_not_report_unregistered_events(t *T) {
-	rg := s.fx.Reg(t)
-	rg.Listen()
-	rg.FireRuneEvent('a')
-	rg.FireKeyEvent(tcell.KeyF11)
-	t.Eq(0, rg.Max)
-}
-
-func (s *ARegister) Reports_registered_rune_and_key_events(t *T) {
-	rg, shiftEnter, aRune := s.fx.Reg(t, 1), false, false
-	err := rg.Key(func(v *lines.View, m tcell.ModMask) {
-		if m == tcell.ModShift {
-			shiftEnter = true
-		}
-	}, tcell.KeyEnter)
-	t.FatalOn(err)
-	t.FatalOn(rg.Rune(func(v *lines.View) { aRune = true }, 'a'))
-	rg.Listen()
-	rg.FireKeyEvent(tcell.KeyEnter, tcell.ModShift)
-	t.True(shiftEnter)
-	rg.FireRuneEvent('a')
-	t.True(aRune)
-	t.Eq(-1, rg.Max)
-}
-
-func (s *ARegister) Unregisters_nil_listener_events(t *T) {
-	rg := s.fx.Reg(t)
-	t.FatalOn(rg.Rune(func(*lines.View) {}, 'a'))
-	t.FatalOn(rg.Rune(nil, 'a'))
-	t.FatalOn(rg.Rune(func(*lines.View) {}, 'a'))
-	t.FatalOn(rg.Key(
-		func(*lines.View, tcell.ModMask) {}, tcell.KeyUp))
-	t.FatalOn(rg.Key(nil, tcell.KeyUp))
-	t.FatalOn(rg.Key(
-		func(*lines.View, tcell.ModMask) {}, tcell.KeyUp))
-}
-
-// TODO: become clear if internally handled events shadow user defined
-// ones, if they should be done both or if event registration should
-// fail if it conflicts with an internally handled event.
-func (s *ARegister) Fails_to_register_overwriting_key_or_rune_events(
-	t *T,
-) {
-	rg, fail := s.fx.Reg(t), []int{int('a'), int('q'), int(tcell.KeyUp),
-		int(tcell.KeyCtrlC), int(tcell.KeyCtrlD)}
-	defer rg.QuitListening()
-	t.FatalOn(rg.Rune(func(*lines.View) {}, 'a'))
-	err := rg.Key(func(*lines.View, tcell.ModMask) {}, tcell.KeyUp)
-	t.FatalOn(err)
-	for i, k := range fail {
-		switch i {
-		case 0, 1:
-			t.ErrIs(
-				rg.Rune(func(*lines.View) {}, rune(k)),
-				lines.ErrRegister,
-			)
-		default:
-			t.ErrIs(rg.Key(
-				func(*lines.View, tcell.ModMask) {}, tcell.Key(k)),
-				lines.ErrRegister,
-			)
-		}
-	}
-}
-
 func (s *ARegister) Reporting_keyboard_shadows_other_input_listener(
 	t *T,
 ) {
 	rg, rn, key, kb := s.fx.Reg(t, 1), false, false, 0
-	rg.Rune(func(v *lines.View) { rn = true }, 'a')
-	rg.Key(func(v *lines.View, mm tcell.ModMask) {
+	t.FatalOn(rg.Rune('a', func(v *lines.View) { rn = true }))
+	t.FatalOn(rg.Key(tcell.KeyUp, 0, func(v *lines.View) {
 		key = true
-	}, tcell.KeyUp)
+	}))
 	rg.Keyboard(func(
 		v *lines.View, r rune, k tcell.Key, m tcell.ModMask,
 	) {
@@ -344,7 +279,7 @@ func (s *ARegister) Reporting_keyboard_shadows_all_but_quit(t *T) {
 
 func (s *ARegister) Stops_reporting_keyboard_if_removed(t *T) {
 	rg, rn, kb := s.fx.Reg(t, 1), false, false
-	rg.Rune(func(v *lines.View) { rn = true }, 'a')
+	rg.Rune('a', func(v *lines.View) { rn = true })
 	rg.Keyboard(func(
 		v *lines.View, r rune, k tcell.Key, m tcell.ModMask,
 	) {
