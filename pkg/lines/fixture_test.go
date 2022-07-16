@@ -6,7 +6,6 @@ package lines_test
 
 import (
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
@@ -30,9 +29,6 @@ import (
 type Events struct {
 	*lines.Events
 	lib           tcell.SimulationScreen
-	mutex         *sync.Mutex
-	reported      bool
-	haveResize    bool
 	autoTerminate bool
 	t             *gounit.T
 
@@ -69,7 +65,7 @@ func New(t *gounit.T, max ...int) *Events {
 	reg, lib, err := lines.Sim()
 	t.FatalOn(err)
 	fx := Events{Events: reg, lib: lib, t: t,
-		mutex: &sync.Mutex{}, Timeout: 100 * time.Millisecond}
+		Timeout: 100 * time.Millisecond}
 	if len(max) == 0 {
 		fx.autoTerminate = true
 		fx.Reported(decrement(&fx))
@@ -87,74 +83,77 @@ func New(t *gounit.T, max ...int) *Events {
 // SetNumberOfLines fires a resize event setting the screen lines to
 // given number.  Note if an resize event listener is registered we can
 // directly wait on returned channel.  SetNumberOfLines posts a resize
-// event and returns after this event has been processed.
-func (rg *Events) SetNumberOfLines(n int) {
-	rg.t.GoT().Helper()
-	if !rg.IsPolling() {
-		rg.t.Fatal("fire key: not polling")
+// event and returns after this event has been processed.  Are wrapped
+// Events not polling it is started (ee.Listen()).
+func (ee *Events) SetNumberOfLines(n int) {
+	ee.t.GoT().Helper()
+	if !ee.IsPolling() {
+		ee.Listen()
 	}
-	w, _ := rg.lib.Size()
-	rg.lib.SetSize(w, n)
-	rg.t.FatalOn(rg.lib.PostEvent(tcell.NewEventResize(w, n)))
+	w, _ := ee.lib.Size()
+	ee.lib.SetSize(w, n)
+	ee.t.FatalOn(ee.lib.PostEvent(tcell.NewEventResize(w, n)))
 	select {
-	case <-rg.Synced:
-	case <-rg.t.Timeout(rg.Timeout):
-		rg.t.Fatalf("set number of lines: sync timed out")
+	case <-ee.Synced:
+	case <-ee.t.Timeout(ee.Timeout):
+		ee.t.Fatalf("set number of lines: sync timed out")
 	}
-	rg.checkTermination()
+	ee.checkTermination()
 }
 
 // FireRuneEvent posts given run-key-press event and returns after this
 // event has been processed.  Note modifier keys are ignored for
-// rune-triggered key-events.
-func (rg *Events) FireRuneEvent(r rune) {
-	rg.t.GoT().Helper()
-	if !rg.IsPolling() {
-		rg.t.Fatal("fire rune: not polling")
+// rune-triggered key-events.  Are wrapped Events not polling it is
+// started (ee.Listen()).
+func (ee *Events) FireRuneEvent(r rune) {
+	ee.t.GoT().Helper()
+	if !ee.IsPolling() {
+		ee.Listen()
 	}
-	rg.lib.InjectKey(tcell.KeyRune, r, tcell.ModNone)
+	ee.lib.InjectKey(tcell.KeyRune, r, tcell.ModNone)
 	select {
-	case <-rg.Synced:
-	case <-rg.t.Timeout(rg.Timeout):
-		rg.t.Fatalf("fire rune: sync timed out")
+	case <-ee.Synced:
+	case <-ee.t.Timeout(ee.Timeout):
+		ee.t.Fatalf("fire rune: sync timed out")
 	}
-	rg.checkTermination()
+	ee.checkTermination()
 }
 
-// FireKeyEvent posts given special-key-press event and returns after
-// this event has been processed.
-func (rg *Events) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) {
-	rg.t.GoT().Helper()
-	if !rg.IsPolling() {
-		rg.t.Fatal("fire key: not polling")
+// FireKeyEvent posts given special-key event and returns after this
+// event has been processed.  Are wrapped Events not polling it is
+// started (ee.Listen()).
+func (ee *Events) FireKeyEvent(k tcell.Key, m ...tcell.ModMask) {
+	ee.t.GoT().Helper()
+	if !ee.IsPolling() {
+		ee.Listen()
 	}
 	if len(m) == 0 {
-		rg.lib.InjectKey(k, 0, tcell.ModNone)
+		ee.lib.InjectKey(k, 0, tcell.ModNone)
 	} else {
-		rg.lib.InjectKey(k, 0, m[0])
+		ee.lib.InjectKey(k, 0, m[0])
 	}
 	select {
-	case <-rg.Synced:
-	case <-rg.t.Timeout(rg.Timeout):
-		rg.t.Fatalf("fire key: sync timed out")
+	case <-ee.Synced:
+	case <-ee.t.Timeout(ee.Timeout):
+		ee.t.Fatalf("fire key: sync timed out")
 	}
-	rg.checkTermination()
+	ee.checkTermination()
 }
 
 // Listen posts the initial resize event and calls the wrapped
-// register's Listen-method in a new go-routine.  Listen returns after
+// Events' Listen-method in a new go-routine.  Listen returns after
 // the initial resize has completed.
-func (rg *Events) Listen() {
-	rg.t.GoT().Helper()
-	err := rg.lib.PostEvent(tcell.NewEventResize(rg.lib.Size()))
-	rg.t.FatalOn(err)
-	go rg.Events.Listen()
+func (ee *Events) Listen() {
+	ee.t.GoT().Helper()
+	err := ee.lib.PostEvent(tcell.NewEventResize(ee.lib.Size()))
+	ee.t.FatalOn(err)
+	go ee.Events.Listen()
 	select {
-	case <-rg.Synced:
-	case <-rg.t.Timeout(rg.Timeout):
-		rg.t.Fatalf("listen: sync timed out")
+	case <-ee.Synced:
+	case <-ee.t.Timeout(ee.Timeout):
+		ee.t.Fatalf("listen: sync timed out")
 	}
-	rg.checkTermination()
+	ee.checkTermination()
 }
 
 func (ee *Events) checkTermination() {
@@ -180,8 +179,8 @@ func (ee *Events) checkTermination() {
 // |   content   |   => "content"
 // |             |
 // +-------------+
-func (rg *Events) String() string {
-	b, w, h := rg.lib.GetContents()
+func (ee *Events) String() string {
+	b, w, h := ee.lib.GetContents()
 	sb := &strings.Builder{}
 	for i := 0; i < h; i++ {
 		line := ""
@@ -213,41 +212,40 @@ func cellIdx(x, y, w int) int {
 	return y*w + x
 }
 
-// QuitListening stops wrapped Register's event loop.  This method does
-// not return before  Events.IsPolling() returns false.
-func (rg *Events) QuitListening() {
-	if !rg.IsPolling() {
+// QuitListening stops wrapped Events' loop.  This method does not
+// return before  Events.IsPolling() returns false.
+func (ee *Events) QuitListening() {
+	if !ee.IsPolling() {
 		return
 	}
-	rg.LastScreen = rg.String()
-	rg.Events.QuitListening()
+	ee.LastScreen = ee.String()
+	ee.Events.QuitListening()
 	select {
-	case <-rg.Synced:
-	case <-rg.t.Timeout(rg.Timeout):
-		rg.t.Fatalf("quit listening: sync timed out")
+	case <-ee.Synced:
+	case <-ee.t.Timeout(ee.Timeout):
+		ee.t.Fatalf("quit listening: sync timed out")
 	}
 }
 
-// Update wraps given listener for MaxEvent-maintenance before it is
-// passed on to the wrapped *Register*'s Update method.  The later posts an
-// event in case the listener is not nil; Update doesn't return before
-// this event is processed.
-func (rg *Events) Update(listener func(*lines.View)) error {
-	rg.t.GoT().Helper()
-	if !rg.IsPolling() {
-		rg.t.Fatal("update: not polling")
+// Update passes given listener on to embedded Events to wait for the
+// event to be processed.  Are wrapped Events not polling it is started
+// (ee.Listen()).
+func (ee *Events) Update(listener func(*lines.View)) error {
+	ee.t.GoT().Helper()
+	if !ee.IsPolling() {
+		ee.Listen()
 	}
 	if listener == nil {
-		return rg.Events.Update(listener)
+		return ee.Events.Update(listener)
 	}
-	err := rg.Events.Update(listener)
+	err := ee.Events.Update(listener)
 	if err == nil {
 		select {
-		case <-rg.Synced:
-		case <-rg.t.Timeout(rg.Timeout):
-			rg.t.Fatalf("update wrapper: sync timed out")
+		case <-ee.Synced:
+		case <-ee.t.Timeout(ee.Timeout):
+			ee.t.Fatalf("update wrapper: sync timed out")
 		}
-		rg.checkTermination()
+		ee.checkTermination()
 	}
 	return err
 }
