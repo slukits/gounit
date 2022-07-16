@@ -27,35 +27,41 @@
 // constants, its *Style* type and color handling as needed.
 //
 // Thirdly an architectural choice.  A typical ui-library has generally
-// two functions: providing user input events and a display one can
-// print/draw to.  The later is in *lines* represented by the type
-// *View* thus I will use the term "view" to refer to a terminal screen
-// or emulator.  One of go's killer features is concurrency.  Using an
-// view concurrently is either prone to rase conditions or adds
-// considerable complexity and overhead to a view's implementation if it
-// were to be concurrency save.  To avoid both I decided to design
-// *lines* around the event-handling and not around the view which seems
-// to be more common.  I.e.
+// two functions:
 //
-//     reg := lines.New()
+// - providing user input events
 //
-// will return a so called "listener register" which may be used to
-// register call-back functions for events:
+// - a screen/display/window/view one can print/draw to.
 //
-//     reg.Resize(func(v *lines.View) {
-//         v.LL().Get(0).Set("line 0")
-//     })
+// In lines the View type represents the instance where you write your
+// output to hence I will use further on the term view.  One of go's
+// killer features is concurrency.  Using a view concurrently is either
+// prone to rase conditions or adds considerable complexity and overhead
+// to a view's implementation if it were to be concurrency save.  To
+// avoid both I decided to design *lines* around the event-handling and
+// not around the view which seems to be more common.  I.e.
+//
+//     ee := lines.New()
+//
+// will return an *Events* instance which may be used to register
+// call-back functions for events:
+//
+//     ee.Resize(func(e *lines.Env) { e.LL().Get(0).Set("line 0") })
 //
 // The above line will effectively print "line 0" into the first line of
 // a terminal once the initial resize-event was emitted after a call of
 //
-//     reg.Listen()
+//     ee.Listen()
 //
 // The later starts the event loop and blocks until a Quit-event was
-// received or reg.QuitListening() was called.
+// received or ee.QuitListening() was called.  Note a lines.Env (short
+// for environment) instance is provided with every event-listener
+// callback.  Env embeds the View-type, i.e. has all methods of the View
+// plus some aspects for the communication between the event-lister and
+// the reporting Events-instance, i.e. e.StopBubbling().
 //
-//     reg.Update(func(v *lines.View) {
-//         v.LL().Get(0).Set("updated 0")
+//     ee.Update(func(e *lines.Env) {
+//         e.LL().Get(0).Set("updated 0")
 //     })
 //
 // The Update method posts an update event into the event-loop and calls
@@ -65,49 +71,51 @@
 // or special keys as they are recognized and provided by the underlying
 // *tcell* package
 //
-//     func help(v *lines.View) {
-//         v.Statusbar().Set("some help-text in the statusbar")
+//     func help(e *lines.Env) {
+//         e.Statusbar().Set("some help-text in the statusbar")
 //     }
-//     reg.Key(tcell.KeyF1, 0, help)
-//     reg.Rune('H', help)
+//     ee.Key(tcell.KeyF1, 0, help)
+//     ee.Rune('H', help)
 //
 // I.e. *help* is called back if the user presses either the F1 or the H
 // key.
 //
-//     reg.Keyboard(func (v *lines.View, r rune, k tcell.Key, m tcell.ModMask) {
+//     ee.Keyboard(func (e *lines.Env, r rune, k tcell.Key, m tcell.ModMask) {
 //         if r != rune(0) {
-//             v.Message().Styledf(Centered, "received rune-input: %c", r)
+//             e.Message().Styledf(
+//                 Centered, "received rune-input: %c", r)
 //             return
 //         }
-//         reg.Keyboard(nil)
+//         ee.Keyboard(nil)
 //     })
 //
-// KeyBoard suppresses all registered Rune- and Key-events (except -
+// Keyboard suppresses all registered Rune- and Key-events (except -
 // remember :) - for the quit event) and provides received rune/key
 // input to registered Keyboard-listener until it is removed.
 //
-//     reg.Quit(func() { fmt.Println("good by") })
+//     ee.Quit(func() { fmt.Println("good by") })
 //
 // A Quit-listener is called if a quit event is received which happens
 // by default if 'q', ctrl-c or ctrl-d is received.  Note you can remove
-// the 'q'-rune from the quit-event handling.
+// the 'q'-rune from the quit-event handling (but not ctrl-c or ctrl-d).
 //
 // The underlying *tcell* library's event-loop already provides an
 // serialization mechanism which is leveraged to make this package
 // robust against race conditions.  If you can resist the temptation to
-// keep a view around outside an event-handler and make sure that all
-// manipulations of a view are finished when the event-listener returns
-// then a View is concurrency save by design.  If you want in response
-// to an event manipulate a view from more than one go-routine *you*
-// must take care that it is done in a concurrency save way which is
-// very difficult if you have not studied the implementation of the
+// let an Env-instance leave a listener's implementation and make sure
+// that all manipulations of a view are finished when the event-listener
+// returns then a view is concurrency save by design.  If you want in
+// response to an event manipulate a view from more than one go-routine
+// *you* must take care that it is done in a concurrency save way which
+// is very difficult if you have not studied the implementation of the
 // view.  If you have cpu/io-heavy operations whose result should go to
-// the screen then send them of in their own go routine which at the end
-// registers an update event which once called back prints its findings
-// to the view.  Note registering event-listeners, i.e. the
-// Register-type, *is* implemented concurrency save! E.g.:
+// the screen then send them of in their own go routine (without the
+// Env-instance) which at the end registers an update event which once
+// called back prints its findings to the view.  Note registering
+// event-listeners, i.e. the Events-type, *is* implemented concurrency
+// save! E.g.:
 //
-//     // can not be run in the go-playground since reg.Listen() is blocking
+//     // can not be run in the go-playground since ee.Listen() is blocking
 //
 //     import "github.com/slukits/lines"
 //
@@ -117,21 +125,21 @@
 //              // of an executable example to
 //              return 42
 //         }()
-//         reg.Update(func(v *View) {
-//             v.Statusbar().Setf("found %d files", n)
+//         ee.Update(func(e *lines.Env) {
+//             e.Statusbar().Setf("found %d files", n)
 //         })
 //     }
 //
-//     func countTextFilesListener(v *View) {
-//         // NOTE the view does not leave the listener!
+//     func countTextFilesListener(e *lines.Env) {
+//         // NOTE the Env-instance does not leave the listener!
 //         go countTextFilesOnMyComputer()
-//         v.Statusbar().Set("counting text files").Busy()
+//         e.Statusbar().Set("counting text files").Busy()
 //     }
 //
 //     func main() {
-//         reg := lines.New()
-//         reg.Key(tcell.KeyF5, 0, countTextFilesListener)
-//         reg.Listen()
+//         ee := lines.New()
+//         ee.Key(tcell.KeyF5, 0, countTextFilesListener)
+//         ee.Listen()
 //     }
 //
 // assuming an appropriate actual implementation this program will print
@@ -156,39 +164,39 @@ import (
 // New returns a listener register providing a view to its event
 // listeners or nil and an error in case tcell's screen-creation or its
 // initialization fails.
-func New() (*Register, error) {
+func New() (*Events, error) {
 	view, err := newView()
 	if err != nil {
 		return nil, err
 	}
-	reg := Register{
+	ee := Events{
 		view:     view,
 		ll:       NewListeners(DefaultFeatures),
 		mutex:    &sync.Mutex{},
 		Synced:   make(chan bool, 1),
 		Features: DefaultFeatures,
 	}
-	reg.Features = DefaultFeatures.Copy()
-	return &reg, nil
+	ee.Features = DefaultFeatures.Copy()
+	return &ee, nil
 }
 
 // Sim returns a listener register providing a view with tcell's
 // simulation screen.  Since the wrapped tcell screen is private it is
 // returned as well to facilitate desired mock-ups.  Sim fails iff
 // tcell's screen-initialization fails.
-func Sim() (*Register, tcell.SimulationScreen, error) {
+func Sim() (*Events, tcell.SimulationScreen, error) {
 	view, err := newSim()
 	if err != nil {
 		return nil, nil, err
 	}
-	reg := Register{
+	ee := Events{
 		view:   view,
 		ll:     NewListeners(DefaultFeatures),
 		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
 	}
-	reg.Features = DefaultFeatures.Copy()
-	return &reg, view.lib.(tcell.SimulationScreen), nil
+	ee.Features = DefaultFeatures.Copy()
+	return &ee, view.lib.(tcell.SimulationScreen), nil
 }
 
 // newView returns a new View instance or nil and an error in case

@@ -12,9 +12,10 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-// Register allows to register for user-input events and posting
-// update-events.  Registering of events is concurrency save.
-type Register struct {
+// Events allows to listen for user-input event which are then reported
+// to registered listeners.  It also manages behind the scenes the
+// screen synchronization.
+type Events struct {
 	view      *View
 	mutex     *sync.Mutex
 	ll        *Listeners
@@ -41,7 +42,7 @@ type Register struct {
 
 // IsPolling returns true if listener register is polling in the event
 // loop.
-func (rg *Register) IsPolling() bool {
+func (rg *Events) IsPolling() bool {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	return rg.isPolling
@@ -51,7 +52,7 @@ func (rg *Register) IsPolling() bool {
 // received events to registered listeners.  Listen returns if either a
 // quit-event was received ('q', ctrl-c, ctrl-d input) or QuitListening
 // was called.
-func (rg *Register) Listen() {
+func (rg *Events) Listen() {
 	rg.startPolling()
 	for {
 		ev := rg.view.lib.PollEvent()
@@ -91,13 +92,13 @@ func (rg *Register) Listen() {
 	}
 }
 
-func (rg *Register) startPolling() {
+func (rg *Events) startPolling() {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	rg.isPolling = true
 }
 
-func (rg *Register) stopPolling() {
+func (rg *Events) stopPolling() {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	rg.isPolling = false
@@ -106,7 +107,7 @@ func (rg *Register) stopPolling() {
 // Resize registers given listener for the resize event.  Note starting
 // the event-loop by calling *Listen* will trigger a mandatory initial
 // resize event.
-func (rg *Register) Resize(listener func(*View)) {
+func (rg *Events) Resize(listener func(*View)) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	rg.resize = listener
@@ -114,7 +115,7 @@ func (rg *Register) Resize(listener func(*View)) {
 
 // Quit registers given listener for the quit event which is triggered
 // by 'r'-rune, ctrl-c and ctrl-d.
-func (rg *Register) Quit(listener func()) {
+func (rg *Events) Quit(listener func()) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	rg.quit = listener
@@ -124,7 +125,7 @@ func (rg *Register) Quit(listener func()) {
 // its turn given listener.  Update fails if the event-loop is full
 // returned error will wrap tcell's *PostEven* error.  Update is an
 // no-op if listener is nil.
-func (rg *Register) Update(listener func(*View)) error {
+func (rg *Events) Update(listener func(*View)) error {
 	if listener == nil {
 		return nil
 	}
@@ -148,23 +149,23 @@ type updateEvent struct {
 
 func (u *updateEvent) When() time.Time { return u.when }
 
-func (rg *Register) Rune(r rune, l Listener) error {
+func (rg *Events) Rune(r rune, l Listener) error {
 	return rg.ll.Rune(r, l)
 }
 
 // Keyboard listener shadows all other rune/key listeners until it is
 // removed by Keyboard(nil).
-func (rg *Register) Keyboard(l KBListener) {
+func (rg *Events) Keyboard(l KBListener) {
 	rg.ll.Keyboard(l)
 }
 
-func (rg *Register) Key(k tcell.Key, m tcell.ModMask, l Listener) error {
+func (rg *Events) Key(k tcell.Key, m tcell.ModMask, l Listener) error {
 	return rg.ll.Key(k, m, l)
 }
 
 // QuitListening posts a quit event ending the event-loop, i.e.
 // IsPolling will be false.
-func (rg *Register) QuitListening() {
+func (rg *Events) QuitListening() {
 	if rg.isPolling {
 		rg.view.lib.PostEvent(&quitEvent{when: time.Now()})
 		return
@@ -172,7 +173,7 @@ func (rg *Register) QuitListening() {
 	rg.quitListening()
 }
 
-func (rg *Register) quitListening() {
+func (rg *Events) quitListening() {
 	rg.view.lib.Fini()
 	close(rg.Synced)
 }
@@ -183,7 +184,7 @@ type quitEvent struct {
 
 func (u *quitEvent) When() time.Time { return u.when }
 
-func (rg *Register) report(ev tcell.Event) (quit bool) {
+func (rg *Events) report(ev tcell.Event) (quit bool) {
 	rg.Ev = ev
 	if rg.view.ToSmall() {
 		if ev, ok := ev.(*tcell.EventKey); ok {
@@ -224,13 +225,13 @@ func (rg *Register) report(ev tcell.Event) (quit bool) {
 	return false
 }
 
-func (rg *Register) resizeListener() func(*View) {
+func (rg *Events) resizeListener() func(*View) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	return rg.resize
 }
 
-func (rg *Register) isQuitEvent(ev *tcell.EventKey) bool {
+func (rg *Events) isQuitEvent(ev *tcell.EventKey) bool {
 	if ev.Key() == tcell.KeyRune && ev.Rune() != 'q' {
 		return false
 	}
@@ -241,7 +242,7 @@ func (rg *Register) isQuitEvent(ev *tcell.EventKey) bool {
 	return true
 }
 
-func (rg *Register) quitListener(ev *tcell.EventKey) func() {
+func (rg *Events) quitListener(ev *tcell.EventKey) func() {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	return rg.quit

@@ -90,17 +90,17 @@ type FX struct {
 	DefaultLineCount int
 }
 
-func (f *FX) Reg(t *T, maxEvt ...int) *Register {
+func (f *FX) Reg(t *T, maxEvt ...int) *Events {
 	if len(maxEvt) == 0 {
-		return f.Get(t).(*Register)
+		return f.Get(t).(*Events)
 	}
-	rg := f.Get(t).(*Register)
+	rg := f.Get(t).(*Events)
 	rg.Max = maxEvt[0]
 	return rg
 }
 
 func (f *FX) Del(t *T) interface{} {
-	rg, ok := f.Fixtures.Del(t).(*Register)
+	rg, ok := f.Fixtures.Del(t).(*Events)
 	if !ok {
 		return nil
 	}
