@@ -18,6 +18,6 @@ func DefaultScreenFactory() ScreenFactoryer {
 	return &defaultFactory{}
 }
 
-func ExtractLib(v *View) tcell.Screen { return v.lib }
+func ExtractLib(v *Screen) tcell.Screen { return v.lib }
 
-func GetLib(rg *Events) tcell.Screen { return rg.view.lib }
+func GetLib(rg *Events) tcell.Screen { return rg.scr.lib }

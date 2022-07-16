@@ -5,7 +5,7 @@
 package lines
 
 type Lines struct {
-	vw       *View
+	scr      *Screen
 	ll       []*Line
 	scrFirst int
 }
@@ -21,8 +21,12 @@ func (ll *Lines) For(cb func(*Line)) {
 	}
 }
 
+// FirstScreenLine returns the index of the first of the currently
+// focused Lines-component.
 func (ll *Lines) FirstScreenLine() int { return ll.scrFirst }
 
+// SetFirstScreenLine sets first line shown on the screen of the
+// currently focused Lines-component.
 func (ll *Lines) SetFirstScreenLine(i int) *Lines {
 	if i < 0 || i >= len(ll.ll) {
 		return ll
@@ -34,7 +38,7 @@ func (ll *Lines) SetFirstScreenLine(i int) *Lines {
 // ForScreen calls ascending ordered back for each line shown on the
 // screen.
 func (ll *Lines) ForScreen(cb func(*Line)) {
-	bound := ll.vw.Len()
+	bound := ll.scr.Len()
 	if len(ll.ll)-ll.scrFirst < bound {
 		bound = len(ll.ll) - ll.scrFirst
 	}
@@ -70,7 +74,7 @@ func (ll *Lines) ensure(n int) {
 	lower, m := len(ll.ll), 0
 	for len(ll.ll) < n {
 		ll.ll = append(ll.ll, &Line{
-			lib: ll.vw.lib,
+			lib: ll.scr.lib,
 			typ: DefaultType,
 			Idx: lower + m})
 		m++

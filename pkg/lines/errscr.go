@@ -16,7 +16,7 @@ type ErrScr struct {
 	Style   tcell.Style
 }
 
-func (v *View) ErrScreen() *ErrScr {
+func (v *Screen) ErrScreen() *ErrScr {
 	if v.errScr == nil {
 		v.errScr = &ErrScr{lib: v.lib}
 	}

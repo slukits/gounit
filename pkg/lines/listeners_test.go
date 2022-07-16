@@ -45,7 +45,7 @@ func (s *Listeners) Is_not_ok_if_listener_for_missing_rune_requested(t *T) {
 	t.False(ok)
 }
 
-var zeroListener = func(*lines.View) {}
+var zeroListener = func(*lines.Screen) {}
 
 func (s *Listeners) Fails_to_add_the_zero_rune(t *T) {
 	t.ErrIs(s.fx.LL(t).Rune(0, zeroListener), lines.ErrZeroRune)
@@ -110,7 +110,7 @@ func (s *Listeners) Removes_key_event_if_given_listener_nil(t *T) {
 }
 
 func (s *Listeners) Discriminates_key_events_by_mode_mask(t *T) {
-	kk, shiftListener := s.fx.LL(t), func(*lines.View) {}
+	kk, shiftListener := s.fx.LL(t), func(*lines.Screen) {}
 	t.FatalOn(kk.Key(tcell.KeyBS, 0, zeroListener))
 	t.FatalOn(kk.Key(tcell.KeyBS, tcell.ModShift, shiftListener))
 	zl, ok := kk.KeyListenerOf(tcell.KeyBS, 0)
@@ -128,7 +128,7 @@ func (s *Listeners) Discriminates_key_events_by_mode_mask(t *T) {
 func (s *Listeners) Have_a_registered_keyboard_listener(t *T) {
 	kk := s.fx.LL(t)
 	kk.Keyboard(func(
-		v *lines.View, r rune, k tcell.Key, mm tcell.ModMask) {
+		v *lines.Screen, r rune, k tcell.Key, mm tcell.ModMask) {
 	})
 	t.True(kk.HasKBListener())
 }
@@ -136,7 +136,7 @@ func (s *Listeners) Have_a_registered_keyboard_listener(t *T) {
 func (s *Listeners) Remove_a_registered_keyboard_listener(t *T) {
 	kk := s.fx.LL(t)
 	kk.Keyboard(func(
-		v *lines.View, r rune, k tcell.Key, mm tcell.ModMask) {
+		v *lines.Screen, r rune, k tcell.Key, mm tcell.ModMask) {
 	})
 	t.True(kk.HasKBListener())
 	kk.Keyboard(nil)

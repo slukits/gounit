@@ -26,9 +26,9 @@ const (
 	FtDown
 )
 
-// InternalFeatures provides a slice of all the potentially internally
+// AllFeatures provides a slice of all the potentially internally
 // handled features
-var InternalFeatures = []Feature{FtQuit, FtUp, FtDown}
+var AllFeatures = []Feature{FtQuit, FtUp, FtDown}
 
 // Features provides information about keys/runes which are registered
 // for features provided by the lines-package.  It also allows to change

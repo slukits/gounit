@@ -10,57 +10,51 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-// View provides a line-based terminal user-interface.  A view instances
-// are provided to event-listeners.  To avoid race conditions they are
-// not meant to be created or kept around outside an event listener
-// callback operation.
-type View struct {
+// Screen provides features to write to a line-based terminal
+// user-interface.
+type Screen struct {
 	lib    tcell.Screen
 	ll     *Lines
 	errScr *ErrScr
 	min    int
-
-	// Synced provides a message each time it is guaranteed that the
-	// potential effect of an event is on the screen.
-	Synced chan bool
 }
 
 // Len returns the number of lines of wrapped terminal screen.  Note len
 // of the simulation screen defaults to 25.
-func (v *View) Len() int {
-	_, h := v.lib.Size()
+func (s *Screen) Len() int {
+	_, h := s.lib.Size()
 	return h
 }
 
-// LL returns the receiving view's lines-set.
-func (v *View) LL() *Lines { return v.ll }
+// LL returns the receiving screens's lines-set.
+func (s *Screen) LL() *Lines { return s.ll }
 
 // SetMin defines the minimal expected number of screen lines.  An error
 // is displayed and event reporting is suppressed as long as the
 // screen-height is below min.
-func (v *View) SetMin(m int) {
-	v.min = m
-	if v.Len() > v.min {
+func (s *Screen) SetMin(m int) {
+	s.min = m
+	if s.Len() > s.min {
 		return
 	}
-	v.minErr()
+	s.minErr()
 }
 
 // ToSmall returns true if a set minimal number of lines is greater than
 // the available screen height.
-func (v *View) ToSmall() bool { return v.Len() < v.min }
+func (s *Screen) ToSmall() bool { return s.Len() < s.min }
 
-func (v *View) resize() (ok bool) {
-	v.lib.Clear()
-	v.ll.ensure(v.Len())
-	ok = v.Len() > v.min
+func (s *Screen) resize() (ok bool) {
+	s.lib.Clear()
+	s.ll.ensure(s.Len())
+	ok = s.Len() > s.min
 	if ok {
-		if v.errScr != nil && v.errScr.Active {
-			v.errScr.Active = false
+		if s.errScr != nil && s.errScr.Active {
+			s.errScr.Active = false
 		}
 		return ok
 	}
-	v.minErr()
+	s.minErr()
 	return ok
 }
 
@@ -68,37 +62,37 @@ func (v *View) resize() (ok bool) {
 // minimal number of lines is greater than the available screen height.
 const ErrScreenFmt = "minimum screen-height: %d"
 
-func (v *View) minErr() {
-	if !v.ErrScreen().Active {
-		v.ErrScreen().Active = true
+func (s *Screen) minErr() {
+	if !s.ErrScreen().Active {
+		s.ErrScreen().Active = true
 	}
 
-	if v.ErrScreen().String() != fmt.Sprintf(ErrScreenFmt, v.min) {
-		v.ErrScreen().Set(fmt.Sprintf(ErrScreenFmt, v.min))
+	if s.ErrScreen().String() != fmt.Sprintf(ErrScreenFmt, s.min) {
+		s.ErrScreen().Set(fmt.Sprintf(ErrScreenFmt, s.min))
 	}
 }
 
-func (v *View) ensureSynced(show bool) {
+func (s *Screen) ensureSynced(show bool) {
 	sync := func() {
 		if show {
-			v.lib.Show()
+			s.lib.Show()
 		} else {
-			v.lib.Sync()
+			s.lib.Sync()
 		}
 	}
-	if v.errScr != nil {
-		if v.errScr.Active {
-			if v.errScr.isDirty {
-				v.errScr.sync()
+	if s.errScr != nil {
+		if s.errScr.Active {
+			if s.errScr.isDirty {
+				s.errScr.sync()
 				sync()
 			}
 			return
 		}
 	}
-	if !v.ll.isDirty() {
+	if !s.ll.isDirty() {
 		return
 	}
-	v.ll.sync()
+	s.ll.sync()
 	sync()
 }
 

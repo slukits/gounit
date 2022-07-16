@@ -29,39 +29,39 @@ func (s *Lines) SetUp(t *T) {
 func (s *Lines) TearDown(t *T) { s.fx.Del(t) }
 
 func (s *Lines) Has_initially_view_len_many_lines(t *T) {
-	rg := s.fx.Reg(t)
-	rg.Resize(func(v *lines.View) {
+	ee := s.fx.EE(t)
+	ee.Resize(func(v *lines.Screen) {
 		t.Eq(v.Len(), v.LL().Len())
 		got := 0
 		v.LL().For(func(l *lines.Line) { got++ })
 		t.Eq(v.Len(), got)
 	})
-	rg.Listen()
+	ee.Listen()
 }
 
 func (s *Lines) First_screen_line_defaults_to_zero(t *T) {
-	rg := s.fx.Reg(t)
-	rg.Resize(func(v *lines.View) {
+	ee := s.fx.EE(t)
+	ee.Resize(func(v *lines.Screen) {
 		t.Eq(0, v.LL().FirstScreenLine())
 	})
-	rg.Listen()
+	ee.Listen()
 }
 
 func (s *Lines) Ignores_first_screen_line_update_if_out_of_bound(t *T) {
-	rg := s.fx.Reg(t)
-	rg.Resize(func(v *lines.View) {
+	ee := s.fx.EE(t)
+	ee.Resize(func(v *lines.Screen) {
 		t.Eq(5, v.LL().SetFirstScreenLine(5).FirstScreenLine())
 		t.Eq(5, v.LL().SetFirstScreenLine(-1).FirstScreenLine())
 		t.Eq(5, v.LL().SetFirstScreenLine(42).FirstScreenLine())
 	})
-	rg.Listen()
+	ee.Listen()
 }
 
 func (s *Lines) Provides_all_screen_lines_from_the_first_screen_line(
 	t *T,
 ) {
-	rg := s.fx.Reg(t)
-	rg.Resize(func(v *lines.View) {
+	ee := s.fx.EE(t)
+	ee.Resize(func(v *lines.Screen) {
 		exp := 0
 		v.LL().ForScreen(func(l *lines.Line) {
 			t.Eq(exp, l.Idx)
@@ -74,28 +74,28 @@ func (s *Lines) Provides_all_screen_lines_from_the_first_screen_line(
 			exp++
 		})
 	})
-	rg.Listen()
+	ee.Listen()
 }
 
 func (s *Lines) Provides_zero_line_for_out_of_bound_requests(t *T) {
-	rg := s.fx.Reg(t)
-	rg.Resize(func(v *lines.View) {
+	ee := s.fx.EE(t)
+	ee.Resize(func(v *lines.Screen) {
 		t.True(lines.Zero == v.LL().Line(s.fx.DefaultLineCount))
 	})
-	rg.Listen()
+	ee.Listen()
 }
 
 func (s *Lines) Are_Increased_as_requested(t *T) {
-	rg, exp := s.fx.Reg(t), 42
-	rg.Resize(func(v *lines.View) {
+	ee, exp := s.fx.EE(t), 42
+	ee.Resize(func(v *lines.Screen) {
 		got := 0
 		v.LL().ForN(-1, func(l *lines.Line) { got++ })
 		t.Eq(0, got)
 		v.LL().ForN(exp, func(l *lines.Line) { got++ })
 		t.Eq(exp, got)
 	})
-	rg.Listen()
-	t.False(rg.IsPolling())
+	ee.Listen()
+	t.False(ee.IsPolling())
 }
 
 func TestLines(t *testing.T) {

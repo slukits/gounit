@@ -14,11 +14,11 @@ import (
 
 // Listener is the most common type of listener: a callback provided
 // with the view-instance.
-type Listener = func(*View)
+type Listener = func(*Screen)
 
 // KBListener is a keyboard callback instance provided with the view and
 // all information about the received key event as reported by tcell.
-type KBListener = func(*View, rune, tcell.Key, tcell.ModMask)
+type KBListener = func(*Screen, rune, tcell.Key, tcell.ModMask)
 
 // Listeners resembles a concurrency save set of registered event
 // listeners mapped to their events.
@@ -51,8 +51,8 @@ func NewListeners(ff IsQuitter) *Listeners {
 	return &Listeners{
 		isQuitting: isQuitterClosure(ff),
 		mutex:      &sync.Mutex{},
-		rr:         map[rune]func(*View){},
-		kk:         map[tcell.ModMask]map[tcell.Key]func(*View){},
+		rr:         map[rune]func(*Screen){},
+		kk:         map[tcell.ModMask]map[tcell.Key]func(*Screen){},
 	}
 }
 

@@ -38,17 +38,17 @@
 //
 // In lines the terminal-screen is accessed through a provided
 // environment instance to event-listeners.  One of go's killer features
-// is concurrency.  Using a view concurrently is either prone to rase
-// conditions or adds considerable complexity and overhead to a view's
+// is concurrency.  Using a screen concurrently is either prone to rase
+// conditions or adds considerable complexity and overhead to a Screen's
 // implementation if it were to be concurrency save.  To avoid both I
-// decided to design lines around event-handling and not around the view
-// which seems to be more common.  I.e.
+// decided to design lines around event-handling and not around the
+// screen which seems to be more common.  I.e.
 //
 //     import "github.com/slukits/lines"
 //
 //     ee := lines.New()
 //
-// will return an *Events* instance which may be used to register
+// will return an Events instance which may be used to register
 // call-back functions for events:
 //
 //     ee.Resize(func(e *lines.Env) { e.LL().Get(0).Set("line 0") })
@@ -60,11 +60,14 @@
 //     ee.Listen()
 //
 // The later starts the event loop and blocks until a Quit-event was
-// received or ee.QuitListening() was called.  Never ever pass an Env
-// instance to an other go-routine.  If you do it anyway your program is
-// most likely to crash because after a listener returns its environment
-// is rendered useless, i.e. method calls on it will likely provide you
-// with a nil pointer exception.  If you want concurrency use:
+// received or ee.QuitListening() was called.  An Env-instance
+// (environment) encapsulates a Screen instance and provides a Screen's
+// public API (not the screen itself).  Env also provides information
+// about the current event and means to communicate back to the
+// reporting Events-instance.  See the documentation of the Screen-Type
+// to learn what you can do with a Screen.  If you use an Env instance
+// in an other go routine you will get most like a nil pointer panic.
+// If you want concurrency use:
 //
 //     ee.Update(func(e *lines.Env) {
 //         e.LL().Get(0).Set("updated 0")
@@ -72,10 +75,10 @@
 //
 // The Update method posts an update event into the event-loop which
 // calls given listener back once it is polled.  I.e. Update provides a
-// programmatically way to update the view without user input.  With
-// this feature we can send cpu/io-heavy operation of in their own
-// go-routine and this go-routine once done registers an update event to
-// inform the user about its findings:
+// programmatically way to trigger an environment providing callback
+// without user input.  With this feature we can send cpu/io-heavy
+// operation of in their own go-routine and this go-routine once done
+// registers an update event to inform the user about its findings:
 //
 //     // can not be run in the go-playground since ee.Listen() is blocking
 //
@@ -106,8 +109,8 @@
 //     }
 //
 // The rule of thump is here: environment properties you can safely pass
-// on to a go routine; return values of environment methods you can't if
-// you want to avoid race conditions.
+// on to an other go routine; return values of environment methods you
+// can't if you want to avoid race conditions.
 //
 // To react on user input listeners may be registered for runes or
 // special keys as they are recognized and provided by the underlying
@@ -131,9 +134,9 @@
 //         ee.Keyboard(nil)
 //     })
 //
-// Keyboard suppresses all registered Rune- and Key-events (except -
-// remember :) - for the quit event) and provides received rune/key
-// input to registered Keyboard-listener until it is removed.
+// Keyboard suppresses all registered rune- and key-events (except for
+// the quit event) and provides received rune/key input to registered
+// Keyboard-listener until it is removed.
 //
 //     ee.Quit(func() { fmt.Println("good by") })
 //
@@ -149,42 +152,41 @@
 //     ll := NewListeners(nil)
 //
 // you can create your own Listeners-instance and register for events as
-// we did before.  To make use of ll we can map this set of
-// event-listener registrations to an environment *Component*.  Most
-// things which are returned by environment methods are components, e.g.
+// we did before.  To make use of ll we can assign this set of
+// event-listener registrations to an Screen Component.  Most things
+// which are returned by environment methods are Screen Components, e.g.
 //
 //    e.MessageBar().Listeners = ll
 //
-// Now we have set our listeners to the environment component message
-// bar which still only waists memory because our message bar can't
-// receive the focus.  Remember: you only get what you ask for.  To make
-// the above actually do something we need last but not least make use
-// of Features.
+// Now we have set our listeners to the Screen Component message bar
+// which still only waists memory because our message bar can't receive
+// the focus.  To make the above actually do something we need last but
+// not least make use of Features.
 //
 // Features
 //
 // In order to use features like focusing or scrolling we need to turn
 // these features on.  lines could try to be smart and reason "if you
-// want to receive key-events on the message bar the environment must
-// have the feature focusing turned on".  Since turning focusing on
-// changes the activated key-bindings as well as the layout and behavior
-// of your application --- none of which you have asked for --- you need
-// to ask for it
+// want to receive key-events on the message bar the screen must have
+// the feature focusing turned on".  Since turning focusing on changes
+// the activated key-bindings as well as the layout and behavior of your
+// application --- none of which you have asked for --- you need to ask
+// for it
 //
-//     e.Features.Add(
-//         FtFocusNext, rune(0), tcell.KeyTab, tcell.ModNone)
-//     e.Features.Add(
-//         FtFocusNext, rune(0), tcell.KeyTab, tcell.ModShift)
+//     e.Features.Key(
+//         FtFocusNext, tcell.KeyTab, tcell.ModNone)
+//     e.Features.Key(
+//         FtFocusNext, tcell.KeyTab, tcell.ModShift)
 //
-// Now the environment has "focusing" turned on and the message bar can
-// receive the focus which activates its event listeners. Don't worry
-// there are predefined feature sets with common defaults to keep
-// things easy for you.  E.g.
+// Now the environment's Screen has "focusing" turned on and the message
+// bar can receive the focus which activates its event listeners.  There
+// are predefined feature sets with common defaults to keep things easy
+// for you.  E.g.
 //
 //     e.LL().Features = NewFeatures(Focusing, Scrolling)
 //
 // will bind the page up/down keys to scroll up and down and the tab-key
-// like above to focus lines of the currently focused component
+// like above to focus lines of the currently focused Screen Component
 // providing (screen) lines.  See the documentation of the Features-type
 // to learn how to change the defaults of features sets.
 package lines
@@ -204,7 +206,7 @@ func New() (*Events, error) {
 		return nil, err
 	}
 	ee := Events{
-		view:     view,
+		scr:      view,
 		ll:       NewListeners(DefaultFeatures),
 		mutex:    &sync.Mutex{},
 		Synced:   make(chan bool, 1),
@@ -224,7 +226,7 @@ func Sim() (*Events, tcell.SimulationScreen, error) {
 		return nil, nil, err
 	}
 	ee := Events{
-		view:   view,
+		scr:    view,
 		ll:     NewListeners(DefaultFeatures),
 		mutex:  &sync.Mutex{},
 		Synced: make(chan bool, 1),
@@ -233,9 +235,9 @@ func Sim() (*Events, tcell.SimulationScreen, error) {
 	return &ee, view.lib.(tcell.SimulationScreen), nil
 }
 
-// newView returns a new View instance or nil and an error in case
+// newView returns a new Screen instance or nil and an error in case
 // tcell's screen-creation or its initialization fails.
-func newView() (*View, error) {
+func newView() (*Screen, error) {
 	lib, err := screenFactory.NewScreen()
 	if err != nil {
 		return nil, err
@@ -243,19 +245,19 @@ func newView() (*View, error) {
 	if err := lib.Init(); err != nil {
 		return nil, err
 	}
-	v := &View{lib: lib, Synced: make(chan bool, 1)}
-	v.ll = &Lines{vw: v}
+	v := &Screen{lib: lib}
+	v.ll = &Lines{scr: v}
 	return v, nil
 }
 
-// newSim returns a new View instance wrapping tcell's simulation
+// newSim returns a new Screen instance wrapping tcell's simulation
 // screen for testing purposes.
-func newSim() (*View, error) {
+func newSim() (*Screen, error) {
 	lib := screenFactory.NewSimulationScreen("")
 	if err := lib.Init(); err != nil {
 		return nil, err
 	}
-	v := &View{lib: lib, Synced: make(chan bool, 1)}
-	v.ll = &Lines{vw: v}
+	v := &Screen{lib: lib}
+	v.ll = &Lines{scr: v}
 	return v, nil
 }

@@ -16,10 +16,10 @@ import (
 // to registered listeners.  It also manages behind the scenes the
 // screen synchronization.
 type Events struct {
-	view      *View
+	scr       *Screen
 	mutex     *sync.Mutex
 	ll        *Listeners
-	resize    func(*View)
+	resize    func(*Screen)
 	quit      func()
 	isPolling bool
 	reported  func()
@@ -56,7 +56,7 @@ func (rg *Events) IsPolling() bool {
 func (rg *Events) Listen() {
 	rg.startPolling()
 	for {
-		ev := rg.view.lib.PollEvent()
+		ev := rg.scr.lib.PollEvent()
 
 		select {
 		case <-rg.Synced:
@@ -74,11 +74,11 @@ func (rg *Events) Listen() {
 			}
 			rg.quitListening()
 		case *tcell.EventResize:
-			if rg.view.resize() {
+			if rg.scr.resize() {
 				// TODO: make report cancelable after a set timeout.
 				rg.report(ev)
 			}
-			rg.view.ensureSynced(false)
+			rg.scr.ensureSynced(false)
 			rg.Synced <- true
 		default:
 			quit := rg.report(ev)
@@ -87,7 +87,7 @@ func (rg *Events) Listen() {
 				rg.quitListening()
 				return
 			}
-			rg.view.ensureSynced(true)
+			rg.scr.ensureSynced(true)
 			rg.Synced <- true
 		}
 	}
@@ -113,7 +113,7 @@ func (rg *Events) Reported(listener func()) {
 // Resize registers given listener for the resize event.  Note starting
 // the event-loop by calling *Listen* will trigger a mandatory initial
 // resize event.
-func (rg *Events) Resize(listener func(*View)) {
+func (rg *Events) Resize(listener func(*Screen)) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	rg.resize = listener
@@ -131,7 +131,7 @@ func (rg *Events) Quit(listener func()) {
 // its turn given listener.  Update fails if the event-loop is full
 // returned error will wrap tcell's *PostEven* error.  Update is an
 // no-op if listener is nil.
-func (rg *Events) Update(listener func(*View)) error {
+func (rg *Events) Update(listener func(*Screen)) error {
 	if listener == nil {
 		return nil
 	}
@@ -139,7 +139,7 @@ func (rg *Events) Update(listener func(*View)) error {
 		when:     time.Now(),
 		listener: listener,
 	}
-	if err := rg.view.lib.PostEvent(evt); err != nil {
+	if err := rg.scr.lib.PostEvent(evt); err != nil {
 		return fmt.Errorf(ErrUpdateFmt, err)
 	}
 	return nil
@@ -150,7 +150,7 @@ var ErrUpdateFmt = "can't post event: %w"
 
 type updateEvent struct {
 	when     time.Time
-	listener func(*View)
+	listener func(*Screen)
 }
 
 func (u *updateEvent) When() time.Time { return u.when }
@@ -173,14 +173,14 @@ func (rg *Events) Key(k tcell.Key, m tcell.ModMask, l Listener) error {
 // IsPolling will be false.
 func (rg *Events) QuitListening() {
 	if rg.isPolling {
-		rg.view.lib.PostEvent(&quitEvent{when: time.Now()})
+		rg.scr.lib.PostEvent(&quitEvent{when: time.Now()})
 		return
 	}
 	rg.quitListening()
 }
 
 func (rg *Events) quitListening() {
-	rg.view.lib.Fini()
+	rg.scr.lib.Fini()
 	close(rg.Synced)
 }
 
@@ -192,19 +192,19 @@ func (u *quitEvent) When() time.Time { return u.when }
 
 func (rg *Events) report(ev tcell.Event) (quit bool) {
 	rg.Ev = ev
-	if rg.view.ToSmall() {
+	if rg.scr.ToSmall() {
 		return rg.reportToSmall(ev)
 	}
 	switch ev := ev.(type) {
 	case *tcell.EventResize:
 		if listener := rg.resizeListener(); listener != nil {
-			listener(rg.view)
+			listener(rg.scr)
 			rg.reportReported()
 		}
 	case *tcell.EventKey:
 		return rg.reportKeyEvent(ev)
 	case *updateEvent:
-		ev.listener(rg.view)
+		ev.listener(rg.scr)
 		rg.reportReported()
 	}
 	return false
@@ -234,16 +234,16 @@ func (rg *Events) reportKeyEvent(ev *tcell.EventKey) bool {
 		return true
 	}
 	if kbl := rg.ll.KBListener(); kbl != nil {
-		kbl(rg.view, ev.Rune(), ev.Key(), ev.Modifiers())
+		kbl(rg.scr, ev.Rune(), ev.Key(), ev.Modifiers())
 		rg.reportReported()
 		return false
 	}
 	if l, ok := rg.ll.RuneListenerOf(ev.Rune()); ok {
-		l(rg.view)
+		l(rg.scr)
 		rg.reportReported()
 	}
 	if l, ok := rg.ll.KeyListenerOf(ev.Key(), ev.Modifiers()); ok {
-		l(rg.view)
+		l(rg.scr)
 		rg.reportReported()
 	}
 	return false
@@ -265,7 +265,7 @@ func (rg *Events) reportedListener() func() {
 	return rg.reported
 }
 
-func (rg *Events) resizeListener() func(*View) {
+func (rg *Events) resizeListener() func(*Screen) {
 	rg.mutex.Lock()
 	defer rg.mutex.Unlock()
 	return rg.resize

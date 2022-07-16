@@ -55,8 +55,8 @@ func (s *ALine) TearDown(t *T) {
 }
 
 func (s *ALine) Is_dirty_after_its_content_changes(t *T) {
-	rg := s.fx.Reg(t)
-	rg.Resize(func(v *lines.View) {
+	rg := s.fx.EE(t)
+	rg.Resize(func(v *lines.Screen) {
 		t.False(v.LL().Line(0).Set("").IsDirty())
 		t.True((v.LL().Line(0)).Set("42").IsDirty())
 	})
@@ -64,15 +64,15 @@ func (s *ALine) Is_dirty_after_its_content_changes(t *T) {
 }
 
 func (s *ALine) Prints_its_content_with_the_first_resize(t *T) {
-	rg, exp := s.fx.Reg(t), "line 0"
-	rg.Resize(func(v *lines.View) { v.LL().Line(0).Set(exp) })
+	rg, exp := s.fx.EE(t), "line 0"
+	rg.Resize(func(v *lines.Screen) { v.LL().Line(0).Set(exp) })
 	rg.Listen()
 	t.Eq(exp, rg.LastScreen)
 }
 
 func (s *ALine) Can_have_its_type_changed(t *T) {
-	rg := s.fx.Reg(t)
-	rg.Resize(func(v *lines.View) {
+	rg := s.fx.EE(t)
+	rg.Resize(func(v *lines.Screen) {
 		v.LL().Line(0).SetType(42)
 		t.Eq(42, v.LL().Line(0).Type())
 		v.LL().Line(0).SetType(0)
@@ -82,51 +82,50 @@ func (s *ALine) Can_have_its_type_changed(t *T) {
 }
 
 func (s *ALine) Updates_on_screen_with_content_changing_event(t *T) {
-	rg, init, update := s.fx.Reg(t, 1), "line 0", "update 0"
-	rg.Resize(func(v *lines.View) { v.LL().Line(0).Set(init) })
-	rg.Rune('u', func(v *lines.View) { v.LL().Line(0).Set(update) })
-	rg.Listen()
-	t.Eq(init, rg.String())
-	rg.FireRuneEvent('u')
-	t.Eq(update, rg.LastScreen)
+	ee, init, update := s.fx.EE(t, 1), "line 0", "update 0"
+	ee.Resize(func(v *lines.Screen) { v.LL().Line(0).Set(init) })
+	ee.Rune('u', func(v *lines.Screen) { v.LL().Line(0).Set(update) })
+	ee.Listen()
+	t.Eq(init, ee.String())
+	ee.FireRuneEvent('u')
+	t.Eq(update, ee.LastScreen)
 }
 
 func (s *ALine) Is_not_dirty_after_screen_synchronization(t *T) {
-	rg := s.fx.Reg(t, 5)
-	rg.Resize(func(v *lines.View) {
+	ee := s.fx.EE(t, 5)
+	ee.Resize(func(v *lines.Screen) {
 		v.LL().Line(0).Set("line 0")
 		t.True(v.LL().Line(0).IsDirty())
 	})
-	rg.Rune('a', func(v *lines.View) {
+	ee.Rune('a', func(v *lines.Screen) {
 		v.LL().Line(0).Set("rune 0")
 		t.True(v.LL().Line(0).IsDirty())
 	})
-	rg.Key(tcell.KeyUp, 0, func(v *lines.View) {
+	ee.Key(tcell.KeyUp, 0, func(v *lines.Screen) {
 		v.LL().Line(0).Set("key 0")
 		t.True(v.LL().Line(0).IsDirty())
 	})
-	rg.Listen()
-	err := rg.Update(
-		func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
+	err := ee.Update(
+		func(v *lines.Screen) { t.False(v.LL().Line(0).IsDirty()) })
 	t.FatalOn(err)
-	rg.FireRuneEvent('a')
-	err = rg.Update(
-		func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
+	ee.FireRuneEvent('a')
+	err = ee.Update(
+		func(v *lines.Screen) { t.False(v.LL().Line(0).IsDirty()) })
 	t.FatalOn(err)
-	rg.FireKeyEvent(tcell.KeyUp)
-	err = rg.Update(
-		func(v *lines.View) { t.False(v.LL().Line(0).IsDirty()) })
+	ee.FireKeyEvent(tcell.KeyUp)
+	err = ee.Update(
+		func(v *lines.Screen) { t.False(v.LL().Line(0).IsDirty()) })
 	t.FatalOn(err)
 }
 
 func (s *ALine) Pads_a_shrinking_line_with_blanks(t *T) {
-	rg, long, short := s.fx.Reg(t, 1), "a longer line", "short line"
-	rg.Resize(func(v *lines.View) { v.LL().Line(0).Set(long) })
-	rg.Rune('a', func(v *lines.View) { v.LL().Line(0).Set(short) })
-	rg.Listen()
-	t.Eq(long, rg.String())
-	rg.FireRuneEvent('a')
-	t.Eq(short, rg.LastScreen)
+	ee, long, short := s.fx.EE(t, 1), "a longer line", "short line"
+	ee.Resize(func(v *lines.Screen) { v.LL().Line(0).Set(long) })
+	ee.Rune('a', func(v *lines.Screen) { v.LL().Line(0).Set(short) })
+	ee.Listen()
+	t.Eq(long, ee.String())
+	ee.FireRuneEvent('a')
+	t.Eq(short, ee.LastScreen)
 }
 
 func TestALine(t *testing.T) {
