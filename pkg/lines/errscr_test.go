@@ -2,55 +2,51 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package lines_test
+package lines
 
 import (
 	"strings"
 	"testing"
 
 	. "github.com/slukits/gounit"
-	"github.com/slukits/gounit/pkg/lines"
 )
 
-type AErrorScreen struct {
+type AnEnvErr struct {
 	Suite
-	fx FX
+	fx *FX
 }
 
-func (s *AErrorScreen) Init(t *I) {
-	s.fx.Fixtures = &Fixtures{}
-	s.fx.DefaultLineCount = 25
-}
+func (s *AnEnvErr) Init(t *I) { s.fx = NewFX() }
 
-func (s *AErrorScreen) SetUp(t *T) {
+func (s *AnEnvErr) SetUp(t *T) {
 	t.Parallel()
-	s.fx.Set(t, New(t))
+	s.fx.New(t)
 }
 
-func (s *AErrorScreen) TearDown(t *T) { s.fx.Del(t) }
+func (s *AnEnvErr) TearDown(t *T) { s.fx.Del(t) }
 
-func (s *AErrorScreen) Is_dirty_after_updated(t *T) {
-	ee := s.fx.EE(t)
-	ee.Resize(func(e *lines.Env) {
-		e.ErrScreen().Set("")
-		t.False(e.ErrScreen().IsDirty())
-		e.ErrScreen().Set("22")
-		t.True(e.ErrScreen().IsDirty())
+func (s *AnEnvErr) Is_dirty_after_updated(t *T) {
+	ee, _ := s.fx.For(t)
+	ee.Resize(func(e *Env) {
+		e.Err().Set("")
+		t.False(e.Err().IsDirty())
+		e.Err().Set("22")
+		t.True(e.Err().IsDirty())
 	})
 	ee.Listen()
 }
 
 // TODO: add formatting directives to an error-screen, e.g. "centered"
-func (s *AErrorScreen) A_100_percent(t *T) {
-	ee := s.fx.EE(t)
-	ee.Resize(func(v *lines.Env) {
-		v.ErrScreen().Set(strings.Repeat("a", 108))
-		v.ErrScreen().Active = true
+func (s *AnEnvErr) A_100_percent(t *T) {
+	ee, _ := s.fx.For(t)
+	ee.Resize(func(v *Env) {
+		v.Err().Set(strings.Repeat("a", 108))
+		v.Err().Active = true
 	})
 	ee.Listen()
 }
 
 func TestAErrorScreen(t *testing.T) {
 	t.Parallel()
-	Run(&AErrorScreen{}, t)
+	Run(&AnEnvErr{}, t)
 }

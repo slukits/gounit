@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package lines_test
+package lines
 
 import (
 	"errors"
@@ -21,23 +21,23 @@ func (f *ScreenFactory) NewScreen() (tcell.Screen, error) {
 	if f.Fail {
 		return nil, ErrScreen
 	}
-	return &Screen{Fail: f.FailInit}, nil
+	return &ScreenMock{Fail: f.FailInit}, nil
 }
 
 // NewSimulationScreen mock tcell's simulation screen creation.
 func (f *ScreenFactory) NewSimulationScreen(string) tcell.SimulationScreen {
-	return &Screen{Fail: f.FailInit}
+	return &ScreenMock{Fail: f.FailInit}
 }
 
 // ErrInit is the error returned by the mocked screen initialization.
 var ErrInit = errors.New("mock: screen: failing initialization")
 
-// Screen mocks tcell's SimulationScreen implementation to mock-up its
+// ScreenMock mocks tcell's SimulationScreen implementation to mock-up its
 // possible creation/initialization-errors.
-type Screen struct{ Fail bool }
+type ScreenMock struct{ Fail bool }
 
 // Init initializes the screen for use.
-func (s *Screen) Init() error {
+func (s *ScreenMock) Init() error {
 	if s.Fail {
 		return ErrInit
 	}
@@ -49,18 +49,18 @@ func (s *Screen) Init() error {
 // set of bytes were processed and delivered as KeyEvents, false
 // if any bytes were not fully understood.  Any bytes that are not
 // fully converted are discarded.
-func (s *Screen) InjectKeyBytes(buf []byte) bool {
+func (s *ScreenMock) InjectKeyBytes(buf []byte) bool {
 	panic("not implemented")
 }
 
 // InjectKey injects a key event.  The rune is a UTF-8 rune, post
 // any translation.
-func (s *Screen) InjectKey(key tcell.Key, r rune, mod tcell.ModMask) {
+func (s *ScreenMock) InjectKey(key tcell.Key, r rune, mod tcell.ModMask) {
 	panic("not implemented")
 }
 
 // InjectMouse injects a mouse event.
-func (s *Screen) InjectMouse(x int, y int, buttons tcell.ButtonMask, mod tcell.ModMask) {
+func (s *ScreenMock) InjectMouse(x int, y int, buttons tcell.ButtonMask, mod tcell.ModMask) {
 	panic("not implemented")
 }
 
@@ -69,7 +69,7 @@ func (s *Screen) InjectMouse(x int, y int, buttons tcell.ButtonMask, mod tcell.M
 // A new physical contents array will be allocated (with data from
 // the old copied), so any prior value obtained with GetContents
 // won't be used anymore
-func (s *Screen) SetSize(width int, height int) {
+func (s *ScreenMock) SetSize(width int, height int) {
 	panic("not implemented")
 }
 
@@ -77,35 +77,35 @@ func (s *Screen) SetSize(width int, height int) {
 // cells, along with the physical width & height.   Note that the
 // physical contents will be used until the next time SetSize()
 // is called.
-func (s *Screen) GetContents() (cells []tcell.SimCell, width int, height int) {
+func (s *ScreenMock) GetContents() (cells []tcell.SimCell, width int, height int) {
 	panic("not implemented")
 }
 
 // GetCursor returns the cursor details.
-func (s *Screen) GetCursor() (x int, y int, visible bool) {
+func (s *ScreenMock) GetCursor() (x int, y int, visible bool) {
 	panic("not implemented")
 }
 
 // Fini finalizes the screen also releasing resources.
-func (s *Screen) Fini() {
+func (s *ScreenMock) Fini() {
 	panic("not implemented")
 }
 
 // Clear erases the screen.  The contents of any screen buffers
 // will also be cleared.  This has the logical effect of
 // filling the screen with spaces, using the global default style.
-func (s *Screen) Clear() {
+func (s *ScreenMock) Clear() {
 	panic("not implemented")
 }
 
 // Fill fills the screen with the given character and style.
-func (s *Screen) Fill(_ rune, _ tcell.Style) {
+func (s *ScreenMock) Fill(_ rune, _ tcell.Style) {
 	panic("not implemented")
 }
 
 // SetCell is an older API, and will be removed.  Please use
 // SetContent instead; SetCell is implemented in terms of SetContent.
-func (s *Screen) SetCell(x int, y int, style tcell.Style, ch ...rune) {
+func (s *ScreenMock) SetCell(x int, y int, style tcell.Style, ch ...rune) {
 	panic("not implemented")
 }
 
@@ -116,7 +116,7 @@ func (s *Screen) SetCell(x int, y int, style tcell.Style, ch ...rune) {
 // be displayed if Show() or Sync() is called.  The width is the width
 // in screen cells; most often this will be 1, but some East Asian
 // characters require two cells.
-func (s *Screen) GetContent(x int, y int) (mainc rune, combc []rune, style tcell.Style, width int) {
+func (s *ScreenMock) GetContent(x int, y int) (mainc rune, combc []rune, style tcell.Style, width int) {
 	panic("not implemented")
 }
 
@@ -133,40 +133,40 @@ func (s *Screen) GetContent(x int, y int) (mainc rune, combc []rune, style tcell
 // and attempts to place character at next cell to the right will have
 // undefined effects.  Wide runes that are printed in the
 // last column will be replaced with a single width space on output.
-func (s *Screen) SetContent(x int, y int, mainc rune, combc []rune, style tcell.Style) {
+func (s *ScreenMock) SetContent(x int, y int, mainc rune, combc []rune, style tcell.Style) {
 	panic("not implemented")
 }
 
 // SetStyle sets the default style to use when clearing the screen
 // or when StyleDefault is specified.  If it is also StyleDefault,
 // then whatever system/terminal default is relevant will be used.
-func (s *Screen) SetStyle(style tcell.Style) {
+func (s *ScreenMock) SetStyle(style tcell.Style) {
 	panic("not implemented")
 }
 
 // ShowCursor is used to display the cursor at a given location.
 // If the coordinates -1, -1 are given or are otherwise outside the
 // dimensions of the screen, the cursor will be hidden.
-func (s *Screen) ShowCursor(x int, y int) {
+func (s *ScreenMock) ShowCursor(x int, y int) {
 	panic("not implemented")
 }
 
 // HideCursor is used to hide the cursor.  Its an alias for
 // ShowCursor(-1, -1).sim
-func (s *Screen) HideCursor() {
+func (s *ScreenMock) HideCursor() {
 	panic("not implemented")
 }
 
 // SetCursorStyle is used to set the cursor style.  If the style
 // is not supported (or cursor styles are not supported at all),
 // then this will have no effect.
-func (s *Screen) SetCursorStyle(_ tcell.CursorStyle) {
+func (s *ScreenMock) SetCursorStyle(_ tcell.CursorStyle) {
 	panic("not implemented")
 }
 
 // Size returns the screen size as width, height.  This changes in
 // response to a call to Clear or Flush.
-func (s *Screen) Size() (width int, height int) {
+func (s *ScreenMock) Size() (width int, height int) {
 	panic("not implemented")
 }
 
@@ -179,14 +179,14 @@ func (s *Screen) Size() (width int, height int) {
 // This method should be used as a goroutine.
 //
 // NOTE: PollEvent should not be called while this method is running.
-func (s *Screen) ChannelEvents(ch chan<- tcell.Event, quit <-chan struct{}) {
+func (s *ScreenMock) ChannelEvents(ch chan<- tcell.Event, quit <-chan struct{}) {
 	panic("not implemented")
 }
 
 // PollEvent waits for events to arrive.  Main application loops
 // must spin on this to prevent the application from stalling.
 // Furthermore, this will return nil if the Screen is finalized.
-func (s *Screen) PollEvent() tcell.Event {
+func (s *ScreenMock) PollEvent() tcell.Event {
 	panic("not implemented")
 }
 
@@ -195,14 +195,14 @@ func (s *Screen) PollEvent() tcell.Event {
 // return nil, then the return value from this function is unspecified.
 // The purpose of this function is to allow multiple events to be collected
 // at once, to minimize screen redraws.
-func (s *Screen) HasPendingEvent() bool {
+func (s *ScreenMock) HasPendingEvent() bool {
 	panic("not implemented")
 }
 
 // PostEvent tries to post an event into the event stream.  This
 // can fail if the event queue is full.  In that case, the event
 // is dropped, and ErrEventQFull is returned.
-func (s *Screen) PostEvent(ev tcell.Event) error {
+func (s *ScreenMock) PostEvent(ev tcell.Event) error {
 	panic("not implemented")
 }
 
@@ -217,29 +217,29 @@ func (s *Screen) PostEvent(ev tcell.Event) error {
 //
 // For this reason, when using this function, the use of a
 // Goroutine is recommended to ensure no deadlock can occur.
-func (s *Screen) PostEventWait(ev tcell.Event) {
+func (s *ScreenMock) PostEventWait(ev tcell.Event) {
 	panic("not implemented")
 }
 
 // EnableMouse enables the mouse.  (If your terminal supports it.)
 // If no flags are specified, then all events are reported, if the
 // terminal supports them.
-func (s *Screen) EnableMouse(_ ...tcell.MouseFlags) {
+func (s *ScreenMock) EnableMouse(_ ...tcell.MouseFlags) {
 	panic("not implemented")
 }
 
 // DisableMouse disables the mouse.
-func (s *Screen) DisableMouse() {
+func (s *ScreenMock) DisableMouse() {
 	panic("not implemented")
 }
 
 // EnablePaste enables bracketed paste mode, if supported.
-func (s *Screen) EnablePaste() {
+func (s *ScreenMock) EnablePaste() {
 	panic("not implemented")
 }
 
 // DisablePaste disables bracketed paste mode.
-func (s *Screen) DisablePaste() {
+func (s *ScreenMock) DisablePaste() {
 	panic("not implemented")
 }
 
@@ -247,14 +247,14 @@ func (s *Screen) DisablePaste() {
 // mouse.  Note that the a return value of true doesn't guarantee that
 // a mouse/pointing device is present; a false return definitely
 // indicates no mouse support is available.
-func (s *Screen) HasMouse() bool {
+func (s *ScreenMock) HasMouse() bool {
 	panic("not implemented")
 }
 
 // Colors returns the number of colors.  All colors are assumed to
 // use the ANSI color map.  If a terminal is monochrome, it will
 // return 0.
-func (s *Screen) Colors() int {
+func (s *ScreenMock) Colors() int {
 	panic("not implemented")
 }
 
@@ -263,7 +263,7 @@ func (s *Screen) Colors() int {
 //
 // It does so in the most efficient and least visually disruptive
 // manner possible.
-func (s *Screen) Show() {
+func (s *ScreenMock) Show() {
 	panic("not implemented")
 }
 
@@ -275,7 +275,7 @@ func (s *Screen) Show() {
 // Typically this is called as a result of a user-requested redraw
 // (e.g. to clear up on screen corruption caused by some other program),
 // or during a resize event.
-func (s *Screen) Sync() {
+func (s *ScreenMock) Sync() {
 	panic("not implemented")
 }
 
@@ -284,7 +284,7 @@ func (s *Screen) Sync() {
 // character set.  Note that this is just for diagnostic purposes,
 // we normally translate input/output to/from UTF-8, regardless of
 // what the user's environment is.
-func (s *Screen) CharacterSet() string {
+func (s *ScreenMock) CharacterSet() string {
 	panic("not implemented")
 }
 
@@ -307,7 +307,7 @@ func (s *Screen) CharacterSet() string {
 //
 // It is recommended that replacement strings consist only of
 // 7-bit ASCII, since other characters may not display everywhere.
-func (s *Screen) RegisterRuneFallback(r rune, subst string) {
+func (s *ScreenMock) RegisterRuneFallback(r rune, subst string) {
 	panic("not implemented")
 }
 
@@ -317,7 +317,7 @@ func (s *Screen) RegisterRuneFallback(r rune, subst string) {
 // glyph is available, '?' is emitted instead.  It is not possible
 // to "disable" the use of alternate characters that are supported
 // by your terminal except by changing the terminal database.
-func (s *Screen) UnregisterRuneFallback(r rune) {
+func (s *ScreenMock) UnregisterRuneFallback(r rune) {
 	panic("not implemented")
 }
 
@@ -330,14 +330,14 @@ func (s *Screen) UnregisterRuneFallback(r rune) {
 // fallbacks are registered, this will return true.  This will
 // also return true if the terminal can replace the glyph with
 // one that is visually indistinguishable from the one requested.
-func (s *Screen) CanDisplay(r rune, checkFallbacks bool) bool {
+func (s *ScreenMock) CanDisplay(r rune, checkFallbacks bool) bool {
 	panic("not implemented")
 }
 
 // Resize does nothing, since its generally not possible to
 // ask a screen to resize, but it allows the Screen to implement
 // the View interface.
-func (s *Screen) Resize(_ int, _ int, _ int, _ int) {
+func (s *ScreenMock) Resize(_ int, _ int, _ int, _ int) {
 	panic("not implemented")
 }
 
@@ -349,24 +349,24 @@ func (s *Screen) Resize(_ int, _ int, _ int, _ int) {
 // on this function, but it can be used for hinting when building
 // menus, displayed hot-keys, etc.  Note that KeyRune (literal
 // runes) is always true.
-func (s *Screen) HasKey(_ tcell.Key) bool {
+func (s *ScreenMock) HasKey(_ tcell.Key) bool {
 	panic("not implemented")
 }
 
 // Suspend pauses input and output processing.  It also restores the
 // terminal settings to what they were when the application started.
 // This can be used to, for example, run a sub-shell.
-func (s *Screen) Suspend() error {
+func (s *ScreenMock) Suspend() error {
 	panic("not implemented")
 }
 
 // Resume resumes after Suspend().
-func (s *Screen) Resume() error {
+func (s *ScreenMock) Resume() error {
 	panic("not implemented")
 }
 
 // Beep attempts to sound an OS-dependent audible alert and returns an error
 // when unsuccessful.
-func (s *Screen) Beep() error {
+func (s *ScreenMock) Beep() error {
 	panic("not implemented")
 }

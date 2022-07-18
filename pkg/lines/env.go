@@ -11,7 +11,7 @@ import "github.com/gdamore/tcell/v2"
 // information about the event which triggered the callback and features
 // to communicate with the reporting operation.
 //
-// NOTE it is not save to provide an Env instance or one of its method's
+// NOTE it is NOT save to provide an Env instance or one of its method's
 // return values to an other go routine.  The former will likely result
 // in a nil pointer panic the later in a race-condition.  It is save
 // though to pass an environment's property values on to a goroutine.
@@ -24,10 +24,11 @@ import "github.com/gdamore/tcell/v2"
 //         e.Statusbar("executing very heavy operation").Busy()
 //     }
 //
-//     func myVeryHeavyOperation(e.EE) {
+//     func myVeryHeavyOperation(ee *lines.Events) {
 //         var theAnswer int
 //         // implementation of very heavy operation to find the answer
-//         e.EE.Update(func(e *lines.Env)) {
+//         ee.Update(func(e *lines.Env)) {
+//             // now we get the environment for the go routine
 //             e.Statusbar("done")
 //             e.MessageBar().Styledf(
 //                 Centered, "the answer is %d" theAnswer)
@@ -61,10 +62,10 @@ func (e *Env) SetMin(m int) { e.scr.SetMin(m) }
 // greater than the available screen lines.
 func (e *Env) ToSmall() bool { return e.scr.ToSmall() }
 
-// ErrScreen returns an overlaying (if activated) error-screen allowing
+// Err returns an overlaying (if activated) error-screen allowing
 // to report errors without loosing the screen content at the time the
 // error screen is requested
-func (e *Env) ErrScreen() *ErrScr { return e.scr.ErrScreen() }
+func (e *Env) Err() *ErrScr { return e.scr.ErrScreen() }
 
 func (e *Env) reset() {
 	e.scr = nil

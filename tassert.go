@@ -23,7 +23,7 @@ const TrueErr = "expected given value to be true"
 // it must be a format-string iff len(msg) > 1.
 func (t *T) True(value bool, msg ...interface{}) bool {
 	t.t.Helper()
-	if true != value {
+	if !value {
 		t.Error(assertErr("true", TrueErr, msg...))
 		return false
 	}
@@ -39,7 +39,7 @@ const FalseErr = "expected given value to be false"
 // it must be a format-string iff len(msg) > 1.
 func (t *T) False(value bool, msg ...interface{}) bool {
 	t.t.Helper()
-	if false != value {
+	if value {
 		t.Error(assertErr("false", FalseErr, msg...))
 		return false
 	}
@@ -274,7 +274,7 @@ const PanicsErr = "given function doesn't panic"
 func (t *T) Panics(f func(), msg ...interface{}) (hasPanicked bool) {
 	t.t.Helper()
 	defer func() {
-		if recover() == nil {
+		if r := recover(); r == nil {
 			t.Error(assertErr("panics", PanicsErr, msg...))
 			hasPanicked = false
 			return

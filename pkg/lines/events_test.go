@@ -1,4 +1,4 @@
-package lines_test
+package lines
 
 import (
 	"testing"
@@ -6,47 +6,58 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	. "github.com/slukits/gounit"
-	"github.com/slukits/gounit/pkg/lines"
 )
 
 type NewEvents struct{ Suite }
 
+// setScreenFactory allows to mock up tcell's screen generation for
+// error handling testing.  Provided factory instance must implement
+// NewScreen() (tcell.Screen, error)
+// NewSimulationScreen() tcell.Screen
+func setScreenFactory(f screenFactoryer) {
+	screenFactory = f
+}
+
+func defaultScreenFactory() screenFactoryer {
+	return &defaultFactory{}
+}
+
 func (s *NewEvents) Fails_if_cell_s_screen_creation_fails(t *T) {
-	lines.SetScreenFactory(&ScreenFactory{Fail: true})
-	_, err := lines.New()
+	setScreenFactory(&ScreenFactory{Fail: true})
+	_, err := New()
 	t.ErrIs(err, ErrScreen)
 }
 
 func (s *NewEvents) Fails_if_tcell_s_screen_init_fails(t *T) {
-	lines.SetScreenFactory(&ScreenFactory{FailInit: true})
-	_, err := lines.New()
+	setScreenFactory(&ScreenFactory{FailInit: true})
+	_, err := New()
 	t.ErrIs(err, ErrInit)
 }
 
 func (s *NewEvents) Succeeds_if_none_of_the_above(t *T) {
-	lines.SetScreenFactory(&ScreenFactory{})
-	_, err := lines.New()
+	setScreenFactory(&ScreenFactory{})
+	_, err := New()
 	t.FatalOn(err)
 }
 
 func (s *NewEvents) May_fail_in_graphical_test_environment(t *T) {
 	// sole purpose of this test is keeping coverage at 100%
-	lines.SetScreenFactory(lines.DefaultScreenFactory())
-	rg, err := lines.New()
+	setScreenFactory(defaultScreenFactory())
+	ee, err := New()
 	if err == nil {
-		lines.GetLib(rg).Fini()
+		ee.scr.lib.Fini()
 	}
 }
 
 func (s *NewEvents) Sim_fails_if_tcell_s_sim_init_fails(t *T) {
-	lines.SetScreenFactory(&ScreenFactory{FailInit: true})
-	_, _, err := lines.Sim()
+	setScreenFactory(&ScreenFactory{FailInit: true})
+	_, _, err := Sim()
 	t.ErrIs(err, ErrInit)
 }
 
 func (s *NewEvents) Sim_succeeds_if_none_of_the_above(t *T) {
-	lines.SetScreenFactory(lines.DefaultScreenFactory())
-	_, lib, err := lines.Sim()
+	setScreenFactory(defaultScreenFactory())
+	_, lib, err := Sim()
 	t.FatalOn(err)
 	lib.Fini()
 }
@@ -54,141 +65,113 @@ func (s *NewEvents) Sim_succeeds_if_none_of_the_above(t *T) {
 func (s *NewEvents) Has_copy_of_default_keys_for_internal_events(
 	t *T,
 ) {
-	lines.SetScreenFactory(lines.DefaultScreenFactory())
-	reg, _, err := lines.Sim()
+	setScreenFactory(defaultScreenFactory())
+	ee, _, err := Sim()
 	t.FatalOn(err)
-	for _, e := range lines.AllFeatures {
-		kk := lines.DefaultFeatures.KeysOf(e)
+	for _, e := range AllFeatures {
+		kk := DefaultFeatures.KeysOf(e)
 		for _, k := range kk {
-			t.True(reg.Features.HasKey(k.Key, k.Mod))
-			t.Eq(e, reg.Features.KeyEvent(k.Key, k.Mod))
+			t.True(ee.Features.HasKey(k.Key, k.Mod))
+			t.Eq(e, ee.Features.KeyEvent(k.Key, k.Mod))
 		}
-		rr := lines.DefaultFeatures.RunesOf(e)
+		rr := DefaultFeatures.RunesOf(e)
 		for _, r := range rr {
-			t.True(reg.Features.HasRune(r))
-			t.Eq(e, reg.Features.RuneEvent(r))
+			t.True(ee.Features.HasRune(r))
+			t.Eq(e, ee.Features.RuneEvent(r))
 		}
 	}
 }
 
 func (s *NewEvents) Finalize(t *F) {
-	lines.SetScreenFactory(lines.DefaultScreenFactory())
+	setScreenFactory(defaultScreenFactory())
 }
 
 // TestNewRegister can not run in parallel since its tests manipulate the
 // package-global state which is necessary to mock errors of the
 // tcell-library.
-func TestNewRegister(t *testing.T) { Run(&NewEvents{}, t) }
+func TestNewEvents(t *testing.T) { Run(&NewEvents{}, t) }
 
 type events struct {
 	Suite
-	fx FX
-}
-
-type FX struct {
-	*Fixtures
-	DefaultLineCount int
-}
-
-func (f *FX) EE(t *T, maxEvt ...int) *Events {
-	if len(maxEvt) == 0 {
-		return f.Get(t).(*Events)
-	}
-	rg := f.Get(t).(*Events)
-	rg.Max = maxEvt[0]
-	return rg
-}
-
-func (f *FX) Del(t *T) interface{} {
-	rg, ok := f.Fixtures.Del(t).(*Events)
-	if !ok {
-		return nil
-	}
-	if rg.IsPolling() {
-		rg.QuitListening()
-	}
-	return rg
+	fx *FX
 }
 
 func (s *events) Init(t *I) {
-	s.fx.Fixtures = &Fixtures{}
-	s.fx.DefaultLineCount = 25
+	s.fx = NewFX()
 }
 
 func (s *events) SetUp(t *T) {
 	t.Parallel()
-	s.fx.Set(t, New(t))
+	s.fx.New(t)
 }
 
 func (s *events) TearDown(t *T) { s.fx.Del(t) }
 
 func (s *events) Reports_initial_resize_event(t *T) {
-	ee, resizeListenerCalled := s.fx.EE(t), false
-	ee.Resize(func(v *lines.Env) { resizeListenerCalled = true })
+	ee, _ := s.fx.For(t)
+	resizeListenerCalled := false
+	ee.Resize(func(v *Env) { resizeListenerCalled = true })
 	ee.Listen()
 	t.True(resizeListenerCalled)
 }
 
 func (s *events) Stops_reporting_if_view_to_small(t *T) {
-	ee, updates := s.fx.EE(t, 2), 0
-	ee.Resize(func(v *lines.Env) {
-		v.SetMin(30)
-	})
+	ee, tt := s.fx.For(t, 3)
+	updates := 0
+	ee.Resize(func(e *Env) { e.SetMin(30) })
 	ee.Listen()
-	t.Eq(1, ee.Max) // initial resize event
-	t.FatalOn(ee.Update(func(v *lines.Env) { updates++ }))
+	t.Eq(2, tt.Max) // initial resize event
+	t.FatalOn(ee.Update(func(v *Env) { updates++ }))
 	t.Eq(0, updates)
-	ee.SetNumberOfLines(35)
-	t.Eq(0, ee.Max) // second resize event
-	t.FatalOn(ee.Update(func(v *lines.Env) { updates++ }))
+	tt.FireResize(35)
+	t.Eq(1, tt.Max) // second resize event
+	t.FatalOn(ee.Update(func(v *Env) { updates++ }))
 	t.Eq(1, updates)
 }
 
 func (s *events) Stops_reporting_except_for_quit(t *T) {
-	ee := s.fx.EE(t, 2)
-	ee.Resize(func(v *lines.Env) {
-		v.SetMin(30)
+	ee, tt := s.fx.For(t, -1)
+	ee.Resize(func(e *Env) {
+		e.SetMin(30)
 	})
-	ee.Listen()
-	ee.FireRuneEvent('q')
-	t.False(ee.IsPolling())
-	ee, quit := New(t, 2), false
-	ee.Resize(func(v *lines.Env) {
-		v.SetMin(30)
-	})
-	ee.Quit(func() { quit = true })
-	ee.Listen()
-	ee.FireRuneEvent('q')
-	t.False(ee.IsPolling())
+	tt.FireRune('q')
+	t.False(ee.IsListening())
+	ee, tt = Test(t.GoT(), -1)
+	quit := false
+	ee.Resize(func(e *Env) { e.SetMin(30) })
+	ee.Quit(func(*Env) { quit = true })
+	tt.FireRune('q')
+	t.False(ee.IsListening())
 	t.True(quit)
 }
 
 func (s *events) Posts_and_reports_update_event(t *T) {
-	ee, update := s.fx.EE(t), false
+	ee, _ := s.fx.For(t)
+	update := false
 	t.FatalOn(ee.Update(nil))
-	t.FatalOn(ee.Update(func(v *lines.Env) {
-		update = true
-	}))
+	t.FatalOn(ee.Update(func(e *Env) { update = true }))
 	t.True(update)
-	t.False(ee.IsPolling())
+	t.False(ee.IsListening())
 }
 
 func (s *events) Reports_an_update_event_with_now_timestamp(t *T) {
-	ee, now, updateReported := s.fx.EE(t, 0), time.Now(), false
-	ee.Update(func(v *lines.Env) {
+	ee, _ := s.fx.For(t)
+	now, updateReported := time.Now(), false
+	ee.Update(func(e *Env) {
 		updateReported = true
-		t.True(ee.Ev.When().After(now))
+		t.True(e.Evn.When().After(now))
 	})
 	t.True(updateReported)
-	t.False(ee.IsPolling())
+	t.False(ee.IsListening())
 }
+
 func (s *events) Fails_posting_an_update_if_event_loop_full(t *T) {
-	ee, _, err := lines.Sim()
+	ee, _, err := Sim()
 	t.FatalOn(err)
 	block, failed := make(chan struct{}), false
-	ee.Update(func(v *lines.Env) { <-block })
+	ee.Update(func(*Env) { <-block })
 	for i := 0; i < 100; i++ {
-		if err := ee.Update(func(v *lines.Env) {}); err != nil {
+		if err := ee.Update(func(*Env) {}); err != nil {
 			failed = true
 			break
 		}
@@ -199,55 +182,39 @@ func (s *events) Fails_posting_an_update_if_event_loop_full(t *T) {
 }
 
 func (s *events) Reports_quit_event_and_ends_event_loop(t *T) {
-	quit := []int{0, int('q'), int(tcell.KeyCtrlC), int(tcell.KeyCtrlD)}
 	now := time.Now()
-	for i, k := range quit {
-		ee, quitEvt := New(t, 1), false
-		ee.Quit(func() {
-			if i == 0 {
-				t.True(ee.Ev.When().After(now))
-			}
-			quitEvt = true
-		})
-		ee.Listen()
-		switch i {
-		case 0:
-			ee.QuitListening()
-		case 1:
-			ee.FireRuneEvent(rune(k))
-		default:
-			ee.FireKeyEvent(tcell.Key(k))
-		}
-		t.True(quitEvt)
-		if i == 0 {
-			t.Eq(1, ee.Max)
-		} else {
-			t.Eq(0, ee.Max)
-		}
-		t.False(ee.IsPolling())
-	}
+	t.FatalIfNot(t.True(len(DefaultFeatures.KeysOf(FtQuit)) > 0))
+	quitKey, quitEvt := DefaultFeatures.KeysOf(FtQuit)[0], false
+	ee, tt := s.fx.For(t)
+	ee.Quit(func(e *Env) {
+		t.True(e.Evn.When().After(now))
+		quitEvt = true
+	})
+	tt.FireKey(quitKey.Key, quitKey.Mod)
+	t.True(quitEvt)
+	t.Eq(0, tt.Max)
+	t.False(ee.IsListening())
 }
 
 func (s *events) Quits_event_loop_on_quit_event_without_listener(
 	t *T,
 ) {
-	ee := s.fx.EE(t)
+	t.FatalIfNot(t.True(len(DefaultFeatures.KeysOf(FtQuit)) > 0))
+	quitKey := DefaultFeatures.KeysOf(FtQuit)[0]
+	ee, tt := s.fx.For(t)
 	ee.Listen()
-	ee.FireRuneEvent('q')
-	t.False(ee.IsPolling())
+	tt.FireKey(quitKey.Key, quitKey.Mod)
+	t.False(ee.IsListening())
 }
 
 func (s *events) Reporting_keyboard_shadows_other_input_listener(
 	t *T,
 ) {
-	ee, rn, key, kb := s.fx.EE(t, 1), false, false, 0
-	t.FatalOn(ee.Rune('a', func(v *lines.Env) { rn = true }))
-	t.FatalOn(ee.Key(tcell.KeyUp, 0, func(v *lines.Env) {
-		key = true
-	}))
-	ee.Keyboard(func(
-		v *lines.Env, r rune, k tcell.Key, m tcell.ModMask,
-	) {
+	ee, tt := s.fx.For(t, 2)
+	rn, key, kb := false, false, 0
+	t.FatalOn(ee.Rune('a', func(*Env) { rn = true }))
+	t.FatalOn(ee.Key(tcell.KeyUp, 0, func(*Env) { key = true }))
+	ee.Keyboard(func(v *Env, r rune, k tcell.Key, m tcell.ModMask) {
 		if r == 'a' {
 			kb++
 		}
@@ -255,45 +222,43 @@ func (s *events) Reporting_keyboard_shadows_other_input_listener(
 			kb++
 		}
 	})
-	ee.FireRuneEvent('a')
-	ee.FireKeyEvent(tcell.KeyUp)
+	tt.FireRune('a')
+	tt.FireKey(tcell.KeyUp)
 	t.False(rn)
 	t.False(key)
 	t.Eq(2, kb)
-	t.False(ee.IsPolling())
+	t.False(ee.IsListening())
 }
 
 func (s *events) Reporting_keyboard_shadows_all_but_quit(t *T) {
-	ee, kb := s.fx.EE(t, 1), false
-	ee.Keyboard(func(
-		v *lines.Env, r rune, k tcell.Key, m tcell.ModMask,
-	) {
+	t.FatalIfNot(t.True(len(DefaultFeatures.KeysOf(FtQuit)) > 0))
+	quitKey, kb := DefaultFeatures.KeysOf(FtQuit)[0], false
+	ee, tt := s.fx.For(t, 2)
+	ee.Keyboard(func(e *Env, r rune, k tcell.Key, m tcell.ModMask) {
 		kb = true
 		ee.Keyboard(nil)
 	})
-	ee.FireKeyEvent(tcell.KeyCtrlC)
-	t.False(ee.IsPolling())
+	tt.FireKey(quitKey.Key, quitKey.Mod)
+	t.False(ee.IsListening())
 	t.False(kb)
 }
 
 func (s *events) Stops_reporting_keyboard_if_removed(t *T) {
-	ee, rn, kb := s.fx.EE(t, 1), false, false
-	ee.Rune('a', func(v *lines.Env) { rn = true })
-	ee.Keyboard(func(
-		v *lines.Env, r rune, k tcell.Key, m tcell.ModMask,
-	) {
+	ee, tt := s.fx.For(t, 2)
+	rn, kb := false, false
+	ee.Rune('a', func(*Env) { rn = true })
+	ee.Keyboard(func(_ *Env, r rune, k tcell.Key, m tcell.ModMask) {
 		t.Eq('a', r)
 		kb = true
 		ee.Keyboard(nil)
 	})
-	ee.FireRuneEvent('a')
-	ee.FireRuneEvent('a')
+	tt.FireRune('a')
+	tt.FireRune('a')
 	t.True(kb)
 	t.True(rn)
-	t.False(ee.IsPolling())
 }
 
-func TestARegister(t *testing.T) {
+func TestEvents(t *testing.T) {
 	t.Parallel()
 	Run(&events{}, t)
 }

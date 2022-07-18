@@ -91,11 +91,20 @@ func (ll *Lines) isDirty() bool {
 	return false
 }
 
-func (ll *Lines) sync() {
+// show writes only dirty components to the screen
+func (ll *Lines) show() {
 	for _, l := range ll.ll {
 		if !l.dirty {
 			continue
 		}
+		l.sync()
+	}
+}
+
+// sync (re)writes everything to the screen usually after a resize or at
+// initialization time.
+func (ll *Lines) sync() {
+	for _, l := range ll.ll {
 		l.sync()
 	}
 }

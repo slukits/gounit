@@ -73,27 +73,25 @@ func (s *Screen) minErr() {
 }
 
 func (s *Screen) ensureSynced(show bool) {
-	sync := func() {
-		if show {
-			s.lib.Show()
-		} else {
-			s.lib.Sync()
-		}
-	}
 	if s.errScr != nil {
 		if s.errScr.Active {
 			if s.errScr.isDirty {
 				s.errScr.sync()
-				sync()
+				s.lib.Sync()
 			}
 			return
 		}
 	}
+	if !show {
+		s.ll.sync()
+		s.lib.Sync()
+		return
+	}
 	if !s.ll.isDirty() {
 		return
 	}
-	s.ll.sync()
-	sync()
+	s.ll.show()
+	s.lib.Show()
 }
 
 // screenFactory is used to create new tcell-screens for production or
