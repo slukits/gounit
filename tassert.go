@@ -49,16 +49,16 @@ func (t *T) False(value bool) bool {
 
 const eqTypeErr = "types mismatch %v != %v"
 
-// Eq returns true if given values are considered equal; it errors and
-// returns false otherwise.  a and b are considered equal if they are of
-// the same type and
+// Eq errors with an corresponding diff if possible and returns false if
+// given values are not considered equal; otherwise true is returns.  a
+// and b are considered equal if they are of the same type and
 //   - a == b in case of two pointers
 //   - a == b in case of two strings
 //   - a.String() == b.String() in case of Stringer implementations
 //   - fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b) in other cases
 //
-// The test-error will show an according diff if a and b are no
-// pointers.
+// if they are not of the same type or one of the above cases replacing
+// "==" by "!=" is true then given values are considered not equal.
 func (t *T) Eq(a, b interface{}) bool {
 	t.t.Helper()
 
@@ -104,8 +104,8 @@ func (t *T) diff(a, b interface{}) string {
 	return diff
 }
 
-// Neq returns true if given values are not considered equal see [T.Eq];
-// otherwise it errors and returns false.
+// Neq errors and returns false if given values considered equal see [T.Eq];
+// otherwise true is returned.
 func (t *T) Neq(a, b interface{}, msg ...interface{}) bool {
 	t.t.Helper()
 	if fmt.Sprintf("%T", a) != fmt.Sprintf("%T", b) {
