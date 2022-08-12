@@ -7,6 +7,7 @@ package gounit
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -21,10 +22,10 @@ const TrueErr = "expected given value to be true"
 // otherwise true is returned.  Given (formatted) message replaces the
 // default error message, i.e. msg[0] must be a string if len(msg) == 1
 // it must be a format-string iff len(msg) > 1.
-func (t *T) True(value bool, msg ...interface{}) bool {
+func (t *T) True(value bool) bool {
 	t.t.Helper()
 	if !value {
-		t.Error(assertErr("true", TrueErr, msg...))
+		t.Errorf(assertErr, "true", TrueErr)
 		return false
 	}
 	return true
@@ -37,46 +38,108 @@ const FalseErr = "expected given value to be false"
 // otherwise true is returned.  Given (formatted) message replaces the
 // default error message, i.e. msg[0] must be a string if len(msg) == 1
 // it must be a format-string iff len(msg) > 1.
-func (t *T) False(value bool, msg ...interface{}) bool {
+func (t *T) False(value bool) bool {
 	t.t.Helper()
 	if value {
-		t.Error(assertErr("false", FalseErr, msg...))
+		t.Errorf(assertErr, "false", FalseErr)
 		return false
 	}
 	return true
 }
 
-// Eq errors the test and returns false iff given values diff is not
-// empty; otherwise true is returned.  Given (formatted) message replaces
-// the default error message, i.e. msg[0] must be a string if len(msg)
-// == 1 it must be a format-string iff len(msg) > 1.
-func (t *T) Eq(a, b interface{}, msg ...interface{}) bool {
+const eqTypeErr = "types mismatch %v != %v"
+
+// Eq returns true if given values are considered equal; it errors and
+// returns false otherwise.  a and b are considered equal if they are of
+// the same type and
+//   - a == b in case of two pointers
+//   - a == b in case of two strings
+//   - a.String() == b.String() in case of Stringer implementations
+//   - fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b) in other cases
+//
+// The test-error will show an according diff if a and b are no
+// pointers.
+func (t *T) Eq(a, b interface{}) bool {
 	t.t.Helper()
-	diff := cmp.Diff(a, b)
-	if diff == "" {
+
+	if fmt.Sprintf("%T", a) != fmt.Sprintf("%T", b) {
+		t.Errorf(assertErr, "equal: types", fmt.Sprintf(
+			eqTypeErr, fmt.Sprintf("%T", a), fmt.Sprintf("%T", b)))
+		return false
+	}
+
+	if reflect.ValueOf(a).Kind() == reflect.Ptr {
+		if a != b {
+			t.Errorf(assertErr, "equal: pointer", fmt.Sprintf("%p != %p", a, b))
+			return false
+		}
 		return true
 	}
-	t.Error(assertErr("equal", diff, msg...))
-	return false
+
+	diff := t.diff(a, b)
+	if diff != "" {
+		t.Errorf(assertErr, "equal: string-representations", diff)
+		return false
+	}
+
+	return true
 }
 
-// NeqErr default message for failed 'Neq'-assertion.
-const NeqErr = "expected given values to differ"
+func (t *T) diff(a, b interface{}) string {
+	diff := ""
+	switch a := a.(type) {
+	case string:
+		if a != b.(string) {
+			diff = cmp.Diff(a, b.(string))
+		}
+	case fmt.Stringer:
+		if a.String() != b.(fmt.Stringer).String() {
+			diff = cmp.Diff(a.String(), b.(fmt.Stringer).String())
+		}
+	default:
+		if fmt.Sprintf("%v", a) != fmt.Sprintf("%v", b) {
+			diff = cmp.Diff(fmt.Sprintf("%v", a), fmt.Sprintf("%v", b))
+		}
+	}
+	return diff
+}
 
-// Neq errors the test and returns false iff given values diff is empty;
-// otherwise true is returned.  Given (formatted) message replaces the
-// default error message, i.e. msg[0] must be a string if len(msg) == 1
-// it must be a format-string iff len(msg) > 1.
+// Neq returns true if given values are not considered equal see [T.Eq];
+// otherwise it errors and returns false.
 func (t *T) Neq(a, b interface{}, msg ...interface{}) bool {
 	t.t.Helper()
 	if fmt.Sprintf("%T", a) != fmt.Sprintf("%T", b) {
 		return true
 	}
-	diff := cmp.Diff(a, b)
-	if diff != "" {
+
+	if reflect.ValueOf(a).Kind() == reflect.Ptr {
+		if a == b {
+			t.Errorf(assertErr, "not-equal", fmt.Sprintf("%p == %p", a, b))
+			return false
+		}
 		return true
 	}
-	t.Error(assertErr("not-equal", NeqErr, msg...))
+
+	err := ""
+	switch a := a.(type) {
+	case string:
+		if a == b.(string) {
+			err = "given strings are equal"
+		}
+	case fmt.Stringer:
+		if a.String() == b.(fmt.Stringer).String() {
+			err = "given Stringer return equal strings"
+		}
+	default:
+		if fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b) {
+			err = "given instances have same fmt-string representations"
+		}
+	}
+
+	if err == "" {
+		return true
+	}
+	t.Errorf(assertErr, "not-equal", err)
 	return false
 }
 
@@ -84,11 +147,8 @@ func (t *T) Neq(a, b interface{}, msg ...interface{}) bool {
 const ContainsErr = "%s doesn't contain %s"
 
 // Contains errors the test and returns false iff given string doesn't
-// contain given sub-string; otherwise true is returned.  Given
-// (formatted) message replaces the default error message, i.e. msg[0]
-// must be a string if len(msg) == 1 it must be a format-string iff
-// len(msg) > 1.
-func (t *T) Contains(str, sub string, msg ...interface{}) bool {
+// contain given sub-string; otherwise true is returned.
+func (t *T) Contains(str, sub string) bool {
 	t.t.Helper()
 	if !strings.Contains(str, sub) {
 		if !strings.HasSuffix(str, "\n") {
@@ -97,8 +157,7 @@ func (t *T) Contains(str, sub string, msg ...interface{}) bool {
 		if !strings.HasPrefix(sub, "\n") {
 			sub = "\n" + sub
 		}
-		t.Error(assertErr("contains", fmt.Sprintf(
-			ContainsErr, str, sub), msg...))
+		t.Errorf(assertErr, "contains", fmt.Sprintf(ContainsErr, str, sub))
 		return false
 	}
 	return true
@@ -108,66 +167,56 @@ func (t *T) Contains(str, sub string, msg ...interface{}) bool {
 const MatchedErr = "Regexp '%s'\ndoesn't match '%s'"
 
 // Matched errors the test and returns false iff given string isn't
-// matched by given regex; otherwise true is returned.  Given
-// (formatted) message replaces the default error message, i.e. msg[0]
-// must be a string if len(msg) == 1 it must be a format-string iff
-// len(msg) > 1.
-func (t *T) Matched(str, regex string, msg ...interface{}) bool {
+// matched by given regex; otherwise true is returned.
+func (t *T) Matched(str, regex string) bool {
 	t.t.Helper()
 	re := regexp.MustCompile(regex)
 	if !re.MatchString(str) {
-		t.Error(assertErr("matched", fmt.Sprintf(
-			MatchedErr, re.String(), str), msg...))
+		t.Errorf(assertErr, "matched",
+			fmt.Sprintf(MatchedErr, re.String(), str))
 		return false
 	}
 	return true
 }
 
-// SpaceMatched escapes given slice-strings before it joins them with
-// the `\s*`-separator and matches the result against given string:
+// SpaceMatched escapes given variadic strings before it joins them with
+// the `\s*`-separator and matches the result against given string str:
 //
-//     <p>
-//        some text
-//     </p>
+//	<p>
+//	   some text
+//	</p>
 //
-// would be matched by []string{"<p>", "some text", "</p>"}.
+// would be matched by t.SpaceMatched(str, "<p>", "some text", "</p>").
 // SpaceMatched errors the test and returns false iff the matching
-// fails; otherwise true is returned.   Given (formatted) message
-// replaces the default error message, i.e. msg[0] must be a string if
-// len(msg) == 1 it must be a format-string iff len(msg) > 1.
-func (t *T) SpaceMatched(str string, ss []string,
-	msg ...interface{}) bool {
+// fails; otherwise true is returned.
+func (t *T) SpaceMatched(str string, ss ...string) bool {
 
 	t.t.Helper()
 	spaceRe := reGen(`\s*`, "", ss...)
 	if !spaceRe.MatchString(str) {
-		t.Error(assertErr("star-match", fmt.Sprintf(
-			MatchedErr, spaceRe.String(), str), msg...))
+		t.Errorf(assertErr, "star-match", fmt.Sprintf(
+			MatchedErr, spaceRe.String(), str))
 		return false
 	}
 	return true
 }
 
-// StarMatched escapes given slice-strings before it joins them with
-// the `.*?`-separator and matches the result against given string:
+// StarMatched escapes given variadic-strings before it joins them with
+// the `.*?`-separator and matches the result against given string str:
 //
-//     <p>
-//        some text
-//     </p>
+//	<p>
+//	   some text
+//	</p>
 //
-// would be matched by []string{"p", "me", "x", "/p"}.
+// would be matched by t.StarMatch(str, "p", "me", "x", "/p").
 // SpaceMatched errors the test and returns false iff the matching
-// fails; otherwise true is returned.   Given (formatted) message
-// replaces the default error message, i.e. msg[0] must be a string if
-// len(msg) == 1 it must be a format-string iff len(msg) > 1.
-func (t *T) StarMatched(
-	str string, ss []string, msg ...interface{},
-) bool {
+// fails; otherwise true is returned.
+func (t *T) StarMatched(str string, ss ...string) bool {
 	t.t.Helper()
 	startRe := reGen(`.*?`, `(?s)`, ss...)
 	if !startRe.MatchString(str) {
-		t.Error(assertErr("star-match", fmt.Sprintf(
-			MatchedErr, startRe.String(), str), msg...))
+		t.Errorf(assertErr, "star-match", fmt.Sprintf(
+			MatchedErr, startRe.String(), str))
 		return false
 	}
 	return true
@@ -192,17 +241,14 @@ func reGen(sep string, flags string, ss ...string) *regexp.Regexp {
 const ErrErr = "given value doesn't implement 'error'"
 
 // Err errors the test and returns false iff given values doesn't
-// implement the error-interface; otherwise true is returned.  Given
-// (formatted) message replaces the default error message, i.e. msg[0]
-// must be a string if len(msg) == 1 it must be a format-string iff
-// len(msg) > 1.
-func (t *T) Err(err interface{}, msg ...interface{}) bool {
+// implement the error-interface; otherwise true is returned.
+func (t *T) Err(err interface{}) bool {
 
 	t.t.Helper()
 
 	_, ok := err.(error)
 	if !ok {
-		t.Error(assertErr("error", ErrErr, msg...))
+		t.Errorf(assertErr, "error", ErrErr)
 		return false
 	}
 	return true
@@ -213,24 +259,20 @@ const ErrIsErr = "given error doesn't wrap target-error"
 
 // ErrIs errors the test and returns false iff given err doesn't
 // implement the error-interface or doesn't wrap given target; otherwise
-// true is returned.  Given (formatted) message replaces the default
-// error message, i.e. msg[0] must be a string if len(msg) == 1 it must
-// be a format-string iff len(msg) > 1.
-func (t *T) ErrIs(
-	err interface{}, target error, msg ...interface{},
-) bool {
+// true is returned.
+func (t *T) ErrIs(err interface{}, target error) bool {
 	t.t.Helper()
 
 	e, ok := err.(error)
 	if !ok {
-		t.Error(assertErr("error is", ErrIsErr, msg...))
+		t.Errorf(assertErr, "error is", ErrIsErr)
 		return false
 	}
 	if errors.Is(e, target) {
 		return true
 	}
-	t.Error(assertErr("error is", fmt.Sprintf(
-		"%s: %+v\n%+v", ErrIsErr, e, target), msg...))
+	t.Errorf(assertErr, "error is",
+		fmt.Sprintf("%s: %+v\n%+v", ErrIsErr, e, target))
 	return false
 }
 
@@ -239,25 +281,22 @@ const ErrMatchedErr = "given regexp '%s' doesn't match '%s'"
 
 // ErrMatched errors the test and returns false iff given err doesn't
 // implement the error-interface or its message isn't matched by given
-// regex; otherwise true is returned.  Given (formatted) message replaces
-// the default error message, i.e. msg[0] must be a string if len(msg)
-// == 1 it must be a format-string iff len(msg) > 1.
-func (t *T) ErrMatched(err interface{}, re string,
-	msg ...interface{}) bool {
+// regex; otherwise true is returned.
+func (t *T) ErrMatched(err interface{}, re string) bool {
 
 	t.t.Helper()
 
 	e, ok := err.(error)
 	if !ok {
-		t.Error(assertErr("error matched", ErrMatchedErr, msg...))
+		t.Error(assertErr, "error matched", ErrMatchedErr)
 		return false
 	}
 
 	re = strings.ReplaceAll(re, "%s", ".*?")
 	regexp := regexp.MustCompile(re)
 	if !regexp.MatchString(e.Error()) {
-		t.Error(assertErr("error matched", fmt.Sprintf(
-			ErrMatchedErr, re, e.Error()), msg...))
+		t.Errorf(assertErr, "error matched", fmt.Sprintf(
+			ErrMatchedErr, re, e.Error()))
 		return false
 	}
 
@@ -275,7 +314,7 @@ func (t *T) Panics(f func(), msg ...interface{}) (hasPanicked bool) {
 	t.t.Helper()
 	defer func() {
 		if r := recover(); r == nil {
-			t.Error(assertErr("panics", PanicsErr, msg...))
+			t.Errorf(assertErr, "panics", PanicsErr)
 			hasPanicked = false
 			return
 		}
@@ -293,9 +332,7 @@ const WithinErr = "timeout while condition unfulfilled"
 // stepper is elapsed without given condition returning true.  Use the
 // returned channel to wait for either the fulfillment of the condition
 // or the failing timeout.
-func (t *T) Within(
-	d *TimeStepper, cond func() bool, mm ...interface{},
-) chan bool {
+func (t *T) Within(d *TimeStepper, cond func() bool) chan bool {
 	done := make(chan bool)
 	go func() {
 		time.Sleep(d.Step())
@@ -310,31 +347,11 @@ func (t *T) Within(
 				return
 			}
 		}
-		t.Error(assertErr("within", WithinErr, mm...))
+		t.Errorf(assertErr, "within", WithinErr)
 		done <- false
 	}()
 	return done
 }
 
-// Assert is the format-string for assertion errors.
-const Assert = "assert %s: %v"
-
-// FormatMsgErr is the error message in case an assertion was called
-// with more then one optional message argument whereas the first
-// argument is not a (format-)string.
-const FormatMsgErr = "expected first message-argument to be string; got %T"
-
-func assertErr(label, msg string, args ...interface{}) string {
-	if len(args) == 0 {
-		return fmt.Sprintf(Assert, label, msg)
-	}
-	if len(args) == 1 {
-		return fmt.Sprintf(Assert, label, args[0])
-	}
-	ext, ok := args[0].(string)
-	if !ok {
-		return fmt.Sprintf("%s: %s", fmt.Sprintf(Assert, label, msg),
-			fmt.Sprintf(FormatMsgErr, args[0]))
-	}
-	return fmt.Sprintf(Assert, label, fmt.Sprintf(ext, args[1:]...))
-}
+// assertErr is the format-string for assertion errors.
+const assertErr = "assert %s: %v"

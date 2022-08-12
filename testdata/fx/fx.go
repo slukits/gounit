@@ -23,6 +23,64 @@ import (
 	"github.com/slukits/gounit"
 )
 
+// A FX instance is meant for fixture suites whose test errors should be
+// suppressed and only logged, i.e. may be retrieved by s.Logs where s
+// is a suite instance embedding FX.  In this why test-test-suites like
+// the following are possible
+//
+//	 type MySuiteFixture { FX }
+//
+//	 func(s *MySuiteFixture) Test_true_assertion_failing(t *gounit.T) {
+//	     t.True(false)
+//	 }
+//
+//	 type Assertion { gounit.Suite }
+//
+//	func(s *Assertion) For_true_fails_if_false_value_given(t *gounit.T) {
+//		fx := &MySuiteFixture{}
+//	    gounit.Run(fx, t.GoT())
+//		// i.e. not the fixture-suite-test fails but the testing suite's
+//		// can investigate if the test would have failed.
+//	    if fx.Logs == "" {
+//	        t.Error("expected true assertion to fail")
+//	    }
+//	}
+//
+//	 or
+//
+//	 type MySuiteFixture { FX }
+//
+//	 func(s *MySuiteFixture) Test_true_assertion_passing(t *gounit.T) {
+//	     t.True(true)
+//	 }
+//
+//	 type Assertion { gounit.Suite }
+//
+//	 func(s *Assertion) For_true_passes_if_true_value_given(t *gounit.T) {
+//	     fx := &MySuiteFixture{}
+//	     gounit.Run(fx, t.GoT())
+//	     if fx.Logs != "" {
+//			// i.e. not the fixture-suite-test fails but the testing suite's
+//			// test fails.
+//			t.Error(fx.Logs)
+//		}
+//	}
+type FX struct {
+	FixtureLog
+	gounit.Suite
+	t *gounit.T
+}
+
+func (s *FX) SetUp(t *gounit.T) { s.t = t }
+
+func (s *FX) error(args ...interface{}) {
+	s.t.Log(args...)
+}
+
+func (s *FX) Error() func(args ...interface{}) {
+	return s.error
+}
+
 // FixtureLog provides the general logging facility for test suites
 // fixtures by implementing gounit.SuiteLogger.  A FixtureLog mustn't
 // been copied once it has been used.

@@ -6,6 +6,7 @@ package fx
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/slukits/gounit"
@@ -70,55 +71,173 @@ func (s *TestTrueReturnsTrue) Error() func(args ...interface{}) {
 	return s.error
 }
 
-func (s *TestTrueReturnsTrue) File() string { return file }
+type PointerEqualityFX struct{ FX }
 
-type TestTrueError struct {
-	FixtureLog
-	gounit.Suite
-	Msg string
-	t   *gounit.T
+type T struct{ n int }
+
+func (s *PointerEqualityFX) Test_equal_pointers(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	testTypeInstance := T{n: 22}
+	p1, p2 := &testTypeInstance, &testTypeInstance
+	t.Eq(p1, p2)
 }
 
-func (s *TestTrueError) True_assertion_overwrites_error_msg(
-	t *gounit.T,
-) {
-	s.t = t
-	t.True(false, s.Msg)
+func (s *PointerEqualityFX) Test_unequal_pointers(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	t.Eq(&T{}, &T{})
+	if !strings.HasPrefix(s.Logs, "assert equal: pointer:") {
+		s.Logs = "pointer-equality: inequality: didn't get expected error"
+		return
+	}
+	s.Logs = ""
 }
 
-func (s *TestTrueError) error(args ...interface{}) {
-	s.t.Log(args...)
+var inequalityMatcher = regexp.MustCompile(
+	`(?s)^assert equal: string-representations.*?[-].*?22.*?[+].*?42.*$`)
+
+type StringEqualityFX struct{ FX }
+
+func (s *StringEqualityFX) Test_equal_strings(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	t.Eq("a", "a")
 }
 
-func (s *TestTrueError) Error() func(args ...interface{}) {
-	return s.error
+func (s *StringEqualityFX) Test_unequal_strings(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	t.Eq("22", "42")
+	if ok := inequalityMatcher.MatchString(s.Logs); !ok {
+		s.Logs = "assert equal: strings: inequality: didn't get expected error"
+		return
+	}
+	s.Logs = ""
 }
 
-func (s *TestTrueError) File() string { return file }
+type TestStructEquality struct{ FX }
 
-type TestTrueFmtError struct {
-	FixtureLog
-	gounit.Suite
-	Msgs []interface{}
-	t    *gounit.T
+func (s *TestStructEquality) Test_struct_equality(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	t.Eq(struct{ n int }{n: 42}, struct{ n int }{n: 42})
 }
 
-func (s *TestTrueFmtError) True_assertion_overwrites_error_msg(
-	t *gounit.T,
-) {
-	s.t = t
-	t.True(false, s.Msgs...)
+func (s *TestStructEquality) Test_struct_inequality(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	t.Eq(struct{ n int }{n: 22}, struct{ n int }{n: 42})
+	if ok := inequalityMatcher.MatchString(s.Logs); !ok {
+		s.Logs = "assert equal: struct: inequality: " +
+			fmt.Sprintf("didn't get expected error: %s", s.Logs)
+		return
+	}
+	s.Logs = ""
 }
 
-func (s *TestTrueFmtError) error(args ...interface{}) {
-	s.t.Log(args...)
+type TestStringerEquality struct {
+	FX
 }
 
-func (s *TestTrueFmtError) Error() func(args ...interface{}) {
-	return s.error
+type testStringer struct{ vl func() string }
+
+func (ts testStringer) String() string { return ts.vl() }
+
+func (s *TestStringerEquality) Test_stringer_equality(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	vl := func() string { return "42" }
+	t.Eq(testStringer{vl: vl}, testStringer{vl: vl})
 }
 
-func (s *TestTrueFmtError) File() string { return file }
+func (s *TestStringerEquality) Test_stringer_inequality(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	vl1, vl2 := func() string { return "22" }, func() string { return "42" }
+	t.Eq(testStringer{vl: vl1}, testStringer{vl: vl2})
+	if ok := inequalityMatcher.MatchString(s.Logs); !ok {
+		s.Logs = "assert equal: stringer: inequality: " +
+			fmt.Sprintf("didn't get expected error: %s", s.Logs)
+		return
+	}
+	s.Logs = ""
+}
+
+type PointerNoneEqualityFX struct{ FX }
+
+func (s *PointerNoneEqualityFX) Test_not_equal_pointers(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	t.Neq(&T{}, &T{})
+}
+
+func (s *PointerNoneEqualityFX) Test_not_not_equal_pointers(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	p := &T{}
+	t.Neq(p, p)
+	if !strings.HasPrefix(s.Logs, "assert not-equal:") {
+		s.Logs = "not-equal pointer: equality: didn't get expected error"
+		return
+	}
+	s.Logs = ""
+}
+
+type StringsNoneEqualityFX struct{ FX }
+
+func (s *StringsNoneEqualityFX) Test_not_equal_strings(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	t.Neq("22", "42")
+}
+
+func (s *StringsNoneEqualityFX) Test_not_not_equal_strings(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	t.Neq("22", "22")
+	if !strings.HasPrefix(s.Logs, "assert not-equal:") {
+		s.Logs = "not-equal pointer: equality: didn't get expected error"
+		return
+	}
+	s.Logs = ""
+}
+
+type StringerNoneEqualityFX struct{ FX }
+
+func (s *StringerNoneEqualityFX) Test_not_equal_strings(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	str1 := testStringer{func() string { return "22" }}
+	str2 := testStringer{func() string { return "42" }}
+	t.Neq(str1, str2)
+}
+
+func (s *StringerNoneEqualityFX) Test_not_not_equal_strings(t *gounit.T) {
+	if s.Logs != "" {
+		return
+	}
+	str := testStringer{func() string { return "22" }}
+	t.Neq(str, str)
+	if !strings.HasPrefix(s.Logs, "assert not-equal:") {
+		s.Logs = "not-equal pointer: equality: didn't get expected error"
+		return
+	}
+	s.Logs = ""
+}
 
 type TestAssertion struct {
 	FixtureLog
@@ -135,16 +254,6 @@ type TestAssertion struct {
 	// Fails executes on given T-instance a failing assertion and
 	// returns the expected error-message
 	Fails func(*gounit.T) string
-
-	// Overwrites executes on given T-instance a failing assertion with
-	// an overwritten error message and returns the expected
-	// error-message's suffix.
-	Overwrite func(*gounit.T, string)
-
-	// Overwrites executes on given T-instance a failing assertion with
-	// an overwritten formatted error message and returns the expected
-	// error-message's suffix.
-	FmtOverwrite func(*gounit.T, string, string)
 
 	msg string
 
@@ -198,30 +307,6 @@ func (s *TestAssertion) Test_fail(t *gounit.T) {
 		s.Msg = fmt.Sprintf(
 			"fail: expect fail-msg to contain: '%s'; got '%s'",
 			exp, s.Msgs["Test_fail"])
-		t.FailNow()
-	}
-}
-
-func (s *TestAssertion) Test_failing_overwrite(t *gounit.T) {
-	s.msg = "Test_failing_overwrite"
-	const exp = "overwritten error"
-	s.Overwrite(t, exp)
-	if !strings.Contains(s.Msgs["Test_failing_overwrite"], exp) {
-		s.Msg = fmt.Sprintf(
-			"failing overwrite: expect fail-msg to contain: '%s'; got '%s'",
-			exp, s.Msgs["Test_failing_overwrite"])
-		t.FailNow()
-	}
-}
-
-func (s *TestAssertion) Test_failing_fmt_overwrite(t *gounit.T) {
-	s.msg = "Test_failing_fmt_overwrite"
-	const exp = "overwritten error"
-	s.FmtOverwrite(t, "%s", exp)
-	if !strings.Contains(s.Msgs["Test_failing_fmt_overwrite"], exp) {
-		s.Msg = fmt.Sprintf(
-			"failing fmt-overwrite: expect fail-msg to contain: '%s'; got '%s'",
-			exp, s.Msgs["Test_failing_fmt_overwrite"])
 		t.FailNow()
 	}
 }
