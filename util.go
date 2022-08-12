@@ -11,7 +11,31 @@ import (
 
 // Fixtures provides a simple concurrency save fixture storage for
 // gounit tests.  A Fixtures instance must not be copied after its first
-// use.
+// use.  A Fixtures storage is typically used to setup test specific
+// fixtures for concurrently run suite-tests
+//
+//	type MySuite {
+//	    gounit.Suite
+//	    fx ff
+//	}
+//
+//	type ff { gounit.Fixtures }
+//
+//	func (fx *ff) Of(t *gounit.T) string { return fx.Get(t).(string) }
+//
+//	func (s *MySuite) SetUp(t *gounit.T) {
+//	    t.Parallel()
+//	    s.fx.Set(t, fmt.Sprintf("%p's fixture", t))
+//	}
+//
+//	func (s *MySuite) MySuiteTest(t *gounit.T) {
+//	    t.Logf("%p: got: %s", t, s.fx.Of(t))
+//	}
+//
+//	func TestMySuite(t *testing.T) {
+//	    t.Parallel()
+//	    Run(&MySuite{}, t)
+//	}
 type Fixtures struct {
 	mutex sync.Mutex
 	ff    map[*T]interface{}
@@ -32,11 +56,6 @@ func (ff *Fixtures) Get(t *T) interface{} {
 	ff.mutex.Lock()
 	defer ff.mutex.Unlock()
 	return ff.ff[t]
-}
-
-// Int returns given test's fixture interpreted as an int.
-func (ff *Fixtures) Int(t *T) int {
-	return ff.Get(t).(int)
 }
 
 // Del removes the mapping of given test to its fixture and returns the

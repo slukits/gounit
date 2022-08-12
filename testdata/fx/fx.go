@@ -158,8 +158,12 @@ type TestSetup struct {
 	FixtureLog
 	gounit.Suite
 	idx uint32
-	fx  gounit.Fixtures
+	fx  intFX
 }
+
+type intFX struct{ gounit.Fixtures }
+
+func (fx *intFX) Of(t *gounit.T) int { return fx.Get(t).(int) }
 
 func (s *TestSetup) SetUp(t *gounit.T) {
 	t.Parallel()
@@ -167,21 +171,21 @@ func (s *TestSetup) SetUp(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(-1 * s.fx.Int(t))
+	t.Log(-1 * s.fx.Of(t))
 }
 
 func (s *TestSetup) Test_A(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(s.fx.Int(t))
+	t.Log(s.fx.Of(t))
 }
 
 func (s *TestSetup) Test_B(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(s.fx.Int(t))
+	t.Log(s.fx.Of(t))
 }
 
 func (s *TestSetup) File() string {
@@ -197,7 +201,7 @@ type TestTearDown struct {
 	FixtureLog
 	gounit.Suite
 	idx uint32
-	fx  gounit.Fixtures
+	fx  intFX
 }
 
 func (s *TestTearDown) SetUp(t *gounit.T) {
@@ -215,14 +219,14 @@ func (s *TestTearDown) Test_A(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(s.fx.Int(t))
+	t.Log(s.fx.Of(t))
 }
 
 func (s *TestTearDown) Test_B(t *gounit.T) {
 	if time.Now().UnixMicro()%2 == 0 {
 		time.Sleep(1 * time.Millisecond)
 	}
-	t.Log(s.fx.Int(t))
+	t.Log(s.fx.Of(t))
 }
 
 func (s *TestTearDown) File() string { return file }
@@ -289,7 +293,7 @@ type TestInit struct {
 	gounit.Suite
 }
 
-func (s *TestInit) Init(t *gounit.I) { t.Log("") }
+func (s *TestInit) Init(t *gounit.S) { t.Log("") }
 
 func (s *TestInit) SetUp(t *gounit.T) {
 	t.Parallel()
@@ -321,7 +325,7 @@ func (s *TestFinalize) TearDown(t *gounit.T) { t.Log(-2) }
 func (s *TestFinalize) Test_a(t *gounit.T) { t.Log(0) }
 func (s *TestFinalize) Test_b(t *gounit.T) { t.Log(1) }
 
-func (s *TestFinalize) Finalize(t *gounit.F) { t.Log("") }
+func (s *TestFinalize) Finalize(t *gounit.S) { t.Log("") }
 
 func (s *TestFinalize) File() string { return file }
 
@@ -375,7 +379,7 @@ func (s *TestCancelerImplementation) Cancel() func() {
 	}
 }
 
-func (s *TestCancelerImplementation) Init(t *gounit.I) {
+func (s *TestCancelerImplementation) Init(t *gounit.S) {
 	t.Fatal(I_FATAL)
 	t.Fatalf("%d", I_FATALF)
 	t.FatalOn(errors.New(strconv.Itoa(I_FATAL_ON)))
@@ -389,7 +393,7 @@ func (s *TestCancelerImplementation) Test(t *gounit.T) {
 	t.Fatalf("%d", T_FATALF)
 }
 
-func (s *TestCancelerImplementation) Finalize(t *gounit.F) {
+func (s *TestCancelerImplementation) Finalize(t *gounit.S) {
 	t.Fatal(F_FATAL)
 	t.Fatalf("%d", F_FATALF)
 	t.FatalOn(errors.New(strconv.Itoa(F_FATAL_ON)))
@@ -412,7 +416,7 @@ type TestInitFinalHaveRunTest struct {
 	Fatal string
 }
 
-func (s *TestInitFinalHaveRunTest) Init(t *gounit.I) {
+func (s *TestInitFinalHaveRunTest) Init(t *gounit.S) {
 	if s.RunT != t.GoT() {
 		s.Fatal = "init: test has not run-test"
 		t.GoT().FailNow()
@@ -420,7 +424,7 @@ func (s *TestInitFinalHaveRunTest) Init(t *gounit.I) {
 	t.Log(s.InitLog)
 }
 
-func (s *TestInitFinalHaveRunTest) Finalize(t *gounit.F) {
+func (s *TestInitFinalHaveRunTest) Finalize(t *gounit.S) {
 	if s.RunT != t.GoT() {
 		s.Fatal = "finalize: test has not run-test"
 		t.GoT().FailNow()
