@@ -50,7 +50,7 @@ func (t *T) False(value bool) bool {
 const eqTypeErr = "types mismatch %v != %v"
 
 // Eq errors with an corresponding diff if possible and returns false if
-// given values are not considered equal; otherwise true is returns.  a
+// given values are not considered equal; otherwise true is returned.  a
 // and b are considered equal if they are of the same type and
 //   - a == b in case of two pointers
 //   - a == b in case of two strings
