@@ -325,28 +325,30 @@ const withinErr = "timeout while condition unfulfilled"
 
 // Within tries after each step of given time-stepper if given condition
 // returns true and fails the test iff the whole duration of given time
-// stepper is elapsed without given condition returning true.  Use the
-// returned channel to wait for either the fulfillment of the condition
-// or the failing timeout.
-func (t *T) Within(d *TimeStepper, cond func() bool) chan bool {
+// stepper is elapsed without given condition returning true.
+func (t *T) Within(d *TimeStepper, cond func() bool) (fulfilled bool) {
 	done := make(chan bool)
-	go func() {
+	go func(c chan bool) {
 		time.Sleep(d.Step())
 		if cond() {
-			done <- true
+			c <- true
 			return
 		}
 		for d.AddStep() {
 			time.Sleep(d.Step())
 			if cond() {
-				done <- true
+				c <- true
 				return
 			}
 		}
+		c <- false
+	}(done)
+	t.t.Helper()
+	if success := <-done; !success {
 		t.Errorf(assertErr, "within", withinErr)
-		done <- false
-	}()
-	return done
+		return false
+	}
+	return true
 }
 
 // assertErr is the format-string for assertion errors.

@@ -354,23 +354,15 @@ func (s *AssertionTests) For_within(t *T) {
 		return (&TimeStepper{}).SetDuration(
 			time.Duration(d) * time.Millisecond)
 	}
-	cond := func() bool { return false }
 	suite := &fx.TestAssertion{
 		True: func(t *T) bool {
-			first := true
-			return <-t.Within(newTs(2), func() bool {
-				if first {
-					first = false
-					return false
-				}
-				return true
-			}) && <-t.Within(newTs(1), func() bool { return true })
+			return t.Within(newTs(2), func() bool { return true })
 		},
 		False: func(t *T) bool {
-			return <-t.Within(newTs(2), cond)
+			return t.Within(newTs(2), func() bool { return false })
 		},
 		Fails: func(t *T) string {
-			<-t.Within(newTs(1), cond)
+			t.Within(newTs(2), func() bool { return false })
 			return WithinErr
 		},
 	}
