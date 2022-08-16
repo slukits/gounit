@@ -119,9 +119,8 @@ func (s *module) Closes_diff_channel_if_watcher_quits(t *T) {
 	})
 }
 
-func (s *module) Ignores_reserves_zero_quitting_for_quit_all(t *T) {
+func (s *module) Reserves_zero_quitting_for_quit_all(t *T) {
 	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
-	defer fx.QuitAll()
 	fx.Interval = 1 * time.Millisecond
 
 	_, _, err := fx.Watch()
@@ -130,8 +129,42 @@ func (s *module) Ignores_reserves_zero_quitting_for_quit_all(t *T) {
 	fx.Quit(0)
 	fx.Quit(500) // coverage
 	t.True(fx.IsWatched())
+
+	fx.QuitAll()
+	t.False(fx.IsWatched())
 }
 
+func (s *module) Reports_initially_all_testing_packages(t *T) {
+	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx.Set(FxPackage | FxTestingPackage)
+	fx.Interval = 1 * time.Millisecond
+	defer fx.QuitAll()
+
+	diff, _, err := fx.Watch()
+	t.FatalOn(err)
+	var init *PackagesDiff
+	select {
+	case init = <-diff:
+		t.FatalIfNot(t.True(init != nil))
+	case <-t.Timeout(0):
+		t.Fatal("initial diff-report timed out")
+	}
+	gotN := 0
+
+	init.For(func(tp *TestingPackage) (stop bool) {
+		t.True(fx.IsTesting(tp.Name()))
+		gotN++
+		return false
+	})
+	t.Eq(2, gotN)
+}
+
+type dbg struct{ Suite }
+
+func (s *dbg) Dbg(t *T) {
+}
+
+func TestDBG(t *testing.T) { Run(&dbg{}, t) }
 func TestModule(t *testing.T) {
 	t.Parallel()
 	Run(&module{}, t)

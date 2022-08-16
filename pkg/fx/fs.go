@@ -141,14 +141,18 @@ func (d *Dir) MkFile(name, content string) *Dir {
 	return d
 }
 
-var rePkgComment = regexp.MustCompile(`(?s)^(\s*?\n|// .*?\n|/\*.*\*/)`)
+var rePkgComment = regexp.MustCompile(`(?s)^(\s*?\n|// .*?\n|/\*.*\*/)*`)
 
 // MkPkgFile adds a file with given content prefixing its content with a
 // package declaration if missing.
 func (d *Dir) MkPkgFile(pkg, name, content string) *Dir {
 	if !strings.Contains(content, fmt.Sprintf("package %s", pkg)) {
 		content = rePkgComment.ReplaceAllString(
-			content, fmt.Sprintf("$1\npackage %s", pkg))
+			content, fmt.Sprintf("$1\npackage %s\n\n", pkg))
+		content = strings.TrimLeft(content, "\n")
+	}
+	if !strings.HasSuffix(name, ".go") {
+		name = fmt.Sprintf("%s.go", name)
 	}
 	d.reset = append(d.reset, AddFile(
 		d.T, d.Name, filepath.Join(pkg, name), content))

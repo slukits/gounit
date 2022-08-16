@@ -7,6 +7,8 @@
 package module
 
 import (
+	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/slukits/gounit/pkg/fx"
@@ -17,17 +19,18 @@ type FxMask uint64
 const (
 	FxMod FxMask = 1 << iota
 	FxTestingPackage
+	FxPackage
 )
 
 var allFixtureSettings = []FxMask{FxMod, FxTestingPackage}
 
 const (
 	FxModuleName   = "example.com/gounit/module"
-	FxPackageName  = "fx_package"
-	FxTestFileName = "fx"
-	FxTest         = "import \"testing\"\n\n" +
-		"func TestFixture(t *testing.T) {\n" +
-		"}\n"
+	fmtPackageName = "fx_package_%s"
+	fxTestFileName = "fx"
+	fxTest         = "import \"testing\"\n\n" +
+		"func TestFixture(t *testing.T) {}\n"
+	fxCode = "type T struct {}"
 )
 
 // ModuleFX wraps a Module instance and augments it with testing
@@ -35,8 +38,9 @@ const (
 // quit.
 type ModuleFX struct {
 	*Module
-	fxWW  []chan struct{}
-	FxDir *fx.Dir
+	fxWW   []chan struct{}
+	FxDir  *fx.Dir
+	n, tpN int
 }
 
 func NewFX(t *testing.T) *ModuleFX {
@@ -59,7 +63,43 @@ func (x *ModuleFX) set(f FxMask) {
 	case FxMod:
 		x.FxDir.MkMod(FxModuleName)
 	case FxTestingPackage:
-		x.FxDir.MkPath(FxPackageName)
-		x.FxDir.MkPkgTest(FxPackageName, FxTestFileName, FxTest)
+		packageName := x.newTestingPackageName()
+		x.FxDir.MkPath(packageName)
+		x.FxDir.MkPkgTest(packageName, fxTestFileName, fxTest)
+		x.FxDir.MkPkgFile(packageName, fxTestFileName, fxCode)
+	case FxPackage:
+		packageName := x.newPackageName()
+		x.FxDir.MkPath(packageName)
+		x.FxDir.MkPkgFile(packageName, fxTestFileName, fxCode)
 	}
+}
+
+// IsTesting returns true iff given package name is a testing package
+// name created by this fixture.
+func (x *ModuleFX) IsTesting(pkg string) bool {
+	for i := 1; i <= x.tpN; i++ {
+		if x.testingPackageNameOf(i) != pkg {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func (x *ModuleFX) newTestingPackageName() string {
+	x.tpN++
+	return x.testingPackageNameOf(x.tpN)
+}
+
+func (x *ModuleFX) testingPackageNameOf(n int) string {
+	return fmt.Sprintf(fmtPackageName, fmt.Sprintf("t%d", n))
+}
+
+func (x *ModuleFX) newPackageName() string {
+	x.n++
+	return x.packageNameOf(x.n)
+}
+
+func (x *ModuleFX) packageNameOf(n int) string {
+	return fmt.Sprintf(fmtPackageName, strconv.Itoa(n))
 }
