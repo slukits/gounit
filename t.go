@@ -114,9 +114,12 @@ func (t *T) Fatalf(format string, args ...interface{}) {
 	t.FailNow()
 }
 
-// Timeout returns a channel which receives a message after given
-// duration *d*
+// Timeout returns a channel which is closed after given duration has
+// elapsed.  Is given duration 0 it defaults to 10ms.
 func (t *T) Timeout(d time.Duration) chan struct{} {
+	if d == 0 {
+		d = 10 * time.Millisecond
+	}
 	done := make(chan struct{})
 	go func() {
 		time.Sleep(d)
