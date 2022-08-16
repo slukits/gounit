@@ -32,6 +32,23 @@ func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) {
 			return
 		}
 	}
+	if d.last == d.current {
+		panic("last became current")
+	}
+}
+
+func (d *PackagesDiff) ForDel(cb func(*TestingPackage) (stop bool)) {
+	if d.last == nil || len(d.last.pp) == 0 {
+		return
+	}
+	for _, tp := range d.last.pp {
+		if d.current.has(tp) {
+			continue
+		}
+		if cb(tp) {
+			return
+		}
+	}
 }
 
 func (d *PackagesDiff) hasDelta() bool {
@@ -75,7 +92,7 @@ func (pp *testingPackages) isUpdatedBy(tp *TestingPackage) bool {
 		return true
 	}
 	for _, _tp := range pp.pp {
-		if _tp.Name() != tp.Name() {
+		if _tp.Rel() != tp.Rel() {
 			continue
 		}
 		if !tp.ModTime.After(_tp.ModTime) {
@@ -83,6 +100,18 @@ func (pp *testingPackages) isUpdatedBy(tp *TestingPackage) bool {
 		}
 	}
 	return true
+}
+
+// has returns true iff receiving testing packages have a package with
+// the same relative name as given testing package.
+func (pp *testingPackages) has(tp *TestingPackage) bool {
+	for _, _tp := range pp.pp {
+		if _tp.Rel() != tp.Rel() {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 // dirStack is a lifo stack of directory names to traverse a go module's
@@ -140,6 +169,8 @@ func packagesSnapshot(
 		if !ok {
 			continue
 		}
+		tp.rel = strings.TrimLeft(
+			tp.abs[len(dir):], string(os.PathSeparator))
 		pp.pp = append(pp.pp, tp)
 		if tp.ModTime.After(pp.ModTime) {
 			pp.ModTime = tp.ModTime
@@ -167,7 +198,7 @@ func newTestingPackage(dir string) (*TestingPackage, bool) {
 		return nil, false
 	}
 
-	tp, testing := &TestingPackage{dir: dir}, false
+	tp, testing := &TestingPackage{abs: dir}, false
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
 			continue
@@ -226,13 +257,17 @@ func isTesting(file string) bool {
 }
 
 type TestingPackage struct {
-	ModTime time.Time
-	dir     string
+	ModTime  time.Time
+	abs, rel string
 }
 
 // Name returns the testing package's name.
-func (tp TestingPackage) Name() string { return filepath.Base(tp.dir) }
+func (tp TestingPackage) Name() string { return filepath.Base(tp.abs) }
 
-// Path returns the path to the testing package, i.e. Path doesn't
-// include the packages name.
-func (tp TestingPackage) Path() string { return filepath.Dir(tp.dir) }
+// Abs returns the absolute path to the testing package, i.e. Abs
+// doesn't include the packages name.
+func (tp TestingPackage) Abs() string { return filepath.Dir(tp.abs) }
+
+// Rel returns the module-relative path including the package itself.
+// I.e. Rel() is a module-global unique identifier of given package.
+func (tp TestingPackage) Rel() string { return tp.rel }

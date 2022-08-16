@@ -8,6 +8,8 @@ package module
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -84,6 +86,24 @@ func (x *ModuleFX) IsTesting(pkg string) bool {
 		return true
 	}
 	return false
+}
+
+// ForTesting calls back for each created testing package fixture by
+// this module fixture.  NOTE this package is not guaranteed to exist.
+func (x *ModuleFX) ForTesting(cb func(string) (stop bool)) {
+	for i := 1; i <= x.tpN; i++ {
+		if cb(x.testingPackageNameOf(i)) {
+			return
+		}
+	}
+}
+
+func (x *ModuleFX) RM(packageName string) {
+	err := os.RemoveAll(filepath.Join(x.FxDir.Name, packageName))
+	if err != nil {
+		x.FxDir.T.Fatalf("couldn't remove package '%s': %v",
+			packageName, err)
+	}
 }
 
 func (x *ModuleFX) newTestingPackageName() string {

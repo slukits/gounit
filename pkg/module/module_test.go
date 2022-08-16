@@ -78,11 +78,13 @@ func (s *module) Reports_package_diffs_to_all_watcher(t *T) {
 	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
 	defer fx.QuitAll()
 	fx.Interval = 1 * time.Millisecond
+
 	diff1, _, err := fx.Watch()
 	t.FatalOn(err)
 	diff2, _, err := fx.Watch()
 	t.FatalOn(err)
-	cond := func() func() bool {
+
+	t.Within(&TimeStepper{}, func() func() bool {
 		got1, got2 := false, false
 		return func() bool {
 			select {
@@ -94,8 +96,7 @@ func (s *module) Reports_package_diffs_to_all_watcher(t *T) {
 			}
 			return got1 && got2
 		}
-	}
-	t.Within(&TimeStepper{}, cond())
+	}())
 }
 
 func (s *module) Closes_diff_channel_if_watcher_quits(t *T) {
@@ -158,34 +159,49 @@ func (s *module) Reports_initially_all_testing_packages(t *T) {
 
 	diff, _, err := fx.Watch()
 	t.FatalOn(err)
-	var init *PackagesDiff
-	select {
-	case init = <-diff:
-		t.FatalIfNot(t.True(init != nil))
-	case <-t.Timeout(0):
-		t.Fatal("initial diff-report timed out")
-	}
-	gotN := 0
 
-	init.For(func(tp *TestingPackage) (stop bool) {
-		t.True(fx.IsTesting(tp.Name()))
-		gotN++
-		return false
+	t.Within(&TimeStepper{}, func() bool {
+		select {
+		default:
+			return false
+		case diff := <-diff:
+			if diff == nil {
+				t.Fatal("expected initial diff")
+			}
+			gotN := 0
+			diff.For(func(tp *TestingPackage) (stop bool) {
+				t.True(fx.IsTesting(tp.Name()))
+				gotN++
+				return false
+			})
+			t.Eq(2, gotN)
+			return true
+		}
 	})
-	t.Eq(2, gotN)
 }
 
-func testWatcher(diff <-chan *PackagesDiff) (initOnly chan bool) {
+func testWatcher(
+	t *T, fx *ModuleFX, diff <-chan *PackagesDiff,
+) (initOnly chan bool) {
 	initOnly, state := make(chan bool), 0
 	go func() {
 		for {
 			select {
 			case diff := <-diff:
 				if diff != nil && state == 0 {
+					// ensure all packages are reported initially
+					gotN := 0
+					diff.For(func(tp *TestingPackage) (stop bool) {
+						t.True(fx.IsTesting(tp.Name()))
+						gotN++
+						return false
+					})
+					t.Eq(2, gotN)
 					state = 1
 					continue
 				}
 				if diff != nil && state == 1 {
+					// ensure they are reported only once
 					state = -1
 				}
 			case respond := <-initOnly:
@@ -205,11 +221,17 @@ func (s *module) Reports_all_testing_packages_to_new_watcher(t *T) {
 	fx.Set(FxPackage | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
 	defer fx.QuitAll()
+
 	diff1, _, err := fx.Watch()
 	t.FatalOn(err)
+	initOnly1 := testWatcher(t, fx, diff1)
+	t.Within(&TimeStepper{}, func() bool {
+		initOnly1 <- true
+		return <-initOnly1
+	})
 	diff2, _, err := fx.Watch()
 	t.FatalOn(err)
-	initOnly1, initOnly2 := testWatcher(diff1), testWatcher(diff2)
+	initOnly2 := testWatcher(t, fx, diff2)
 
 	t.Within(&TimeStepper{}, func() bool {
 		initOnly1 <- true
@@ -218,16 +240,81 @@ func (s *module) Reports_all_testing_packages_to_new_watcher(t *T) {
 		io2 := <-initOnly2
 		return io1 && io2
 	})
+
 	initOnly1 <- false
 	initOnly2 <- false
 }
 
-type dbg struct{ Suite }
+func (s *module) Reports_added_package_to_registered_watcher(t *T) {
+	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx.Interval = 1 * time.Millisecond
+	defer fx.QuitAll()
 
-func (s *dbg) Dbg(t *T) {
+	diff, _, err := fx.Watch()
+	t.FatalOn(err)
+
+	init, n := (*PackagesDiff)(nil), 0
+	select {
+	case init = <-diff:
+	case <-t.Timeout(0):
+		t.Fatal("expected initial diff-report")
+	}
+	init.For(func(tp *TestingPackage) (stop bool) {
+		n++
+		t.True(fx.IsTesting(tp.Name()))
+		return false
+	})
+	t.Eq(1, n)
+
+	fx.Set(FxPackage | FxTestingPackage)
+	add, n := (*PackagesDiff)(nil), 0
+	select {
+	case add = <-diff:
+	case <-t.Timeout(0):
+		t.Fatal("expected diff-report for added package")
+	}
+	add.For(func(tp *TestingPackage) (stop bool) {
+		n++
+		t.True(fx.IsTesting(tp.Name()))
+		return false
+	})
+	t.Eq(1, n)
 }
 
-func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+func (s *module) Reports_deleted_package_to_registered_watcher(t *T) {
+	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx.Set(FxPackage | FxTestingPackage)
+	fx.Interval = 1 * time.Millisecond
+	defer fx.QuitAll()
+
+	diff, _, err := fx.Watch()
+	t.FatalOn(err)
+	select {
+	case <-diff:
+	case <-t.Timeout(0):
+		t.Fatal("expected initial diff-report")
+	}
+
+	var delPack string
+	fx.ForTesting(func(s string) (stop bool) {
+		fx.RM(s)
+		delPack = s
+		return true
+	})
+	del, n := (*PackagesDiff)(nil), 0
+	select {
+	case del = <-diff:
+	case <-t.Timeout(0):
+		t.Fatal("expected diff-report for deleted package")
+	}
+	del.ForDel(func(tp *TestingPackage) (stop bool) {
+		n++
+		t.Eq(delPack, tp.Name())
+		return false
+	})
+	t.Eq(1, n)
+}
+
 func TestModule(t *testing.T) {
 	t.Parallel()
 	Run(&module{}, t)
