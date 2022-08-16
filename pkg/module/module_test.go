@@ -119,6 +119,22 @@ func (s *module) Closes_diff_channel_if_watcher_quits(t *T) {
 	})
 }
 
+func (s *module) Is_unwatched_if_all_watcher_quit(t *T) {
+	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	defer fx.QuitAll()
+	fx.Interval = 1 * time.Millisecond
+	_, ID1, err := fx.Watch()
+	t.FatalOn(err)
+	_, ID2, err := fx.Watch()
+	t.FatalOn(err)
+	t.True(fx.IsWatched())
+
+	fx.Quit(ID1)
+	fx.Quit(ID2)
+
+	t.Within(&TimeStepper{}, func() bool { return !fx.IsWatched() })
+}
+
 func (s *module) Reserves_zero_quitting_for_quit_all(t *T) {
 	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
@@ -157,6 +173,53 @@ func (s *module) Reports_initially_all_testing_packages(t *T) {
 		return false
 	})
 	t.Eq(2, gotN)
+}
+
+func testWatcher(diff <-chan *PackagesDiff) (initOnly chan bool) {
+	initOnly, state := make(chan bool), 0
+	go func() {
+		for {
+			select {
+			case diff := <-diff:
+				if diff != nil && state == 0 {
+					state = 1
+					continue
+				}
+				if diff != nil && state == 1 {
+					state = -1
+				}
+			case respond := <-initOnly:
+				if !respond {
+					close(initOnly)
+					return
+				}
+				initOnly <- state == 1
+			}
+		}
+	}()
+	return initOnly
+}
+
+func (s *module) Reports_all_testing_packages_to_new_watcher(t *T) {
+	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx.Set(FxPackage | FxTestingPackage)
+	fx.Interval = 1 * time.Millisecond
+	defer fx.QuitAll()
+	diff1, _, err := fx.Watch()
+	t.FatalOn(err)
+	diff2, _, err := fx.Watch()
+	t.FatalOn(err)
+	initOnly1, initOnly2 := testWatcher(diff1), testWatcher(diff2)
+
+	t.Within(&TimeStepper{}, func() bool {
+		initOnly1 <- true
+		io1 := <-initOnly1
+		initOnly2 <- true
+		io2 := <-initOnly2
+		return io1 && io2
+	})
+	initOnly1 <- false
+	initOnly2 <- false
 }
 
 type dbg struct{ Suite }

@@ -34,8 +34,9 @@ var DefaultIgnore = []string{".git", "node_modules"}
 
 // A Module represents a go module which can be watched for changes of
 // testing packages.  A Module may not be copied after its first watcher
-// has been registered by [Module.Watch].  A Module instance may be used
-// concurrently and arbitrary many watcher may be registered.
+// has been registered by [Module.Watch].  A Module instance's methods
+// may be used concurrently and arbitrary many watcher may be
+// registered.
 type Module struct {
 
 	// mutex for a Module-instance's concurrency safety.
@@ -52,6 +53,8 @@ type Module struct {
 	// the removal of one or all watchers.  The former if send ID is
 	// greater zero; the later if it is zero.
 	quit chan uint64
+
+	isWatched chan bool
 
 	// newID creates a new Module-instance unique ID > 0 for registered
 	// watcher to provide the possibility to remove a particular
@@ -147,16 +150,21 @@ func (m *Module) ensureDiffer() {
 	if m.Interval == 0 {
 		m.Interval = DefaultInterval
 	}
-	differ(m.Dir, m.Interval, ignoreClosure(m.Ignore...),
+	m.isWatched = differ(m.Dir, m.Interval, ignoreClosure(m.Ignore...),
 		m.register, m.quit)
 }
 
-// IsWatched returns true after the first call of [Module.Watch] until
-// [Module.QuitAll] is called.
+// IsWatched returns true iff at least one watcher is registered.  Note
+// a false return value doesn't mean that there is no diffing go routine
+// running.  To guarantee this see [Module.QuitAll].
 func (m *Module) IsWatched() bool {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	return m.register != nil
+	if m.isWatched == nil {
+		return false
+	}
+	m.isWatched <- true
+	return <-m.isWatched
 }
 
 // Quit unregisters the watcher with given ID and closes its
@@ -182,6 +190,7 @@ func (m *Module) QuitAll() {
 	close(m.quit)
 	m.register = nil
 	m.quit = nil
+	m.isWatched = nil
 }
 
 func idClosure() func() uint64 {
@@ -227,12 +236,14 @@ type watcher struct {
 func differ(
 	dir string, interval time.Duration, ignore func(string) bool,
 	register chan *newWatcher, quit <-chan uint64,
-) {
-	ww := map[uint64]*watcher{}
+) (isWatched chan bool) {
+	ww, isWatched := map[uint64]*watcher{}, make(chan bool)
 
 	go func() {
 		for {
 			select {
+			case <-isWatched:
+				isWatched <- len(ww) > 0
 			case register := <-register:
 				ww[register.ID] = &watcher{diff: register.diff}
 			case wID := <-quit:
@@ -244,6 +255,8 @@ func differ(
 			}
 		}
 	}()
+
+	return isWatched
 }
 
 func quitWatching(
