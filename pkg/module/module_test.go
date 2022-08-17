@@ -291,7 +291,7 @@ func (s *module) Reports_deleted_package_to_registered_watcher(t *T) {
 	t.FatalOn(err)
 	select {
 	case <-diff:
-	case <-t.Timeout(0):
+	case <-t.Timeout(20 * time.Millisecond):
 		t.Fatal("expected initial diff-report")
 	}
 
@@ -318,37 +318,6 @@ func (s *module) Reports_deleted_package_to_registered_watcher(t *T) {
 type dbg struct{ Suite }
 
 func (s *dbg) Dbg(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
-	fx.Set(FxPackage | FxTestingPackage)
-	fx.Interval = 1 * time.Millisecond
-	defer fx.QuitAll()
-
-	diff, _, err := fx.Watch()
-	t.FatalOn(err)
-	select {
-	case <-diff:
-	case <-t.Timeout(0):
-		t.Fatal("expected initial diff-report")
-	}
-
-	var delPack string
-	fx.ForTesting(func(s string) (stop bool) {
-		fx.RM(s)
-		delPack = s
-		return true
-	})
-	del, n := (*PackagesDiff)(nil), 0
-	select {
-	case del = <-diff:
-	case <-t.Timeout(0):
-		t.Fatal("expected diff-report for deleted package")
-	}
-	del.ForDel(func(tp *TestingPackage) (stop bool) {
-		n++
-		t.Eq(delPack, tp.Name())
-		return false
-	})
-	t.Eq(1, n)
 }
 
 func TestDBG(t *testing.T) { Run(&dbg{}, t) }
