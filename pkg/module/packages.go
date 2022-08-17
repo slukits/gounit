@@ -18,16 +18,17 @@ import (
 // different points in time.  PackagesDiff is immutable hence we can
 // report an instance by sending a pointer over an according channel.
 type PackagesDiff struct {
-	last, current *testingPackages
+	last, current *packagesStat
 }
 
 // For returns all testing packages which were updated since the last
 // reported diff.
 func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) {
-	for _, tp := range d.current.pp {
-		if !d.last.isUpdatedBy(tp) {
+	for _, ps := range d.current.pp {
+		if !d.last.isUpdatedBy(ps) {
 			continue
 		}
+		tp := &TestingPackage{rel: ps.abs, abs: ps.abs}
 		if cb(tp) {
 			return
 		}
@@ -37,20 +38,26 @@ func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) {
 	}
 }
 
+// ForDel returns a testing package which got deleted.  Note neither
+// tests nor suites are provide by such a testing package.
 func (d *PackagesDiff) ForDel(cb func(*TestingPackage) (stop bool)) {
 	if d.last == nil || len(d.last.pp) == 0 {
 		return
 	}
-	for _, tp := range d.last.pp {
-		if d.current.has(tp) {
+	for _, ps := range d.last.pp {
+		if d.current.has(ps) {
 			continue
 		}
+		tp := &TestingPackage{rel: ps.abs, abs: ps.abs, parsed: true}
 		if cb(tp) {
 			return
 		}
 	}
 }
 
+// hasDelta returns true iff the two packages stats represent different
+// numbers of package stats or if a current package stat updates (or
+// misses) its corresponding last package stat.
 func (d *PackagesDiff) hasDelta() bool {
 	if d.last == nil && d.current == nil {
 		return false
@@ -67,15 +74,31 @@ func (d *PackagesDiff) hasDelta() bool {
 		}
 		return true
 	}
+	// NOTE the case that d.last contains package stats which are not in
+	// d.current can be safely neglected since at this point d.last and
+	// d.current have equally many package stats, i.e. if d.current
+	// misses package stats of d.last it must have package stats which
+	// are not in d.last which trigger a true return value in the above
+	// case already.
 	return false
 }
 
-type testingPackages struct {
+// A packagesStat holds a modules testing packages stats and the
+// modification time of the most recently modified testing package.  It
+// is used by [Module.PackagesDiff] to report changes between two
+// packages stats of the same module at different points in time.
+type packagesStat struct {
 	ModTime time.Time
-	pp      []*TestingPackage
+	pp      []*pkgStat
 }
 
-func (pp *testingPackages) diff(other *testingPackages) *PackagesDiff {
+// diff returns a new PackagesDiff iff there are differences between
+// receiving packages stats and given other packages stats.  I.e. a
+// PackagesDiff instance is returned both packagesStat instances
+// represent different series of package stats or if other contains a
+// package stats with more recent modification time than its
+// corresponding package stats in receiving packages stats.
+func (pp *packagesStat) diff(other *packagesStat) *PackagesDiff {
 	d := &PackagesDiff{last: other, current: pp}
 	if !d.hasDelta() {
 		return nil
@@ -83,11 +106,11 @@ func (pp *testingPackages) diff(other *testingPackages) *PackagesDiff {
 	return d
 }
 
-// isUpdatedBy returns true iff given testing package is not included in
-// receiving testing packages or if its modification time is after the
-// modification time of corresponding testing package of receiving
-// testing packages.
-func (pp *testingPackages) isUpdatedBy(tp *TestingPackage) bool {
+// isUpdatedBy returns true iff given package stats not included in
+// receiving packages stats or if its modification time is after the
+// modification time of corresponding package stats of receiving
+// packages stats.
+func (pp *packagesStat) isUpdatedBy(tp *pkgStat) bool {
 	if pp == nil {
 		return true
 	}
@@ -102,9 +125,9 @@ func (pp *testingPackages) isUpdatedBy(tp *TestingPackage) bool {
 	return true
 }
 
-// has returns true iff receiving testing packages have a package with
-// the same relative name as given testing package.
-func (pp *testingPackages) has(tp *TestingPackage) bool {
+// has returns true iff receiving packages stats have package stats with
+// the same relative name as given package stats.
+func (pp *packagesStat) has(tp *pkgStat) bool {
 	for _, _tp := range pp.pp {
 		if _tp.Rel() != tp.Rel() {
 			continue
@@ -144,28 +167,28 @@ func (s *dirStack) PushDir(dir string, ignore func(string) bool) error {
 	return nil
 }
 
-// packagesSnapshot traverses to given directory -- excluding the ones
-// for which ignore is true -- and adds a given directory as testing
-// package iff it contains at least one *_test.go file which contains at
-// least one test function.  The MostResentChange-property is the most
-// recently updated testing package's update time.
-func packagesSnapshot(
+// calcPackagesStat traverses given directory -- excluding the ones for
+// which ignore is true -- and adds a given directory as a testing
+// package's package stats iff it contains at least one *_test.go file
+// which contains at least one test function.  The ModTime-property is
+// the modification time of the most recently modified package.
+func calcPackagesStat(
 	dir string, ignore func(string) bool,
-) *testingPackages {
+) *packagesStat {
 
 	stk := dirStack{}
 	if err := stk.PushDir(dir, ignore); err != nil || len(stk) == 0 {
 		return nil
 	}
 
-	pp := testingPackages{}
+	pp := packagesStat{}
 
 	for len(stk) > 0 {
 		d := stk.Pop()
 		if err := stk.PushDir(d, ignore); err != nil {
 			continue
 		}
-		tp, ok := newTestingPackage(d)
+		tp, ok := newTestingPackageStat(d)
 		if !ok {
 			continue
 		}
@@ -180,14 +203,14 @@ func packagesSnapshot(
 	return &pp
 }
 
-// newTestingPackage evaluates if given directory has at least one go
-// test file with at least one test in which case a new TestingPackage
+// newTestingPackageStat evaluates if given directory has at least one
+// go test file with at least one test in which case a new *pkgStat
 // instance and true is returned; otherwise nil and false.  NOTE the
 // testing package's modification time is determined as the most recent
 // modification time of all *.go source files in this package.  I.e. if
-// a package contains none go source files their update have no
-// influence on the testing packages modification time.
-func newTestingPackage(dir string) (*TestingPackage, bool) {
+// a package contains none go source files their update have no effect
+// on the testing package's modification time.
+func newTestingPackageStat(dir string) (*pkgStat, bool) {
 
 	stt, err := os.Stat(dir)
 	if err != nil || !stt.IsDir() {
@@ -198,7 +221,7 @@ func newTestingPackage(dir string) (*TestingPackage, bool) {
 		return nil, false
 	}
 
-	tp, testing := &TestingPackage{abs: dir}, false
+	tp, testing := &pkgStat{abs: dir}, false
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
 			continue

@@ -15,8 +15,28 @@ import (
 	"time"
 )
 
-type TestingPackage struct {
+// A pkgStat is calculated to determine if a package changed in the
+// course of time.
+type pkgStat struct {
 	ModTime  time.Time
+	abs, rel string
+}
+
+// Name returns a testing package's name.
+func (ps pkgStat) Name() string { return filepath.Base(ps.abs) }
+
+// Abs returns the absolute path of a testing package, i.e. Abs
+// doesn't include the packages name.
+func (ps pkgStat) Abs() string { return filepath.Dir(ps.abs) }
+
+// Rel returns the module-relative path including the package itself.
+// I.e. Rel() is a module-global unique identifier of a testing package.
+func (ps pkgStat) Rel() string { return ps.rel }
+
+// A TestingPackage provides information on a module's package's tests
+// and test suites.  As well as the feature to execute and report on a
+// package's tests.
+type TestingPackage struct {
 	abs, rel string
 	parsed   bool
 	tests    tests
@@ -67,6 +87,7 @@ func (tp *TestingPackage) ensureParsing() {
 	}
 
 	ff := []*testFile{}
+	tt, ss := tests{}, suites{}
 	for _, e := range ee {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), "_test.go") {
 			continue
@@ -79,11 +100,12 @@ func (tp *TestingPackage) ensureParsing() {
 		}
 		guSlc := parseGoUnitSelector(af)
 		ff = append(ff, &testFile{fs: fs, af: af, guSlc: guSlc})
-		tt, ss := parseTestNSuites(fs, af, guSlc)
-		tp.tests = append(tp.tests, tt...)
-		tp.suites = append(tp.suites, ss...)
+		_tt, _ss := parseTestNSuites(fs, af, guSlc)
+		tt, ss = append(tt, _tt...), append(ss, _ss...)
 	}
-	parseSuiteTests(ff, tp.suites)
+	parseSuiteTests(ff, ss)
+	tp.tests = tt
+	tp.suites = ss
 }
 
 const gounitPath = `"github.com/slukits/gounit"`

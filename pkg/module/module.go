@@ -220,7 +220,7 @@ type newWatcher struct {
 
 type watcher struct {
 	diff                     chan *PackagesDiff
-	lastReported, lastPolled *testingPackages
+	lastReported, lastPolled *packagesStat
 }
 
 // differ starts a go routine which every given interval informs all
@@ -251,7 +251,7 @@ func differ(
 					return
 				}
 			case <-time.After(interval):
-				reportDiffs(packagesSnapshot(dir, ignore), ww)
+				reportDiffs(calcPackagesStat(dir, ignore), ww)
 			}
 		}
 	}()
@@ -279,7 +279,7 @@ func quitWatching(
 	return
 }
 
-func reportDiffs(snapshot *testingPackages, ww map[uint64]*watcher) {
+func reportDiffs(snapshot *packagesStat, ww map[uint64]*watcher) {
 	for _, w := range ww {
 		// w.diff has a 1-buffer which is drained ...
 		select {
