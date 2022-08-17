@@ -19,12 +19,20 @@ import (
 type FxMask uint64
 
 const (
+	// FxMod indicates a go.mod file creation.
 	FxMod FxMask = 1 << iota
+	// FxTestingPackage indicates the creation of a package with test
+	// file.
 	FxTestingPackage
+	// FxPackage indicates a package creation without test file
 	FxPackage
+	// FxParsing indicates the creation of a testing package having the
+	// two test files with content fxParseA and fxParseB respectively.
+	FxParsing
 )
 
-var allFixtureSettings = []FxMask{FxMod, FxTestingPackage}
+var allFixtureSettings = []FxMask{
+	FxMod, FxTestingPackage, FxParsing}
 
 const (
 	FxModuleName   = "example.com/gounit/module"
@@ -32,7 +40,57 @@ const (
 	fxTestFileName = "fx"
 	fxTest         = "import \"testing\"\n\n" +
 		"func TestFixture(t *testing.T) {}\n"
-	fxCode = "type T struct {}"
+	fxSuiteA   = "FxSuiteA"
+	fxSuiteB   = "FxSuiteB"
+	fxARunner  = "TestFxSuiteA"
+	fxBRunner  = "TestFxSuiteB"
+	fxTestA    = "TestFixtureA"
+	fxTestB    = "TestFixtureB"
+	fxStATest1 = "Suite_test1"
+	fxStATest2 = "SuiteA_test2"
+	fxStBTest1 = "Suite_test1"
+	fxStBTest2 = "SuiteB_test2"
+	fxCode     = "type T struct {}"
+)
+
+var (
+	fxParseA = "import (\n" +
+		"\t\"testing\"\n\n" +
+		"\t. \"github.com/slukits/gounit\"\n" +
+		")\n\n" +
+		fmt.Sprintf("func %s(t *testing.T) {}\n\n", fxTestA) +
+		fmt.Sprintf("type %s struct{ Suite }\n\n", fxSuiteA) +
+		"func (s *FxSuiteA) Init(t *S) {}\n\n" +
+		"func (s *FxSuiteA) SetUp(t *T) {}\n\n" +
+		"func (s *FxSuiteA) TearDown(t *T) {}\n\n" +
+		fmt.Sprintf(
+			"func (s *%s) %s(t *T) {}\n\n", fxSuiteA, fxStATest1) +
+		"func (s *FxSuiteA) PublicHelper() {}\n\n" +
+		"func (s *FxSuiteA) Finalize(t *S) {}\n\n" +
+		fmt.Sprintf("func %s(t *testing.T) { Run(&%s{}, t) }\n\n",
+			fxARunner, fxSuiteA) +
+		fmt.Sprintf(
+			"func (s *%s) %s(t *T) {}\n\n", fxSuiteB, fxStBTest2)
+
+	fxParseB = "import (\n" +
+		"\t\"testing\"\n\n" +
+		"\t\"github.com/slukits/gounit\"\n" +
+		")\n\n" +
+		fmt.Sprintf("func %s(t *testing.T) {}\n\n", fxTestB) +
+		fmt.Sprintf("func (s *%s) %s(t *gounit.T) {}\n\n",
+			fxSuiteA, fxStATest2) +
+		"type FxSuiteB struct{ gounit.Suite }\n\n" +
+		"func (s *FxSuiteB) Init(t *gounit.S) {}\n\n" +
+		"func (s *FxSuiteB) SetUp(t *gounit.T) {}\n\n" +
+		"func (s *FxSuiteB) TearDown(t *gounit.T) {}\n\n" +
+		fmt.Sprintf("func (s *%s) %s(t *gounit.T) {}\n\n",
+			fxSuiteB, fxStBTest1) +
+		"func (s *FxSuiteB) privateHelper(t *gounit.T) {}\n\n" +
+		"func (s *FxSuiteB) Finalize(t *gounit.S) {}\n\n" +
+		fmt.Sprintf(
+			"func %s(t *testing.T) { gounit.Run(&%s{}, t) }\n\n",
+			fxBRunner, fxSuiteB,
+		)
 )
 
 // ModuleFX wraps a Module instance and augments it with testing
@@ -73,6 +131,13 @@ func (x *ModuleFX) set(f FxMask) {
 		packageName := x.newPackageName()
 		x.FxDir.MkPath(packageName)
 		x.FxDir.MkPkgFile(packageName, fxTestFileName, fxCode)
+	case FxParsing:
+		packageName := x.newTestingPackageName()
+		x.FxDir.MkPath(packageName)
+		x.FxDir.MkPkgTest(packageName,
+			fmt.Sprintf("%sa", fxTestFileName), fxParseA)
+		x.FxDir.MkPkgTest(packageName,
+			fmt.Sprintf("%sb", fxTestFileName), fxParseB)
 	}
 }
 

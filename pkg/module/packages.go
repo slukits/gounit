@@ -255,19 +255,3 @@ func isTesting(file string) bool {
 
 	return found
 }
-
-type TestingPackage struct {
-	ModTime  time.Time
-	abs, rel string
-}
-
-// Name returns the testing package's name.
-func (tp TestingPackage) Name() string { return filepath.Base(tp.abs) }
-
-// Abs returns the absolute path to the testing package, i.e. Abs
-// doesn't include the packages name.
-func (tp TestingPackage) Abs() string { return filepath.Dir(tp.abs) }
-
-// Rel returns the module-relative path including the package itself.
-// I.e. Rel() is a module-global unique identifier of given package.
-func (tp TestingPackage) Rel() string { return tp.rel }

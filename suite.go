@@ -36,7 +36,7 @@ type Suite struct {
 	t               *testing.T
 	self            interface{}
 	value           reflect.Value
-	rtype           reflect.Type
+	rType           reflect.Type
 	setUp, tearDown *reflect.Method
 }
 
@@ -96,9 +96,9 @@ func (s *Suite) sWrapper(t *testing.T) *S {
 func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 	s.self, s.t = self, t
 	s.value = reflect.ValueOf(self)
-	s.rtype = reflect.TypeOf(self)
-	for i := 0; i < s.rtype.NumMethod(); i++ {
-		m := s.rtype.Method(i)
+	s.rType = reflect.TypeOf(self)
+	for i := 0; i < s.rType.NumMethod(); i++ {
+		m := s.rType.Method(i)
 		switch m.Name {
 		case "SetUp":
 			s.setUp = &m
@@ -136,8 +136,8 @@ type SuiteEmbedder interface {
 func Run(suite SuiteEmbedder, t *testing.T) {
 	s := suite.init(suite, t)
 	subTestFactory := newSubTestFactory(s)
-	for i := 0; i < s.rtype.NumMethod(); i++ {
-		method := s.rtype.Method(i)
+	for i := 0; i < s.rType.NumMethod(); i++ {
+		method := s.rType.Method(i)
 		if method.Type.NumIn() != 2 {
 			continue
 		}
