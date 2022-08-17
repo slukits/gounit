@@ -63,6 +63,11 @@ var ErrNoModule = errors.New("module: no module found in path: ")
 // set.
 var DefaultInterval = 200 * time.Millisecond
 
+// DefaultTimeout is the default value for Module.Timeout which sets the
+// timeout for a module's testing package's tests run.  It is set iff at
+// the first call of [Module.Watch] no timeout is set.
+var DefaultTimeout = 10 * time.Second
+
 // DefaultIgnore is the default value for Module.Ignore a list of
 // directories which is ignored when searching for testing packages in a
 // go module's directory, e.g.:
@@ -111,6 +116,10 @@ type Module struct {
 	// Interval is the duration between two packages diff-reports  for a
 	// watcher.
 	Interval time.Duration
+
+	// Timeout is the duration after which a testing package's tests run
+	// is canceled.
+	Timeout time.Duration
 
 	// Ignore is the list of directory names which are ignored in the
 	// search for a go module's testing packages.  It defaults to
@@ -191,8 +200,11 @@ func (m *Module) ensureDiffer() {
 	if m.Interval == 0 {
 		m.Interval = DefaultInterval
 	}
-	m.isWatched = differ(m.Dir, m.Interval, ignoreClosure(m.Ignore...),
-		m.register, m.quit)
+	if m.Timeout == 0 {
+		m.Timeout = DefaultTimeout
+	}
+	m.isWatched = differ(m.Dir, m.Interval, m.Timeout,
+		ignoreClosure(m.Ignore...), m.register, m.quit)
 }
 
 // IsWatched returns true iff at least one watcher is registered.  Note
@@ -274,8 +286,9 @@ type watcher struct {
 // guarantee to not block and keep each watcher individually accurately
 // posted about changes independently if a watcher is polling from its
 // diff-channel or not.
-func differ(
-	dir string, interval time.Duration, ignore func(string) bool,
+func differ(dir string,
+	interval, timeout time.Duration,
+	ignore func(string) bool,
 	register chan *newWatcher, quit <-chan uint64,
 ) (isWatched chan bool) {
 	ww, isWatched := map[uint64]*watcher{}, make(chan bool)
@@ -292,7 +305,8 @@ func differ(
 					return
 				}
 			case <-time.After(interval):
-				reportDiffs(calcPackagesStat(dir, ignore), ww)
+				reportDiffs(
+					calcPackagesStat(dir, ignore), ww, timeout)
 			}
 		}
 	}()
@@ -320,7 +334,12 @@ func quitWatching(
 	return
 }
 
-func reportDiffs(snapshot *packagesStat, ww map[uint64]*watcher) {
+func reportDiffs(
+	snapshot *packagesStat,
+	ww map[uint64]*watcher,
+	timeout time.Duration,
+) {
+
 	for _, w := range ww {
 		// w.diff has a 1-buffer which is drained ...
 		select {
@@ -335,6 +354,7 @@ func reportDiffs(snapshot *packagesStat, ww map[uint64]*watcher) {
 		if diff == nil {
 			continue
 		}
+		diff.timeout = timeout
 
 		// ... and we send the most recent diff relative to the last
 		// snapshot whose diff was polled to the watcher making sure at

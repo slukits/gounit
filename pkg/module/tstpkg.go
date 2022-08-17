@@ -38,6 +38,7 @@ func (ps pkgStat) Rel() string { return ps.rel }
 // package's tests.
 type TestingPackage struct {
 	abs, rel string
+	timeout  time.Duration
 	parsed   bool
 	tests    tests
 	suites   suites

@@ -19,6 +19,7 @@ import (
 // report an instance by sending a pointer over an according channel.
 type PackagesDiff struct {
 	last, current *packagesStat
+	timeout       time.Duration
 }
 
 // For returns all testing packages which were updated since the last
@@ -28,7 +29,8 @@ func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) {
 		if !d.last.isUpdatedBy(ps) {
 			continue
 		}
-		tp := &TestingPackage{rel: ps.abs, abs: ps.abs}
+		tp := &TestingPackage{
+			rel: ps.abs, abs: ps.abs, timeout: d.timeout}
 		if cb(tp) {
 			return
 		}
@@ -48,7 +50,8 @@ func (d *PackagesDiff) ForDel(cb func(*TestingPackage) (stop bool)) {
 		if d.current.has(ps) {
 			continue
 		}
-		tp := &TestingPackage{rel: ps.abs, abs: ps.abs, parsed: true}
+		tp := &TestingPackage{
+			rel: ps.abs, abs: ps.abs, parsed: true, timeout: 0}
 		if cb(tp) {
 			return
 		}
