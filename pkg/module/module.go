@@ -2,6 +2,47 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
+// Package Module allows its client to watch a go module for changes of
+// its testing packages.  A testing package is a package which contains at
+// least one *_test.go source file having at least one Test*-function.
+//
+//	import (
+//	    "fmt"
+//
+//	    "github.com/slukits/gounit/pkg/module"
+//	)
+//
+//	func main() {
+//	    var mdl module.Module // zero value defaults to working directory
+//	    diff, ID, err := mdl.Watch() // may be called arbitrary many times
+//	    if err != nil { // no go.mod file found traversing ascending
+//	        panic(err)
+//	    }
+//	    countdown := 10
+//
+//	    for {
+//	        diff := <- diff // block until next change
+//	        countdown--
+//	        diff.For(func(tp *module.TestingPackage) (stop bool) {
+//	            fmt.Printf("changed/added: %s\n", tp.Name())
+//	            tp.ForTest(func(t *module.Test) {
+//	                fmt.Println(t.Name())
+//	            })
+//	            tp.ForSuite(func(ts *module.TestSuite) {
+//	                fmt.Println(ts.Name())
+//	            })
+//	        })
+//	        diff.ForDel(func(tp *module.TestingPackage) (stop bool) {
+//	            fmt.Printf("deleted: %s\n", tp.Rel())
+//	        })
+//	        if countdown == 0 {
+//	            mdl.Quit(ID) // remove watcher from registered watchers
+//	            break
+//	        }
+//	    }
+//
+//	    mdl.QuitAll() // terminate reporting go routine; release resources
+//	}
 package module
 
 import (

@@ -46,12 +46,13 @@ type TestingPackage struct {
 // Name returns the testing package's name.
 func (tp TestingPackage) Name() string { return filepath.Base(tp.abs) }
 
-// Abs returns the absolute path to the testing package, i.e. Abs
+// Abs returns the absolute path *to* the testing package, i.e. Abs
 // doesn't include the packages name.
 func (tp TestingPackage) Abs() string { return filepath.Dir(tp.abs) }
 
-// Rel returns the module-relative path including the package itself.
-// I.e. Rel() is a module-global unique identifier of given package.
+// Rel returns the module-relative path including the package name
+// itself.  I.e. Rel() is a module-global unique identifier of given
+// package.
 func (tp TestingPackage) Rel() string { return tp.rel }
 
 // ForTest provides given testing package's tests.
@@ -306,13 +307,16 @@ func isIdent(fldType ast.Expr) (string, bool) {
 	return ident.Name, true
 }
 
+// A Test provides information about a go test, i.e. Test*-function.
 type Test struct {
 	name string
 	pos  string
 }
 
+// Name returns a tests name.
 func (t *Test) Name() string { return t.name }
 
+// Pos returns a tests absolute filename with line and column number.
 func (t *Test) Pos() string { return t.pos }
 
 type tests []*Test
@@ -327,8 +331,11 @@ type TestSuite struct {
 	tests  []*Test
 }
 
+// Runner returns the Test*-function's name which is executing given
+// test suite.
 func (s *TestSuite) Runner() string { return s.runner }
 
+// ForTest provides given test suite's tests.
 func (s *TestSuite) ForTest(cb func(*Test)) {
 	for _, t := range s.tests {
 		cb(t)
