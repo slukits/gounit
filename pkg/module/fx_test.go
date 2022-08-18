@@ -11,9 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"testing"
 
-	"github.com/slukits/gounit/pkg/fx"
+	"github.com/slukits/gounit"
 )
 
 type FxMask uint64
@@ -29,10 +28,16 @@ const (
 	// FxParsing indicates the creation of a testing package having the
 	// two test files with content fxParseA and fxParseB respectively.
 	FxParsing
+	// FxTidy runs go mod tidy in a created module fixture and caches
+	// the result for reuse.
+	FxTidy
 )
 
 var allFixtureSettings = []FxMask{
-	FxMod, FxTestingPackage, FxParsing}
+	FxMod, FxTestingPackage, FxParsing,
+	// Note FxTidy must be processed after FxMod
+	FxTidy,
+}
 
 const (
 	FxModuleName   = "example.com/gounit/module"
@@ -58,13 +63,17 @@ var (
 		"\t\"testing\"\n\n" +
 		"\t. \"github.com/slukits/gounit\"\n" +
 		")\n\n" +
-		fmt.Sprintf("func %s(t *testing.T) {}\n\n", fxTestA) +
+		fmt.Sprintf("func %s(t *testing.T) {\n", fxTestA) +
+		"\tt.Error(\"fixture test A: failed\")\n}\n\n" +
 		fmt.Sprintf("type %s struct{ Suite }\n\n", fxSuiteA) +
-		"func (s *FxSuiteA) Init(t *S) {}\n\n" +
+		"func (s *FxSuiteA) Init(t *S) {\n" +
+		"\tt.Log(\"log: suite a: init\")\n}\n\n" +
 		"func (s *FxSuiteA) SetUp(t *T) {}\n\n" +
 		"func (s *FxSuiteA) TearDown(t *T) {}\n\n" +
 		fmt.Sprintf(
-			"func (s *%s) %s(t *T) {}\n\n", fxSuiteA, fxStATest1) +
+			"func (s *%s) %s(t *T) {\n", fxSuiteA, fxStATest1) +
+		"\tt.Log(\"log: suite a: one\")\n" +
+		"\tt.Log(\"log: suite a: two\")\n}\n\n" +
 		"func (s *FxSuiteA) PublicHelper() {}\n\n" +
 		"func (s *FxSuiteA) Finalize(t *S) {}\n\n" +
 		fmt.Sprintf("func %s(t *testing.T) { Run(&%s{}, t) }\n\n",
@@ -76,17 +85,21 @@ var (
 		"\t\"testing\"\n\n" +
 		"\t\"github.com/slukits/gounit\"\n" +
 		")\n\n" +
-		fmt.Sprintf("func %s(t *testing.T) {}\n\n", fxTestB) +
+		fmt.Sprintf("func %s(t *testing.T) {\n", fxTestB) +
+		"\tt.Log(\"log: test b\")\n}\n\n" +
 		fmt.Sprintf("func (s *%s) %s(t *gounit.T) {}\n\n",
 			fxSuiteA, fxStATest2) +
 		"type FxSuiteB struct{ gounit.Suite }\n\n" +
-		"func (s *FxSuiteB) Init(t *gounit.S) {}\n\n" +
+		"func (s *FxSuiteB) Init(t *gounit.S) {\n" +
+		"\tt.Log(\"log: suite b: init\")\n}\n\n" +
 		"func (s *FxSuiteB) SetUp(t *gounit.T) {}\n\n" +
 		"func (s *FxSuiteB) TearDown(t *gounit.T) {}\n\n" +
-		fmt.Sprintf("func (s *%s) %s(t *gounit.T) {}\n\n",
+		fmt.Sprintf("func (s *%s) %s(t *gounit.T) {\n",
 			fxSuiteB, fxStBTest1) +
+		"\tt.True(false)\n}\n\n" +
 		"func (s *FxSuiteB) privateHelper(t *gounit.T) {}\n\n" +
-		"func (s *FxSuiteB) Finalize(t *gounit.S) {}\n\n" +
+		"func (s *FxSuiteB) Finalize(t *gounit.S) {\n" +
+		"\tt.Log(\"log: suite b: finalize\")\n}\n\n" +
 		fmt.Sprintf(
 			"func %s(t *testing.T) { gounit.Run(&%s{}, t) }\n\n",
 			fxBRunner, fxSuiteB,
@@ -98,14 +111,15 @@ var (
 // quit.
 type ModuleFX struct {
 	*Module
+	t      *gounit.T
 	fxWW   []chan struct{}
-	FxDir  *fx.Dir
+	FxDir  *gounit.TmpDir
 	n, tpN int
 }
 
-func NewFX(t *testing.T) *ModuleFX {
-	d := fx.NewDir(t)
-	return &ModuleFX{Module: &Module{Dir: d.Name}, FxDir: d}
+func NewFX(t *gounit.T) *ModuleFX {
+	d := t.FS().Tmp()
+	return &ModuleFX{Module: &Module{Dir: d.Path()}, t: t, FxDir: d}
 }
 
 func (x *ModuleFX) Set(ff FxMask) *ModuleFX {
@@ -124,20 +138,22 @@ func (x *ModuleFX) set(f FxMask) {
 		x.FxDir.MkMod(FxModuleName)
 	case FxTestingPackage:
 		packageName := x.newTestingPackageName()
-		x.FxDir.MkPath(packageName)
-		x.FxDir.MkPkgTest(packageName, fxTestFileName, fxTest)
-		x.FxDir.MkPkgFile(packageName, fxTestFileName, fxCode)
+		pkgDir, _ := x.FxDir.MkTmp(packageName)
+		pkgDir.MkPkgTest(fxTestFileName, fxTest)
+		pkgDir.MkPkgFile(fxTestFileName, fxCode)
 	case FxPackage:
 		packageName := x.newPackageName()
-		x.FxDir.MkPath(packageName)
-		x.FxDir.MkPkgFile(packageName, fxTestFileName, fxCode)
+		pkgDir, _ := x.FxDir.MkTmp(packageName)
+		pkgDir.MkPkgFile(fxTestFileName, fxCode)
 	case FxParsing:
 		packageName := x.newTestingPackageName()
-		x.FxDir.MkPath(packageName)
-		x.FxDir.MkPkgTest(packageName,
+		pkgDir, _ := x.FxDir.MkTmp(packageName)
+		pkgDir.MkPkgTest(
 			fmt.Sprintf("%sa", fxTestFileName), fxParseA)
-		x.FxDir.MkPkgTest(packageName,
+		pkgDir.MkPkgTest(
 			fmt.Sprintf("%sb", fxTestFileName), fxParseB)
+	case FxTidy:
+		x.FxDir.MkTidy()
 	}
 }
 
@@ -164,10 +180,18 @@ func (x *ModuleFX) ForTesting(cb func(string) (stop bool)) {
 }
 
 func (x *ModuleFX) RM(packageName string) {
-	err := os.RemoveAll(filepath.Join(x.FxDir.Name, packageName))
+	err := os.RemoveAll(filepath.Join(x.FxDir.Path(), packageName))
 	if err != nil {
-		x.FxDir.T.Fatalf("couldn't remove package '%s': %v",
+		x.t.Fatalf("couldn't remove package '%s': %v",
 			packageName, err)
+	}
+}
+
+func (x *ModuleFX) RMFile(relFile string) {
+	err := os.Remove(filepath.Join(x.FxDir.Path(), relFile))
+	if err != nil {
+		x.t.Fatalf("couldn't remove file '%s': %v",
+			filepath.Join(x.FxDir.Path(), relFile), err)
 	}
 }
 

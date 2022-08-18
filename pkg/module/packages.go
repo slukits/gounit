@@ -30,7 +30,7 @@ func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) {
 			continue
 		}
 		tp := &TestingPackage{
-			rel: ps.abs, abs: ps.abs, timeout: d.timeout}
+			id: ps.abs, abs: ps.abs, timeout: d.timeout}
 		if cb(tp) {
 			return
 		}
@@ -51,7 +51,7 @@ func (d *PackagesDiff) ForDel(cb func(*TestingPackage) (stop bool)) {
 			continue
 		}
 		tp := &TestingPackage{
-			rel: ps.abs, abs: ps.abs, parsed: true, timeout: 0}
+			id: ps.abs, abs: ps.abs, parsed: true, timeout: 0}
 		if cb(tp) {
 			return
 		}

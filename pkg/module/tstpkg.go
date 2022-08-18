@@ -5,10 +5,13 @@
 package module
 
 import (
+	"context"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -37,11 +40,11 @@ func (ps pkgStat) Rel() string { return ps.rel }
 // and test suites.  As well as the feature to execute and report on a
 // package's tests.
 type TestingPackage struct {
-	abs, rel string
-	timeout  time.Duration
-	parsed   bool
-	tests    tests
-	suites   suites
+	abs, id string
+	timeout time.Duration
+	parsed  bool
+	tests   tests
+	suites  suites
 }
 
 // Name returns the testing package's name.
@@ -51,10 +54,14 @@ func (tp TestingPackage) Name() string { return filepath.Base(tp.abs) }
 // doesn't include the packages name.
 func (tp TestingPackage) Abs() string { return filepath.Dir(tp.abs) }
 
-// Rel returns the module-relative path including the package name
-// itself.  I.e. Rel() is a module-global unique identifier of given
+// Rel returns the module relative path *to* the testing package, i.e. Rel
+// doesn't include the packages name.
+func (tp TestingPackage) Rel() string { return filepath.Dir(tp.id) }
+
+// ID returns the module-relative package path including the package's
+// name.  Hence ID() is a module-global unique identifier of given
 // package.
-func (tp TestingPackage) Rel() string { return tp.rel }
+func (tp TestingPackage) ID() string { return tp.id }
 
 // ForTest provides given testing package's tests.
 func (tp *TestingPackage) ForTest(cb func(*Test)) {
@@ -70,6 +77,48 @@ func (tp *TestingPackage) ForSuite(cb func(*TestSuite)) {
 	for _, s := range tp.suites {
 		cb(s)
 	}
+}
+
+const StdErr = "shell exit error: "
+
+// Run executes go test for the testing package an returns its result.
+// Returned error if any is the error of command execution, i.e. a
+// timeout.  While Result.Err reflects errors from the error console.
+// Note right before the Run executes its command the testing package's
+// test files are parsed to increase the likeliness that the parsed
+// result matches the ran tests.  I.e. time is saved if tests and test
+// suites are accessed after the call of Run.  The output of the go
+// testing tool is sadly not enough to report tests in the order they
+// were written if tests run concurrently.  Hence to achieve the goal
+// that the test reporting outlines the documentation and thought
+// process of the production code, i.e. tests are reported in the order
+// they were written, it is necessary to parse the test files separately
+// and then match the findings to the result of the test run.
+func (tp *TestingPackage) Run() (*Results, error) {
+	ctx, cancel := context.WithTimeout(
+		context.Background(), tp.timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", "test", "-json")
+	cmd.Dir = tp.abs
+	start := time.Now()
+	stdout, err := cmd.CombinedOutput()
+	if err != nil {
+		if _, ok := err.(*exec.ExitError); !ok {
+			return nil, fmt.Errorf("%s: %s", cmd.String(), string(stdout))
+		}
+	}
+	duration := time.Since(start)
+	rr, jsonErr := unmarshal(stdout)
+	if jsonErr != nil {
+		if err != nil {
+			return &Results{duration: time.Since(start),
+				err: fmt.Sprintf("%s%v: %s",
+					StdErr, err, string(stdout))}, nil
+		}
+		return &Results{duration: time.Since(start),
+			err: fmt.Sprintf("json-unmarshal stdout: %v", err)}, nil
+	}
+	return &Results{rr: rr, duration: duration}, nil
 }
 
 type testFile struct {

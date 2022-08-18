@@ -256,7 +256,7 @@ func (s *module) Reports_added_package_to_registered_watcher(t *T) {
 	init, n := (*PackagesDiff)(nil), 0
 	select {
 	case init = <-diff:
-	case <-t.Timeout(0):
+	case <-t.Timeout(30 * time.Millisecond):
 		t.Fatal("expected initial diff-report")
 	}
 	init.For(func(tp *TestingPackage) (stop bool) {
@@ -270,7 +270,7 @@ func (s *module) Reports_added_package_to_registered_watcher(t *T) {
 	add, n := (*PackagesDiff)(nil), 0
 	select {
 	case add = <-diff:
-	case <-t.Timeout(0):
+	case <-t.Timeout(30 * time.Millisecond):
 		t.Fatal("expected diff-report for added package")
 	}
 	add.For(func(tp *TestingPackage) (stop bool) {
@@ -291,7 +291,7 @@ func (s *module) Reports_deleted_package_to_registered_watcher(t *T) {
 	t.FatalOn(err)
 	select {
 	case <-diff:
-	case <-t.Timeout(20 * time.Millisecond):
+	case <-t.Timeout(30 * time.Millisecond):
 		t.Fatal("expected initial diff-report")
 	}
 
@@ -304,7 +304,7 @@ func (s *module) Reports_deleted_package_to_registered_watcher(t *T) {
 	del, n := (*PackagesDiff)(nil), 0
 	select {
 	case del = <-diff:
-	case <-t.Timeout(0):
+	case <-t.Timeout(30 * time.Millisecond):
 		t.Fatal("expected diff-report for deleted package")
 	}
 	del.ForDel(func(tp *TestingPackage) (stop bool) {
