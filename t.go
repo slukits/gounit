@@ -24,6 +24,17 @@ type T struct {
 	logger   func(...interface{})
 	errorer  func(...interface{})
 	canceler func()
+	fs       *FS
+}
+
+// NewT wraps given go testing.T instance.
+func NewT(t *testing.T) *T {
+	return &T{
+		t:        t,
+		logger:   t.Log,
+		errorer:  t.Error,
+		canceler: t.FailNow,
+	}
 }
 
 // GoT returns a pointer to wrapped testing.T instance which was created
@@ -129,6 +140,22 @@ func (t *T) Timeout(d time.Duration) chan struct{} {
 		close(done)
 	}()
 	return done
+}
+
+// FS returns an FS-instance with handy features for file system
+// operations for testing.  I.e. copying a "golden" test file from a
+// packages "testdata" directory to a test specific temporary directory
+// looks like this:
+//
+//	t.FS().Data().Copy(golden, t.FS().Temp())
+//
+// It also removes error handling for file system operations by simply
+// failing the test in case of an error.
+func (t *T) FS() *FS {
+	if t.fs == nil {
+		t.fs = &FS{t: t}
+	}
+	return t.fs
 }
 
 // InitPrefix prefixes logging-messages of the Init-method to enable the
