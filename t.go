@@ -33,7 +33,10 @@ func (t *T) GoT() *testing.T { return t.t }
 // Log writes given arguments to set logger which defaults to the logger
 // of wrapped *testing.T* instance.  The default may be overwritten by a
 // suite-embedder implementing the SuiteLogging interface.
-func (t *T) Log(args ...interface{}) { t.logger(args...) }
+func (t *T) Log(args ...interface{}) {
+	t.t.Helper()
+	t.logger(args...)
+}
 
 // Logf writes given format string leveraging Sprintf to set logger which
 // defaults to the logger of wrapped *testing.T* instance.  The default
