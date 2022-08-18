@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	. "github.com/slukits/gounit"
-	"github.com/slukits/gounit/pkg/fx"
 )
 
 type Util struct{ Suite }
@@ -16,21 +15,21 @@ type Util struct{ Suite }
 func (s *Util) SetUp(t *T) { t.Parallel() }
 
 func (s *Util) Reports_module_path_and_name_in_given_directory(t *T) {
-	exp := "github.com/slukits/test"
-	fx := fx.NewDir(t.GoT()).MkMod(exp)
-	_, path := fx.MkPath("dirA", "dirB", "dirC")
+	fx, exp := t.FS().Tmp(), "github.com/slukits/test"
+	fx.MkMod(exp)
+	nested, _ := fx.MkTmp("dirA", "dirB", "dirC")
 
-	gotDir, gotName, err := findModule(path)
+	gotDir, gotName, err := findModule(nested.Path())
 	t.FatalOn(err)
 
-	t.Eq(fx.Name, gotDir)
+	t.Eq(fx.Path(), gotDir)
 	t.Eq(exp, gotName)
 }
 
 func (s *Util) Reports_no_module_if_no_go_mod_in_given_path(t *T) {
-	_, path := fx.NewDir(t.GoT()).MkPath("dirA", "dirB", "dirC")
+	nested, _ := t.FS().Tmp().Mk("dirA", "dirB", "dirC")
 
-	_, _, err := findModule(path)
+	_, _, err := findModule(nested.Path())
 
 	t.FatalIfNot(t.True(err != nil))
 	t.ErrIs(err, ErrNoModule)

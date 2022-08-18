@@ -9,18 +9,18 @@ import (
 	"time"
 
 	. "github.com/slukits/gounit"
-	"github.com/slukits/gounit/pkg/fx"
 )
 
 func TestModuleDefaultsToWorkingDirectory(t *testing.T) {
-	fx, expMod := fx.NewDir(t).CWD(), "example.com/test_wd"
-	defer fx.Reset()
+	fx, expMod := NewT(t).FS().Tmp(), "example.com/test_wd"
+	undo := fx.CWD()
+	defer undo()
 	fx.MkMod(expMod)
 	m := Module{}
 	m.Watch()
 	defer m.QuitAll()
-	if fx.Name != m.Dir {
-		t.Errorf("expected module dir %s; got %s", fx.Name, m.Dir)
+	if fx.Path() != m.Dir {
+		t.Errorf("expected module dir %s; got %s", fx.Path(), m.Dir)
 	}
 	if expMod != m.Name() {
 		t.Errorf("expected module name %s; got %s", expMod, m.Name())
@@ -32,7 +32,7 @@ type module struct{ Suite }
 func (s *module) SetUp(t *T) { t.Parallel() }
 
 func (s *module) Fails_initial_watcher_registration_if_no_module(t *T) {
-	fx := NewFX(t.GoT())
+	fx := NewFX(t)
 	defer fx.QuitAll()
 	_, _, err := fx.Watch()
 	t.FatalIfNot(t.True(err != nil))
@@ -40,12 +40,12 @@ func (s *module) Fails_initial_watcher_registration_if_no_module(t *T) {
 }
 
 func (s *module) Is_not_watched_if_no_initial_watcher(t *T) {
-	fx := NewFX(t.GoT())
+	fx := NewFX(t)
 	t.False(fx.IsWatched())
 }
 
 func (s *module) Is_watched_having_registered_initial_watcher(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod)
+	fx := NewFX(t).Set(FxMod)
 	defer fx.QuitAll()
 
 	_, _, err := fx.Watch()
@@ -55,17 +55,17 @@ func (s *module) Is_watched_having_registered_initial_watcher(t *T) {
 }
 
 func (s *module) Reports_dir_after_initial_watcher(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod)
+	fx := NewFX(t).Set(FxMod)
 	defer fx.QuitAll()
 
 	_, _, err := fx.Watch()
 	t.FatalOn(err)
 
-	t.Eq(fx.FxDir.Name, fx.Dir)
+	t.Eq(fx.FxDir.Path(), fx.Dir)
 }
 
 func (s *module) Reports_name_after_initial_watcher(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod)
+	fx := NewFX(t).Set(FxMod)
 	defer fx.QuitAll()
 
 	_, _, err := fx.Watch()
@@ -75,7 +75,7 @@ func (s *module) Reports_name_after_initial_watcher(t *T) {
 }
 
 func (s *module) Reports_package_diffs_to_all_watcher(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	defer fx.QuitAll()
 	fx.Interval = 1 * time.Millisecond
 
@@ -100,7 +100,7 @@ func (s *module) Reports_package_diffs_to_all_watcher(t *T) {
 }
 
 func (s *module) Closes_diff_channel_if_watcher_quits(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	defer fx.QuitAll()
 	fx.Interval = 1 * time.Millisecond
 
@@ -121,7 +121,7 @@ func (s *module) Closes_diff_channel_if_watcher_quits(t *T) {
 }
 
 func (s *module) Is_unwatched_if_all_watcher_quit(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	defer fx.QuitAll()
 	fx.Interval = 1 * time.Millisecond
 	_, ID1, err := fx.Watch()
@@ -137,7 +137,7 @@ func (s *module) Is_unwatched_if_all_watcher_quit(t *T) {
 }
 
 func (s *module) Reserves_zero_quitting_for_quit_all(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
 
 	_, _, err := fx.Watch()
@@ -152,7 +152,7 @@ func (s *module) Reserves_zero_quitting_for_quit_all(t *T) {
 }
 
 func (s *module) Reports_initially_all_testing_packages(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Set(FxPackage | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
 	defer fx.QuitAll()
@@ -217,7 +217,7 @@ func testWatcher(
 }
 
 func (s *module) Reports_all_testing_packages_to_new_watcher(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Set(FxPackage | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
 	defer fx.QuitAll()
@@ -246,7 +246,7 @@ func (s *module) Reports_all_testing_packages_to_new_watcher(t *T) {
 }
 
 func (s *module) Reports_added_package_to_registered_watcher(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
 	defer fx.QuitAll()
 
@@ -282,7 +282,7 @@ func (s *module) Reports_added_package_to_registered_watcher(t *T) {
 }
 
 func (s *module) Reports_deleted_package_to_registered_watcher(t *T) {
-	fx := NewFX(t.GoT()).Set(FxMod | FxTestingPackage)
+	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Set(FxPackage | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
 	defer fx.QuitAll()
@@ -314,13 +314,6 @@ func (s *module) Reports_deleted_package_to_registered_watcher(t *T) {
 	})
 	t.Eq(1, n)
 }
-
-type dbg struct{ Suite }
-
-func (s *dbg) Dbg(t *T) {
-}
-
-func TestDBG(t *testing.T) { Run(&dbg{}, t) }
 
 func TestModule(t *testing.T) {
 	t.Parallel()
