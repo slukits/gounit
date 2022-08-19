@@ -10,6 +10,28 @@ import (
 	"time"
 )
 
+// A TMock instance is obtained by [T.Mock] and provides the
+// possibilities to mock logging, error handing and canceling a test
+// which default to [testing.T.Log], [testing.T.Error] and
+// [testing.T.FailNow].
+type TMock struct{ t *T }
+
+// Logger is the final call which does the actual logging for
+// t.Log*, t.Error* and t.Fatal*(...), i.e. this function will receive
+// all the log calls of these functions.
+func (m *TMock) Logger(l func(...interface{})) { m.t.logger = l }
+
+// Errorer the last function call of an error reporting function which
+// by default reports beck to the go testing framework indicating the
+// failing of the test ... if mocked the later is prevented.
+func (m *TMock) Errorer(e func(...interface{})) { m.t.errorer = e }
+
+// Canceler the last function call of an error canceling function like
+// Fatal which by default reports back to the go testing framework
+// to stop the test execution instantly ... if mocked the later is
+// prevented.
+func (m *TMock) Canceler(c func()) { m.t.canceler = c }
+
 // T instances are passed to suite tests providing means for logging,
 // assertion, failing, cancellation and concurrency-control for a test:
 //
@@ -35,6 +57,12 @@ func NewT(t *testing.T) *T {
 		errorer:  t.Error,
 		canceler: t.FailNow,
 	}
+}
+
+// Mock provides the options to mock test logging, error handling and
+// canceling.
+func (t *T) Mock() *TMock {
+	return &TMock{t: t}
 }
 
 // GoT returns a pointer to wrapped testing.T instance which was created
@@ -147,13 +175,13 @@ func (t *T) Timeout(d time.Duration) chan struct{} {
 // packages "testdata" directory to a test specific temporary directory
 // looks like this:
 //
-//	t.FS().Data().Copy(golden, t.FS().Temp())
+//	t.FS().Data().CopyFl(golden, t.FS().Temp())
 //
 // It also removes error handling for file system operations by simply
 // failing the test in case of an error.
 func (t *T) FS() *FS {
 	if t.fs == nil {
-		t.fs = &FS{t: t}
+		t.fs = &FS{t: t, tools: defaultFSTools}
 	}
 	return t.fs
 }

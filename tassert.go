@@ -309,6 +309,7 @@ const panicsErr = "given function doesn't panic"
 func (t *T) Panics(f func(), msg ...interface{}) (hasPanicked bool) {
 	t.t.Helper()
 	defer func() {
+		t.t.Helper()
 		if r := recover(); r == nil {
 			t.Errorf(assertErr, "panics", panicsErr)
 			hasPanicked = false

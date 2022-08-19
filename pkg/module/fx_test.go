@@ -139,19 +139,19 @@ func (x *ModuleFX) set(f FxMask) {
 	case FxTestingPackage:
 		packageName := x.newTestingPackageName()
 		pkgDir, _ := x.FxDir.MkTmp(packageName)
-		pkgDir.MkPkgTest(fxTestFileName, fxTest)
-		pkgDir.MkPkgFile(fxTestFileName, fxCode)
+		pkgDir.MkPkgTest(fxTestFileName, []byte(fxTest))
+		pkgDir.MkPkgFile(fxTestFileName, []byte(fxCode))
 	case FxPackage:
 		packageName := x.newPackageName()
 		pkgDir, _ := x.FxDir.MkTmp(packageName)
-		pkgDir.MkPkgFile(fxTestFileName, fxCode)
+		pkgDir.MkPkgFile(fxTestFileName, []byte(fxCode))
 	case FxParsing:
 		packageName := x.newTestingPackageName()
 		pkgDir, _ := x.FxDir.MkTmp(packageName)
 		pkgDir.MkPkgTest(
-			fmt.Sprintf("%sa", fxTestFileName), fxParseA)
+			fmt.Sprintf("%sa", fxTestFileName), []byte(fxParseA))
 		pkgDir.MkPkgTest(
-			fmt.Sprintf("%sb", fxTestFileName), fxParseB)
+			fmt.Sprintf("%sb", fxTestFileName), []byte(fxParseB))
 	case FxTidy:
 		x.FxDir.MkTidy()
 	}
