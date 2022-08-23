@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package gounit
+package fs
 
 import (
 	"io"
@@ -16,7 +16,7 @@ type FSfx struct {
 	mock *fsTMocker
 }
 
-func NewFS(t *T) *FSfx {
+func NewFX(t Tester) *FSfx {
 	return &FSfx{FS: t.FS()}
 }
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package gounit
+package fs
 
 import (
 	"bufio"
@@ -16,8 +16,16 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"testing"
 	"time"
 )
+
+type Tester interface {
+	Fatal(...interface{})
+	Fatalf(string, ...interface{})
+	GoT() *testing.T
+	FS() *FS
+}
 
 // FS provides filesystem operation specifically for testing, e.g.
 // without error handling, preset file/dir-mod, restricted to temporary
@@ -25,9 +33,13 @@ import (
 // file system operations fatal associated testing instance; failing
 // undo function calls panic.
 type FS struct {
-	t     *T
+	t     Tester
 	td    *Dir
 	tools *fsTools
+}
+
+func New(t Tester) *FS {
+	return &FS{t: t, tools: defaultFSTools}
 }
 
 // tls provides the file system tools to created Dir and TmpDir instances.
@@ -88,7 +100,7 @@ func (fs *FS) Tmp() *Dir {
 // replaces error handling by failing the test.  The zero value of a Dir
 // instance is *NOT* usable.  Use [T.FS] to obtain a Dir-instance.
 type Dir struct {
-	t    *T
+	t    Tester
 	fs   func() *fsTools
 	path string
 }

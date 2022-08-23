@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/slukits/gounit/pkg/fs"
 )
 
 // A TMock instance is obtained by [T.Mock] and provides the
@@ -52,7 +54,7 @@ type T struct {
 	logger   func(...interface{})
 	errorer  func(...interface{})
 	canceler func()
-	fs       *FS
+	fs       *fs.FS
 }
 
 // NewT wraps given go testing.T instance.
@@ -185,9 +187,9 @@ func (t *T) Timeout(d time.Duration) chan struct{} {
 //
 // It also removes error handling for file system operations by simply
 // failing the test in case of an error.
-func (t *T) FS() *FS {
+func (t *T) FS() *fs.FS {
 	if t.fs == nil {
-		t.fs = &FS{t: t, tools: defaultFSTools}
+		t.fs = fs.New(t)
 	}
 	return t.fs
 }
