@@ -198,17 +198,17 @@ func (d *Dir) Copy(toDir Pather) (undo func()) {
 	}
 }
 
-// Diff return true if given dir and given path have the same [fp.Base],
+// Eq return true if given dir and given path have the same [fp.Base],
 // both contain the same directory structure with the same files whereas
 // two files are considered the same iff they have the same name, the
 // same size and the same mode.  I.e. the content of two files is not
-// compared.  Otherwise Diff returns false.  Diff fatales associated
+// compared.  Otherwise Eq returns false.  Eq fatales associated
 // testing instance if any of the executed file system operations fails.
 // Note this implementation could be more efficient by avoiding the
 // FileInfo calculation in case of directories.  Since the typical use
 // case in testing are simple local directory structures I haven't
 // jumped through this hoop yet.
-func (d *Dir) Diff(p Pather) bool {
+func (d *Dir) Eq(p Pather) bool {
 
 	src, dest := fp.Dir(d.path), fp.Dir(p.Path())
 	srcFI, err := d.fs().Stat(d.path)

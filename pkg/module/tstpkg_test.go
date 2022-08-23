@@ -239,7 +239,7 @@ func (s *PkgTestRun) Reports_suite_test_logs(t *T) {
 	})
 }
 
-func (s *PkgTestRun) Test_run_reports_suit_init_logs(t *T) {
+func (s *PkgTestRun) Test_run_reports_suit_init_finalize_logs(t *T) {
 	s.pkg.ForSuite(func(st *TestSuite) {
 		sr := s.rslt.OfSuite(st)
 		switch st.Name() {

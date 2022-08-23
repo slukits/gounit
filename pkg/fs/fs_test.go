@@ -217,7 +217,7 @@ func (s *ADir) Copies_its_file_structure_to_an_other_dir(t *T) {
 
 	d1.Copy(d2)
 
-	t.True(d2.Child("base").Diff(d1))
+	t.True(d2.Child("base").Eq(d1))
 }
 
 func fxTwoDirs(t *T) (fx *fs.FSfx, _, _, nested *fs.Dir, file string) {
@@ -345,7 +345,7 @@ func (s *ADirDiff) Fails_if_given_directories_have_different_bases(t *T) {
 	d1, d2 := t.FS().Tmp(), t.FS().Tmp()
 	t.FatalIfNot(t.False(fp.Base(d1.Path()) == fp.Base(d2.Path())))
 
-	t.False(d1.Diff(d2))
+	t.False(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fails_if_dirs_have_not_the_same_amounts_of_files(
@@ -355,7 +355,7 @@ func (s *ADirDiff) Fails_if_dirs_have_not_the_same_amounts_of_files(
 	d2, _ := t.FS().Tmp().Mk("base")
 	d1.MkFile("not_in.txt", []byte("compassion"))
 
-	t.False(d1.Diff(d2))
+	t.False(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fails_if_directories_have_not_the_same_files(t *T) {
@@ -364,7 +364,7 @@ func (s *ADirDiff) Fails_if_directories_have_not_the_same_files(t *T) {
 	d1.MkFile("not_in.txt1", []byte("compassion"))
 	d2.MkFile("not_in.txt2", []byte("compassion"))
 
-	t.False(d1.Diff(d2))
+	t.False(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fails_having_common_files_with_different_mode(t *T) {
@@ -374,7 +374,7 @@ func (s *ADirDiff) Fails_having_common_files_with_different_mode(t *T) {
 	d2.MkFile("file.txt", []byte("compassion"))
 	t.FatalOn(os.Chmod(fp.Join(d1.Path(), "file.txt"), 0622))
 
-	t.False(d1.Diff(d2))
+	t.False(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fails_having_common_files_with_different_size(t *T) {
@@ -383,7 +383,7 @@ func (s *ADirDiff) Fails_having_common_files_with_different_size(t *T) {
 	d1.MkFile("file.txt", []byte("compassion"))
 	d2.MkFile("file.txt", []byte("wisdom"))
 
-	t.False(d1.Diff(d2))
+	t.False(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fatales_if_nested_dir_cant_be_red(t *T) {
@@ -397,7 +397,7 @@ func (s *ADirDiff) Fatales_if_nested_dir_cant_be_red(t *T) {
 		return []gofs.DirEntry{}, errors.New("mock-err")
 	})
 
-	d1.Diff(d2)
+	d1.Eq(d2)
 
 	t.True(fatales)
 }
@@ -424,7 +424,7 @@ func (s *ADirDiff) Fatales_if_nested_dir_s_file_info_cant_be_obtained(
 		return []gofs.DirEntry{&dirInfoMock{}}, nil
 	})
 
-	d1.Diff(d2)
+	d1.Eq(d2)
 
 	t.True(fatales)
 }
@@ -437,7 +437,7 @@ func (s *ADirDiff) Passes_if_non_of_the_above(t *T) {
 	n1.MkFile("file.txt", []byte("108"))
 	n2.MkFile("file.txt", []byte("108"))
 
-	t.True(d1.Diff(d2))
+	t.True(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fatales_if_the_dirs_file_info_cant_be_obtained(t *T) {
@@ -455,7 +455,7 @@ func (s *ADirDiff) Fatales_if_the_dirs_file_info_cant_be_obtained(t *T) {
 		return nil, errors.New("mock-err")
 	})
 
-	t.Panics(func() { d1.Diff(d2) })
+	t.Panics(func() { d1.Eq(d2) })
 
 	t.Eq(2, fail)
 }
@@ -483,7 +483,7 @@ func (s *Testdata) fxMoveTestdata(t *T) func() {
 	tmp := t.FS().Tmp()
 	td, _ := t.FS().Data()
 	td.Copy(tmp)
-	if !tmp.Child(fp.Base(td.Path())).Diff(td) {
+	if !tmp.Child(fp.Base(td.Path())).Eq(td) {
 		panic("consistency error: copied directory should be " +
 			"equal to source.")
 	}

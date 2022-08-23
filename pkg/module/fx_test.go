@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/slukits/gounit"
+	"github.com/slukits/gounit/pkg/fs"
 )
 
 type FxMask uint64
@@ -113,7 +114,7 @@ type ModuleFX struct {
 	*Module
 	t      *gounit.T
 	fxWW   []chan struct{}
-	FxDir  *gounit.Dir
+	FxDir  *fs.Dir
 	n, tpN int
 }
 
