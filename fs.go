@@ -40,29 +40,37 @@ func (fs *FS) tls() *fsTools { return fs.tools }
 // subsequent calls to Data after it has been created at the first call.
 func (fs *FS) Data() (_ *Dir, undo func()) {
 	if fs.td != nil {
-		return fs.td, nil
+		if _, err := os.Stat(fs.td.path); err == nil {
+			return fs.td, nil
+		}
 	}
-	_, f, _, ok := fs.tools.Caller(2)
+	_, f, _, ok := fs.tools.Caller(1)
 	if !ok {
 		fs.t.Fatal("gounit: fs: testdata: can't determine caller")
 	}
 
+	return fs.Dir(fp.Join(fp.Dir(f), "testdata"))
+}
+
+// Dir wraps given path in a directory which is created if not existing.
+// In the later case an undo function is returned to undo the directory
+// creation.
+func (fs *FS) Dir(path string) (_ *Dir, undo func()) {
 	created := false
-	tdDir := fp.Join(fp.Dir(f), "testdata")
-	if _, err := fs.tools.Stat(tdDir); err != nil {
-		if err := fs.tools.Mkdir(tdDir, 0711); err != nil {
+	if _, err := fs.tools.Stat(path); err != nil {
+		if err := fs.tools.MkdirAll(path, 0711); err != nil {
 			fs.t.Fatal("gounit: fs: testdata: create: %v", err)
 		}
 		created = true
 	}
-	fs.td = &Dir{t: fs.t, path: tdDir, fs: fs.tls}
+	fs.td = &Dir{t: fs.t, path: path, fs: fs.tls}
 
 	if !created {
 		return fs.td, nil
 	}
 
 	return fs.td, func() {
-		if err := fs.tools.RemoveAll(tdDir); err != nil {
+		if err := fs.tools.RemoveAll(path); err != nil {
 			panic(err)
 		}
 	}
@@ -71,16 +79,14 @@ func (fs *FS) Data() (_ *Dir, undo func()) {
 // Tmp creates a new unique temporary directory bound to associated
 // testing instance.  Associated testing instance fatales if the temp
 // directory creation fails.
-func (fs *FS) Tmp() *TmpDir {
-	return &TmpDir{
-		Dir: Dir{t: fs.t, path: fs.t.GoT().TempDir(), fs: fs.tls}}
+func (fs *FS) Tmp() *Dir {
+	return &Dir{t: fs.t, path: fs.t.GoT().TempDir(), fs: fs.tls}
 }
 
 // Dir provides file system operations inside its path, i.e. either a
-// temporary directory or a a package's testdata directory.  It replaces
-// error handling by failing the test using a Dir instance.  The zero
-// value of a Dir instance is *NOT* usable.  Use gounit.T testing
-// instance's [t.FS]-method to obtain a Dir-instance.
+// temporary directory or (in) a a package's testdata directory.  It
+// replaces error handling by failing the test.  The zero value of a Dir
+// instance is *NOT* usable.  Use [T.FS] to obtain a Dir-instance.
 type Dir struct {
 	t    *T
 	fs   func() *fsTools
@@ -90,11 +96,27 @@ type Dir struct {
 // Path returns the directory's directory, och, path.
 func (d *Dir) Path() string { return d.path }
 
+// Child returns a Dir from given directory with given name.  Child
+// fatales if child's file info can't be obtained of if child is not a
+// directory.
+func (d *Dir) Child(name string) *Dir {
+	stt, err := d.fs().Stat(fp.Join(d.path, name))
+	if err != nil {
+		d.t.Fatalf("gounit: fs: dir: child: %s: %v", name, err)
+	}
+	if !stt.IsDir() {
+		d.t.Fatalf("gounit: fs: dir: child: %s: is no directory", name)
+	}
+	return &Dir{t: d.t, fs: d.fs, path: fp.Join(d.path, name)}
+}
+
 type Pather interface{ Path() string }
 
-// Copy copies given directory to given path.  Note only regular files and
-// symlinks are supported.  Copy fatales on other irregular files.
-func (d *Dir) Copy(toDir Pather) {
+// Copy copies given (base) directory to given path.  Note next to
+// directories only regular files and symlinks are supported.  Copy
+// fatales on other irregular files as well as on any failing filesystem
+// operation.  A failing undo panics.
+func (d *Dir) Copy(toDir Pather) (undo func()) {
 
 	err := d.fs().Walk(d.path, func(
 		path string, info fs.FileInfo, err error,
@@ -104,11 +126,14 @@ func (d *Dir) Copy(toDir Pather) {
 			return err
 		}
 
-		dest := fp.Join(
-			toDir.Path(), strings.TrimPrefix(path, d.path))
+		dstPath := fp.Join(
+			toDir.Path(), strings.TrimPrefix(path, fp.Dir(d.path)))
 
 		if info.IsDir() {
-			d.fs().MkdirAll(dest, info.Mode())
+			err := d.fs().MkdirAll(dstPath, info.Mode())
+			if err != nil {
+				return err
+			}
 			return nil // means recursive
 		}
 
@@ -119,7 +144,7 @@ func (d *Dir) Copy(toDir Pather) {
 				if err != nil {
 					return err
 				}
-				return d.fs().Symlink(link, dest)
+				return d.fs().Symlink(link, dstPath)
 			}
 			return fmt.Errorf(
 				"gounit: fs: dir: copy: can't handle file: %s",
@@ -127,26 +152,37 @@ func (d *Dir) Copy(toDir Pather) {
 			)
 		}
 
-		in, _ := d.fs().Open(path)
+		src, err := d.fs().Open(path)
 		if err != nil {
 			return err
 		}
-		defer in.Close()
+		defer src.Close()
 
-		fh, err := d.fs().Create(dest)
+		dst, err := d.fs().Create(dstPath)
 		if err != nil {
 			return err
 		}
-		defer fh.Close()
+		defer dst.Close()
 
-		fh.Chmod(info.Mode())
+		if _, err = d.fs().Copy(dst, src); err != nil {
+			return err
+		}
+		if err := d.fs().Chmod(dstPath, info.Mode()); err != nil {
+			return err
+		}
 
-		_, err = io.Copy(fh, in)
 		return err
 	})
 
 	if err != nil {
 		d.t.Fatalf("gounit: fs: dir: copy: %v", err)
+	}
+
+	return func() {
+		dir := fp.Join(toDir.Path(), fp.Base(d.path))
+		if err := d.fs().RemoveAll(dir); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -165,11 +201,11 @@ func (d *Dir) Diff(p Pather) bool {
 	src, dest := fp.Dir(d.path), fp.Dir(p.Path())
 	srcFI, err := d.fs().Stat(d.path)
 	if err != nil {
-		d.t.Fatal("gounit: fs: dir: diff: %v", err)
+		d.t.Fatalf("gounit: fs: dir: diff: %v", err)
 	}
 	dstFI, err := d.fs().Stat(p.Path())
 	if err != nil {
-		d.t.Fatal("gounit: fs: dir: diff: %v", err)
+		d.t.Fatalf("gounit: fs: dir: diff: %v", err)
 	}
 	// "stack" for sources relative to src
 	ss := map[string]fs.FileInfo{srcFI.Name(): srcFI}
@@ -177,6 +213,9 @@ func (d *Dir) Diff(p Pather) bool {
 	dd := map[string]fs.FileInfo{dstFI.Name(): dstFI}
 
 	for len(ss) > 0 {
+		if len(ss) != len(dd) {
+			return false
+		}
 		for k := range ss { // check files/dirs for equality
 			if _, ok := dd[k]; !ok {
 				return false
@@ -217,6 +256,7 @@ func (d *Dir) replaceDirWithContent(
 		fi, err := e.Info()
 		if err != nil {
 			d.t.Fatal("gounit: fs: dir: diff: %v", err)
+			return
 		}
 		(*m)[fp.Join(dir, e.Name())] = fi
 	}
@@ -292,20 +332,9 @@ func (d *Dir) FileContent(relName string) []byte {
 	return bb
 }
 
-// TmpDir is a temporary directory created for testing.  It adds to
-// features of its embedded Dir instance the possibility to make it the
-// working directory.  Or to create a temporary go module with go mod
-// file, packages and go mod tidy to resolve imports. (to save time
-// go.mod and go.sum are cached if possible.)  The zero value of a Dir
-// instance is *NOT* usable.  Use gounit.T testing instance's
-// [t.FS]-method to obtain a TmpDir-instance.
-type TmpDir struct {
-	Dir
-}
-
 // MkMod adds to given directory a go.mod file with given module name.
 // It fatales/panics iff subsequent [Dir.AddFile] call fatales/panics.
-func (d *TmpDir) MkMod(module string) (reset func()) {
+func (d *Dir) MkMod(module string) (reset func()) {
 	os.UserCacheDir()
 	return d.MkFile("go.mod", []byte(fmt.Sprintf("module %s", module)))
 }
@@ -314,7 +343,7 @@ func (d *TmpDir) MkMod(module string) (reset func()) {
 // references needed by its packages.  Once successfully executed go.mod
 // and go.sum are cached in the users caching path's gounit directory.
 // This cached files are considered stale every 24 hours.
-func (d *TmpDir) MkTidy() {
+func (d *Dir) MkTidy() {
 	mdlName := d.moduleName()
 	if mdlName == "" {
 		d.t.Fatal("gounit: fs: tmp-dir: mk-tidy: missing module name")
@@ -326,7 +355,7 @@ func (d *TmpDir) MkTidy() {
 // the user's caching path's gounit directory.  If that is not possible
 // it is tried to created needed files by calling go mod tidy and to
 // cache them.
-func (d *TmpDir) mkGoModSum(module string) {
+func (d *Dir) mkGoModSum(module string) {
 	modFl := fp.Join(d.path, "go.mod")
 	sumFl := fp.Join(d.path, "go.sum")
 	mod, sum, ok := goModSumFromCache(d.fs(), module)
@@ -405,7 +434,7 @@ func goModSumToCache(fs *fsTools, module string, bbMod, bbSum []byte) {
 	fs.WriteFile(sumCache, bbSum, 0644)
 }
 
-func (d *TmpDir) moduleName() string {
+func (d *Dir) moduleName() string {
 	goMod, err := d.fs().Open(fp.Join(d.path, "go.mod"))
 	if err != nil {
 		d.t.Fatalf("gounit: fs: tmp-dir: module-name: %v", err)
@@ -430,7 +459,7 @@ var rePkgComment = regexp.MustCompile(`(?s)^(\s*?\n|// .*?\n|/\*.*\*/)*`)
 
 // MkPkgFile adds a file with given content prefixing its content with a
 // package declaration and suffixing given file name with ".go" if missing.
-func (d *TmpDir) MkPkgFile(name string, content []byte) (undo func()) {
+func (d *Dir) MkPkgFile(name string, content []byte) (undo func()) {
 	pkg := fp.Base(d.path)
 	if !bytes.Contains(content, []byte(fmt.Sprintf("package %s", pkg))) {
 		content = rePkgComment.ReplaceAll(
@@ -446,23 +475,18 @@ func (d *TmpDir) MkPkgFile(name string, content []byte) (undo func()) {
 // MkPkgTest adds a test file with given content prefixing its content
 // with a package declaration and suffixes "_test.go" to the name if
 // missing.
-func (d *TmpDir) MkPkgTest(name string, content []byte) (undo func()) {
+func (d *Dir) MkPkgTest(name string, content []byte) (undo func()) {
 	if !strings.HasSuffix(name, "_test.go") {
 		name = fmt.Sprintf("%s%s", name, "_test.go")
 	}
 	return d.MkPkgFile(name, content)
 }
 
-func (td *TmpDir) MkTmp(dir string, path ...string) (_ *TmpDir, undo func()) {
-	new, undo := td.Mk(dir, path...)
-	return &TmpDir{Dir: *new}, undo
-}
-
 // CWD changes the current working directory to given temporary
 // directory and returns a function to undo this change.  CWD fatales
 // given testing instance if given directory if the working directory
 // change fails.  It panics if the undo fails.
-func (td *TmpDir) CWD() (undo func()) {
+func (td *Dir) CWD() (undo func()) {
 	wd, err := os.Getwd()
 	if err != nil {
 		td.t.Fatalf("gounit: fs: tmp-dir: cwd: get: %v", err)
@@ -516,6 +540,12 @@ type fsTools struct {
 	// WriteFile defaults to and has the semantics of os.WriteFile
 	WriteFile func(string, []byte, fs.FileMode) error
 
+	// Chmod defaults to and has the semantics of os.Chmod
+	Chmod func(string, fs.FileMode) error
+
+	// Copy defaults to and has the semantics of io.Copy
+	Copy func(io.Writer, io.Reader) (int64, error)
+
 	// Walk defaults to and has the semantics of filepath.Walk
 	Walk func(string, fp.WalkFunc) error
 
@@ -536,6 +566,8 @@ func (t *fsTools) copy() *fsTools {
 		ReadDir:   t.ReadDir,
 		ReadFile:  t.ReadFile,
 		WriteFile: t.WriteFile,
+		Chmod:     t.Chmod,
+		Copy:      t.Copy,
 		Walk:      t.Walk,
 		Caller:    t.Caller,
 	}
@@ -554,6 +586,8 @@ var defaultFSTools = func() *fsTools {
 		ReadDir:   os.ReadDir,
 		ReadFile:  os.ReadFile,
 		WriteFile: os.WriteFile,
+		Chmod:     os.Chmod,
+		Copy:      io.Copy,
 		Walk:      fp.Walk,
 		Caller:    runtime.Caller,
 	}

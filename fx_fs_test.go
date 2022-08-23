@@ -5,6 +5,7 @@
 package gounit
 
 import (
+	"io"
 	"io/fs"
 	"os"
 	fp "path/filepath"
@@ -67,32 +68,42 @@ func (m *fsTMocker) Symlink(f func(string, string) error) {
 	m.fs.tools.Symlink = f
 }
 
-// Open defaults to and has the semantics of os.Open
+// Open defaults to and has the semantics of os.Open.
 func (m *fsTMocker) Open(f func(string) (*os.File, error)) {
 	m.fs.tools.Open = f
 }
 
-// Create defaults to and has the semantics of os.Create
+// Create defaults to and has the semantics of os.Create.
 func (m *fsTMocker) Create(f func(string) (*os.File, error)) {
 	m.fs.tools.Create = f
 }
 
-// ReadDir defaults to and has the semantics of os.ReadDir
+// ReadDir defaults to and has the semantics of os.ReadDir.
 func (m *fsTMocker) ReadDir(f func(string) ([]fs.DirEntry, error)) {
 	m.fs.tools.ReadDir = f
 }
 
-// ReadFile defaults to and has the semantics of os.ReadFile
+// ReadFile defaults to and has the semantics of os.ReadFile.
 func (m *fsTMocker) ReadFile(f func(string) ([]byte, error)) {
 	m.fs.tools.ReadFile = f
 }
 
-// WriteFile defaults to and has the semantics of os.WriteFile
+// WriteFile defaults to and has the semantics of os.WriteFile.
 func (m *fsTMocker) WriteFile(f func(string, []byte, fs.FileMode) error) {
 	m.fs.tools.WriteFile = f
 }
 
-// Walk defaults to and has the semantics of filepath.Walk
+// Chmod defaults to and has the semantics of os.Chmod.
+func (m *fsTMocker) Chmod(f func(string, fs.FileMode) error) {
+	m.fs.tools.Chmod = f
+}
+
+// Copy defaults to and has the semantics of io.Copy
+func (m *fsTMocker) Copy(f func(io.Writer, io.Reader) (int64, error)) {
+	m.fs.tools.Copy = f
+}
+
+// Walk defaults to and has the semantics of filepath.Walk.
 func (m *fsTMocker) Walk(f func(string, fp.WalkFunc) error) {
 	m.fs.tools.Walk = f
 }

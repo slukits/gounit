@@ -113,13 +113,14 @@ type ModuleFX struct {
 	*Module
 	t      *gounit.T
 	fxWW   []chan struct{}
-	FxDir  *gounit.TmpDir
+	FxDir  *gounit.Dir
 	n, tpN int
 }
 
 func NewFX(t *gounit.T) *ModuleFX {
 	d := t.FS().Tmp()
-	return &ModuleFX{Module: &Module{Dir: d.Path()}, t: t, FxDir: d}
+	return &ModuleFX{
+		Module: &Module{Dir: d.Path()}, t: t, FxDir: d}
 }
 
 func (x *ModuleFX) Set(ff FxMask) *ModuleFX {
@@ -138,16 +139,16 @@ func (x *ModuleFX) set(f FxMask) {
 		x.FxDir.MkMod(FxModuleName)
 	case FxTestingPackage:
 		packageName := x.newTestingPackageName()
-		pkgDir, _ := x.FxDir.MkTmp(packageName)
+		pkgDir, _ := x.FxDir.Mk(packageName)
 		pkgDir.MkPkgTest(fxTestFileName, []byte(fxTest))
 		pkgDir.MkPkgFile(fxTestFileName, []byte(fxCode))
 	case FxPackage:
 		packageName := x.newPackageName()
-		pkgDir, _ := x.FxDir.MkTmp(packageName)
+		pkgDir, _ := x.FxDir.Mk(packageName)
 		pkgDir.MkPkgFile(fxTestFileName, []byte(fxCode))
 	case FxParsing:
 		packageName := x.newTestingPackageName()
-		pkgDir, _ := x.FxDir.MkTmp(packageName)
+		pkgDir, _ := x.FxDir.Mk(packageName)
 		pkgDir.MkPkgTest(
 			fmt.Sprintf("%sa", fxTestFileName), []byte(fxParseA))
 		pkgDir.MkPkgTest(

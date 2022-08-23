@@ -17,7 +17,7 @@ func (s *Util) SetUp(t *T) { t.Parallel() }
 func (s *Util) Reports_module_path_and_name_in_given_directory(t *T) {
 	fx, exp := t.FS().Tmp(), "github.com/slukits/test"
 	fx.MkMod(exp)
-	nested, _ := fx.MkTmp("dirA", "dirB", "dirC")
+	nested, _ := fx.Mk("dirA", "dirB", "dirC")
 
 	gotDir, gotName, err := findModule(nested.Path())
 	t.FatalOn(err)

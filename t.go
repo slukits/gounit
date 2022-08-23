@@ -32,6 +32,12 @@ func (m *TMock) Errorer(e func(...interface{})) { m.t.errorer = e }
 // prevented.
 func (m *TMock) Canceler(c func()) { m.t.canceler = c }
 
+func (m *TMock) Reset() {
+	m.t.logger = m.t.GoT().Log
+	m.t.errorer = m.t.GoT().Error
+	m.t.canceler = m.t.GoT().FailNow
+}
+
 // T instances are passed to suite tests providing means for logging,
 // assertion, failing, cancellation and concurrency-control for a test:
 //
