@@ -262,12 +262,12 @@ func (d *Dir) replaceDirWithContent(
 	delete(*m, dir)
 	ee, err := d.fs().ReadDir(fp.Join(parent, dir))
 	if err != nil {
-		d.t.Fatal("gounit: fs: dir: diff: %v", err)
+		d.t.Fatalf("gounit: fs: dir: diff: %v", err)
 	}
 	for _, e := range ee {
 		fi, err := e.Info()
 		if err != nil {
-			d.t.Fatal("gounit: fs: dir: diff: %v", err)
+			d.t.Fatalf("gounit: fs: dir: diff: %v", err)
 			return
 		}
 		(*m)[fp.Join(dir, e.Name())] = fi
@@ -280,11 +280,11 @@ func (d *Dir) replaceDirWithContent(
 func (d *Dir) CopyFl(file string, toDir Pather) (undo func()) {
 	bb, err := d.fs().ReadFile(fp.Join(d.path, file))
 	if err != nil {
-		d.t.Fatal("gounit: fs: dir: copy: read: %s: %v", file, err)
+		d.t.Fatalf("gounit: fs: dir: copy: read: %s: %v", file, err)
 	}
 	err = d.fs().WriteFile(fp.Join(toDir.Path(), file), bb, 0644)
 	if err != nil {
-		d.t.Fatal("gounit: fs: dir: copy: write: %s: %v", file, err)
+		d.t.Fatalf("gounit: fs: dir: copy: write: %s: %v", file, err)
 	}
 	return func() {
 		if err := d.fs().Remove(fp.Join(toDir.Path(), file)); err != nil {

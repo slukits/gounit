@@ -152,13 +152,13 @@ func (s *PkgTestRun) Reports_a_result_for_each_test(t *T) {
 	})
 }
 
-func (s *PkgTestRun) Tests_run_reports_a_result_for_each_suite(t *T) {
+func (s *PkgTestRun) Reports_a_result_for_each_suite(t *T) {
 	s.pkg.ForSuite(func(tst *TestSuite) {
 		t.True(s.rslt.OfSuite(tst) != nil)
 	})
 }
 
-func (s *PkgTestRun) Tests_run_reports_results_for_suite_tests(t *T) {
+func (s *PkgTestRun) Reports_results_for_suite_tests(t *T) {
 	s.pkg.ForSuite(func(st *TestSuite) {
 		st.ForTest(func(tst *Test) {
 			t.True(s.rslt.OfSuite(st).OfTest(tst) != nil)
@@ -166,7 +166,7 @@ func (s *PkgTestRun) Tests_run_reports_results_for_suite_tests(t *T) {
 	})
 }
 
-func (s *PkgTestRun) Tests_run_reports_failing_and_passing_of_tests(t *T) {
+func (s *PkgTestRun) Reports_failing_and_passing_of_tests(t *T) {
 	s.pkg.ForTest(func(tst *Test) {
 		switch tst.Name() {
 		case fxTestA:
@@ -177,7 +177,7 @@ func (s *PkgTestRun) Tests_run_reports_failing_and_passing_of_tests(t *T) {
 	})
 }
 
-func (s *PkgTestRun) Tests_run_reports_failing_and_passing_of_suite_tests(
+func (s *PkgTestRun) Reports_failing_and_passing_of_suite_tests(
 	t *T,
 ) {
 	s.pkg.ForSuite(func(ts *TestSuite) {
@@ -239,7 +239,7 @@ func (s *PkgTestRun) Reports_suite_test_logs(t *T) {
 	})
 }
 
-func (s *PkgTestRun) Test_run_reports_suit_init_finalize_logs(t *T) {
+func (s *PkgTestRun) Reports_suit_init_finalize_logs(t *T) {
 	s.pkg.ForSuite(func(st *TestSuite) {
 		sr := s.rslt.OfSuite(st)
 		switch st.Name() {

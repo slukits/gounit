@@ -18,24 +18,6 @@ import (
 	"time"
 )
 
-// A pkgStat is calculated to determine if a package changed in the
-// course of time.
-type pkgStat struct {
-	ModTime  time.Time
-	abs, rel string
-}
-
-// Name returns a testing package's name.
-func (ps pkgStat) Name() string { return filepath.Base(ps.abs) }
-
-// Abs returns the absolute path of a testing package, i.e. Abs
-// doesn't include the packages name.
-func (ps pkgStat) Abs() string { return filepath.Dir(ps.abs) }
-
-// Rel returns the module-relative path including the package itself.
-// I.e. Rel() is a module-global unique identifier of a testing package.
-func (ps pkgStat) Rel() string { return ps.rel }
-
 // A TestingPackage provides information on a module's package's tests
 // and test suites.  As well as the feature to execute and report on a
 // package's tests.
@@ -121,7 +103,7 @@ func (tp *TestingPackage) Run() (*Results, error) {
 	return &Results{rr: rr, duration: duration}, nil
 }
 
-type testFile struct {
+type testAst struct {
 	fs    *token.FileSet
 	af    *ast.File
 	guSlc string
@@ -137,7 +119,7 @@ func (tp *TestingPackage) ensureParsing() {
 		return
 	}
 
-	ff := []*testFile{}
+	ff := []*testAst{}
 	tt, ss := tests{}, suites{}
 	for _, e := range ee {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), "_test.go") {
@@ -150,7 +132,7 @@ func (tp *TestingPackage) ensureParsing() {
 			continue
 		}
 		guSlc := parseGoUnitSelector(af)
-		ff = append(ff, &testFile{fs: fs, af: af, guSlc: guSlc})
+		ff = append(ff, &testAst{fs: fs, af: af, guSlc: guSlc})
 		_tt, _ss := parseTestNSuites(fs, af, guSlc)
 		tt, ss = append(tt, _tt...), append(ss, _ss...)
 	}
@@ -189,7 +171,7 @@ func parseTestNSuites(
 	return tt, ss
 }
 
-func parseSuiteTests(ff []*testFile, ss suites) {
+func parseSuiteTests(ff []*testAst, ss suites) {
 	for _, tf := range ff {
 		ast.Inspect(tf.af, func(n ast.Node) bool {
 			if _, ok := n.(*ast.File); ok {
@@ -419,4 +401,62 @@ func (ss suites) has(name string) bool {
 		return true
 	}
 	return false
+}
+
+// A pkgStat is calculated to determine if a package changed in the
+// course of time.
+type pkgStat struct {
+	ModTime  time.Time
+	abs, rel string
+	tt       []*testFile
+}
+
+// Name returns a testing package's name.
+func (ps pkgStat) Name() string { return filepath.Base(ps.abs) }
+
+// Abs returns the absolute path *to* the stated testing package, i.e.
+// Abs doesn't include the packages name.
+func (ps pkgStat) Abs() string { return filepath.Dir(ps.abs) }
+
+// ID returns the module-relative path including the package itself.
+// I.e. ID() is a module-global unique identifier of a testing package.
+func (ps pkgStat) ID() string { return ps.rel }
+
+// loadTestFiles reads the test-files to find the first diff between
+// versions at different times of the same file.
+func (ps *pkgStat) loadTestFiles() error {
+	if ps.tt != nil {
+		ps.tt = nil
+	}
+	ee, err := os.ReadDir(ps.abs)
+	if err != nil {
+		return err
+	}
+
+	for _, e := range ee {
+		if !strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		stt, err := os.Stat(filepath.Join(ps.abs, e.Name()))
+		if err != nil {
+			return err
+		}
+		bb, err := os.ReadFile(filepath.Join(ps.abs, e.Name()))
+		if err != nil {
+			return err
+		}
+		ps.tt = append(
+			ps.tt, &testFile{
+				modTime: stt.ModTime(),
+				name:    filepath.Join(ps.abs, e.Name()),
+				content: bb,
+			})
+	}
+	return nil
+}
+
+type testFile struct {
+	modTime time.Time
+	name    string
+	content []byte
 }

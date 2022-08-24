@@ -10,6 +10,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -23,8 +24,11 @@ type PackagesDiff struct {
 }
 
 // For returns all testing packages which were updated since the last
-// reported diff.
+// reported diff in ascending order to their last modification time.
 func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) {
+	sort.Slice(d.current.pp, func(i, j int) bool {
+		return d.current.pp[i].ModTime.Before(d.current.pp[j].ModTime)
+	})
 	for _, ps := range d.current.pp {
 		if !d.last.isUpdatedBy(ps) {
 			continue
@@ -118,7 +122,7 @@ func (pp *packagesStat) isUpdatedBy(tp *pkgStat) bool {
 		return true
 	}
 	for _, _tp := range pp.pp {
-		if _tp.Rel() != tp.Rel() {
+		if _tp.ID() != tp.ID() {
 			continue
 		}
 		if !tp.ModTime.After(_tp.ModTime) {
@@ -132,7 +136,7 @@ func (pp *packagesStat) isUpdatedBy(tp *pkgStat) bool {
 // the same relative name as given package stats.
 func (pp *packagesStat) has(tp *pkgStat) bool {
 	for _, _tp := range pp.pp {
-		if _tp.Rel() != tp.Rel() {
+		if _tp.ID() != tp.ID() {
 			continue
 		}
 		return true
@@ -224,7 +228,7 @@ func newTestingPackageStat(dir string) (*pkgStat, bool) {
 		return nil, false
 	}
 
-	tp, testing := &pkgStat{abs: dir}, false
+	stat, testing := &pkgStat{abs: dir}, false
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
 			continue
@@ -233,8 +237,8 @@ func newTestingPackageStat(dir string) (*pkgStat, bool) {
 		if err != nil {
 			continue
 		}
-		if tp.ModTime.Before(s.ModTime()) {
-			tp.ModTime = s.ModTime()
+		if stat.ModTime.Before(s.ModTime()) {
+			stat.ModTime = s.ModTime()
 		}
 		if testing {
 			continue
@@ -251,7 +255,8 @@ func newTestingPackageStat(dir string) (*pkgStat, bool) {
 		return nil, false
 	}
 
-	return tp, true
+	stat.loadTestFiles() // TODO: handle error
+	return stat, true
 }
 
 // isTesting returns true if given file contains at least one function
