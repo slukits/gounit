@@ -43,14 +43,14 @@
 //	}
 //
 //	func TestTestedSubject(t *testing.T) {
-//	    gounit.Run(&MySuite{}, t)
+//	    gounit.Run(&TestedSubject{}, t)
 //	}
 //
 // If suites should run concurrently:
 //
 //	func TestTestedSubject(t *testing.T) {
 //	    t.Parallel()
-//	    gounit.Run(&MySuite{}, t)
+//	    gounit.Run(&TestedSubject{}, t)
 //	}
 //
 // If all tests of a suite should run concurrently as well:
@@ -118,7 +118,7 @@
 // is something done, i.e. keep it DRY.  Through special methods and
 // compact assertions attached to provided [gounit.T] instance all noise
 // can be systematically removed from a test implementation which lets
-// the test express specification and usage of the production API.
+// the test express specifics and usage of the production API.
 //
 // While IDE's are very feature rich when it comes to the details they
 // are less so when it comes to the bird's eye view.  gounit shows you
