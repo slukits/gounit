@@ -178,10 +178,10 @@ type SuiteLogging interface {
 
 // SuiteErrorer overwrites default test-error handling which defaults to
 // a testing.T.Error-call of a wrapped testing.T-instance.  I.e. calling
-// on a [gounit.T] instance t methods like [T.Error], [T.Errorf] or
-// [T.FailOn] end up in an Error-call of the testing.T-instance which is
-// wrapped by t.  If a suite implements the SuiteErrorer-interface
-// provided function is called in case of an test-error.
+// on a [gounit.T] instance t methods like [T.Error] or [T.Errorf] end
+// up in an Error-call of the testing.T-instance which is wrapped by t.
+// If a suite implements the SuiteErrorer-interface provided function is
+// called in case of an test-error.
 type SuiteErrorer interface {
 	Error() func(...interface{})
 }

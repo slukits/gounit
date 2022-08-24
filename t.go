@@ -217,7 +217,7 @@ const FinalPrefix = "__final__"
 //	func TestMySuite(t *testing.T) { gounit.Run(&MySuite{}, t) }
 //
 // An S instance provides logging-mechanisms and the possibility to
-// cancel a suite's tests-run.  Note implementations of SuiteLogger or
+// cancel a suite's test-run.  Note implementations of SuiteLogger or
 // SuiteCanceler in a test-suite replace the default logging or
 // cancellation behavior of an S-instance.  It defaults to testing.T.Log
 // and testing.T.FailNow of the wrapped suit-runner's testing.T
@@ -248,7 +248,7 @@ func (st *S) Logf(format string, args ...interface{}) {
 	st.Log(fmt.Sprintf(format, args...))
 }
 
-// Fatal cancels the test-suite's tests-run after given arguments were
+// Fatal cancels the test-suite's test-run after given arguments were
 // logged.  The cancellation defaults to a FailNow call of wrapped
 // test-runner's testing.T-instance or its replacement  provided by a
 // suite's SuiteCanceler-implementation.
@@ -258,7 +258,7 @@ func (st *S) Fatal(args ...interface{}) {
 	st.canceler()
 }
 
-// Fatalf cancels the test-suite's tests-run after given arguments were
+// Fatalf cancels the test-suite's test-run after given arguments were
 // logged.  The cancellation defaults to a FailNow call of wrapped
 // test-runner's testing.T-instance or its replacement  provided by a
 // suite's SuiteCanceler-implementation.
@@ -268,7 +268,7 @@ func (st *S) Fatalf(format string, args ...interface{}) {
 	st.canceler()
 }
 
-// FatalOn cancels the test-suite's tests-run iff given error is not
+// FatalOn cancels the test-suite's test-run iff given error is not
 // nil.  The cancellation defaults to a FailNow call of wrapped
 // test-runner's testing.T-instance or its replacement provided by a
 // suite's SuiteCanceler-implementation.
