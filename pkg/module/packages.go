@@ -24,24 +24,27 @@ type PackagesDiff struct {
 }
 
 // For returns all testing packages which were updated since the last
-// reported diff in ascending order to their last modification time.
-func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) {
+// reported diff in descending order by their modification time.
+func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) error {
 	sort.Slice(d.current.pp, func(i, j int) bool {
-		return d.current.pp[i].ModTime.Before(d.current.pp[j].ModTime)
+		return d.current.pp[i].ModTime.After(d.current.pp[j].ModTime)
 	})
 	for _, ps := range d.current.pp {
 		if !d.last.isUpdatedBy(ps) {
 			continue
 		}
+		tt, err := ps.loadTestFiles()
+		if err != nil {
+			return err
+		}
 		tp := &TestingPackage{
-			id: ps.abs, abs: ps.abs, timeout: d.timeout}
+			ModTime: ps.ModTime,
+			id:      ps.abs, abs: ps.abs, files: tt, timeout: d.timeout}
 		if cb(tp) {
-			return
+			return nil
 		}
 	}
-	if d.last == d.current {
-		panic("last became current")
-	}
+	return nil
 }
 
 // ForDel returns a testing package which got deleted.  Note neither
@@ -106,6 +109,9 @@ type packagesStat struct {
 // package stats with more recent modification time than its
 // corresponding package stats in receiving packages stats.
 func (pp *packagesStat) diff(other *packagesStat) *PackagesDiff {
+	if pp == other {
+		return nil
+	}
 	d := &PackagesDiff{last: other, current: pp}
 	if !d.hasDelta() {
 		return nil

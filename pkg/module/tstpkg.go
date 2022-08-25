@@ -22,9 +22,11 @@ import (
 // and test suites.  As well as the feature to execute and report on a
 // package's tests.
 type TestingPackage struct {
+	ModTime time.Time
 	abs, id string
 	timeout time.Duration
 	parsed  bool
+	files   []*testFile
 	tests   tests
 	suites  suites
 }
@@ -106,6 +108,7 @@ func (tp *TestingPackage) Run() (*Results, error) {
 type testAst struct {
 	fs    *token.FileSet
 	af    *ast.File
+	name  string
 	guSlc string
 }
 
@@ -126,13 +129,15 @@ func (tp *TestingPackage) ensureParsing() {
 			continue
 		}
 		fs := token.NewFileSet()
+		flName := filepath.Join(tp.abs, e.Name())
 		af, err := parser.ParseFile(fs,
-			filepath.Join(tp.abs, e.Name()), nil, 0)
+			flName, nil, 0)
 		if err != nil {
 			continue
 		}
-		guSlc := parseGoUnitSelector(af)
-		ff = append(ff, &testAst{fs: fs, af: af, guSlc: guSlc})
+		guSlc := parseGounitSelector(af)
+		ff = append(ff, &testAst{
+			fs: fs, af: af, name: flName, guSlc: guSlc})
 		_tt, _ss := parseTestNSuites(fs, af, guSlc)
 		tt, ss = append(tt, _tt...), append(ss, _ss...)
 	}
@@ -187,14 +192,26 @@ func parseSuiteTests(ff []*testAst, ss suites) {
 			}
 			ss.addTest(suite, &Test{
 				name: test,
-				pos:  tf.fs.Position(fDcl.Pos()).String(),
+				pos:  int(fDcl.Pos()),
+				abs:  tf.fs.Position(fDcl.Pos()).String(),
 			})
 			return false
 		})
 	}
 }
 
-func parseGoUnitSelector(af *ast.File) string {
+// parseGounitSelect figures if there is no selector
+//
+//	import . "github.com/slukits/gounit"
+//
+// the default selector
+//
+//	import "github.com/slukits/gounit"
+//
+// or some other selector to reference gounit's Suite type
+//
+//	import gu "github.com/slukits/gounit"
+func parseGounitSelector(af *ast.File) string {
 	for _, i := range af.Imports {
 		if i.Path.Value == gounitPath {
 			if i.Name != nil {
@@ -341,20 +358,22 @@ func isIdent(fldType ast.Expr) (string, bool) {
 
 // A Test provides information about a go test, i.e. Test*-function.
 type Test struct {
+	file string
 	name string
-	pos  string
+	pos  int
+	abs  string
 }
 
 // Name returns a tests name.
 func (t *Test) Name() string { return t.name }
 
 // Pos returns a tests absolute filename with line and column number.
-func (t *Test) Pos() string { return t.pos }
+func (t *Test) Pos() string { return t.abs }
 
 type tests []*Test
 
 func (tt *tests) add(pos, name string) {
-	*tt = append(*tt, &Test{pos: pos, name: name})
+	*tt = append(*tt, &Test{abs: pos, name: name})
 }
 
 type TestSuite struct {
@@ -378,7 +397,7 @@ type suites []*TestSuite
 
 func (ss *suites) add(pos, name, runner string) {
 	*ss = append(*ss, &TestSuite{
-		Test:   Test{pos: pos, name: name},
+		Test:   Test{abs: pos, name: name},
 		runner: runner,
 	})
 }
@@ -408,7 +427,6 @@ func (ss suites) has(name string) bool {
 type pkgStat struct {
 	ModTime  time.Time
 	abs, rel string
-	tt       []*testFile
 }
 
 // Name returns a testing package's name.
@@ -422,15 +440,12 @@ func (ps pkgStat) Abs() string { return filepath.Dir(ps.abs) }
 // I.e. ID() is a module-global unique identifier of a testing package.
 func (ps pkgStat) ID() string { return ps.rel }
 
-// loadTestFiles reads the test-files to find the first diff between
-// versions at different times of the same file.
-func (ps *pkgStat) loadTestFiles() error {
-	if ps.tt != nil {
-		ps.tt = nil
-	}
+// loadTestFiles reads the test-files of a testing package to order
+// parsed suits by modification time of their associated test files.
+func (ps *pkgStat) loadTestFiles() (tt []*testFile, err error) {
 	ee, err := os.ReadDir(ps.abs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, e := range ee {
@@ -439,20 +454,20 @@ func (ps *pkgStat) loadTestFiles() error {
 		}
 		stt, err := os.Stat(filepath.Join(ps.abs, e.Name()))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		bb, err := os.ReadFile(filepath.Join(ps.abs, e.Name()))
 		if err != nil {
-			return err
+			return nil, err
 		}
-		ps.tt = append(
-			ps.tt, &testFile{
+		tt = append(
+			tt, &testFile{
 				modTime: stt.ModTime(),
 				name:    filepath.Join(ps.abs, e.Name()),
 				content: bb,
 			})
 	}
-	return nil
+	return tt, nil
 }
 
 type testFile struct {

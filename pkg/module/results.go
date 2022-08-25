@@ -18,11 +18,11 @@ import (
 // Results reports the results for each go Test* function of a testing
 // package's test run.  Results of sub tests are reported by their
 // parent test.  Results may be queried leveraging a testing package's
-// parsed tests, test suites and suite tests. E.g. let pkg a
-// TestingPackage instance reported by a module watcher.
+// parsed tests, test suites and suite tests. E.g. let pkg be a
+// TestingPackage instance reported to a module watcher.
 //
 //	rr, err := pkg.Run()
-//	panic(err) // before go test command finished
+//	panic(err) // before executed "go test" command finished
 //	if rr.HasErr() { // from stderr after command execution finished
 //	        panic(rr.Err())
 //	}
@@ -37,7 +37,8 @@ import (
 //	    })
 //	})
 type Results struct {
-	// rr holds the parsed go test -json events of a test run
+
+	// rr holds the results of a testing package's test run
 	rr results
 
 	// duration of a test run.
