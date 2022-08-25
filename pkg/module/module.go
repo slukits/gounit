@@ -2,9 +2,10 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-// Package Module allows its client to watch a go module for changes of
-// its testing packages.  A testing package is a package which contains at
-// least one *_test.go source file having at least one Test*-function.
+// Package Module allows its client to watch a go source folder for
+// changes of its testing packages.  A testing package is a package
+// which contains at least one *_test.go source file having at least one
+// Test*-function.
 //
 //	import (
 //	    "fmt"
@@ -78,12 +79,13 @@ var DefaultTimeout = 10 * time.Second
 // [Module.Watch].
 var DefaultIgnore = []string{".git", "node_modules"}
 
-// A Module represents a go module which can be watched for changes of
-// testing packages.  A Module may not be copied after its first watcher
-// has been registered by [Module.Watch].  A Module instance's methods
-// may be used concurrently and arbitrary many watcher may be
-// registered.
-type Module struct {
+// Sources represents a go module's directory which itself or its
+// descendants is a (testing) go package.  A Sources-instance can be
+// watched for changes of testing packages.  A Sources instance may not
+// be copied after its first watcher has been registered by
+// [Sources.Watch].  A Sources instance's methods may be used
+// concurrently and arbitrary many watcher may be registered.
+type Sources struct {
 
 	// mutex for a Module-instance's concurrency safety.
 	mutex sync.Mutex
@@ -107,11 +109,14 @@ type Module struct {
 	// registered watcher.  See Module.Quit
 	newID func() uint64
 
-	// The directory of a watched go module which is represented by a
-	// Module instance.  If unset a Module.Watch initializes this
-	// property by the first directory containing a go.mod file which is
-	// found ascending along the path of the current working directory.
+	// The directory of a go module's package which is watched.  If
+	// unset Source.Watch initializes this property with the current
+	// working directory.
 	Dir string
+
+	// moduleDir is the directory of go module whose Sources are
+	// watched.
+	moduleDir string
 
 	// Interval is the duration between two packages diff-reports  for a
 	// watcher.
@@ -124,33 +129,50 @@ type Module struct {
 	// Ignore is the list of directory names which are ignored in the
 	// search for a go module's testing packages.  It defaults to
 	// DefaultIgnore iff unset at the first call of Watch.  Note once
-	// Module.Watch was called for the first time further modifications
-	// of Ignore are not taken into account (until Module.QuitAll was
-	// called and then Module.Watch again).
+	// Sources.Watch was called for the first time further modifications
+	// of Ignore are not taken into account (until Sources.QuitAll was
+	// called and then Sources.Watch again).
 	Ignore []string
 }
 
-// Name returns a watched module's name.  Note if [Module.Watch] wasn't
-// called the zero string is returned.
-func (m *Module) Name() string {
+// ModuleName returns a watched module's name.  Note if [Sources.Watch]
+// wasn't called the zero string is returned.
+func (m *Sources) ModuleName() string {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	return m.name
 }
 
+// SourcesDir returns the watch (package) directory inside a go module.
+func (m *Sources) SourcesDir() string {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	return m.Dir
+}
+
+// ModuleDir return the directory of a module which has one of its (package)
+// directories and its descendants watched for changes.
+func (m *Sources) ModuleDir() string {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	return m.moduleDir
+}
+
 // Watch reports to each of its callers changes about a module's testing
 // packages through returned channel.  The module which is reported
-// about is the first module which is found in Module.Dir ascending
+// about is the first module which is found in Sources.Dir ascending
 // towards root.  If Module.Dir is unset the current working directory
 // is used.  If no directory with a go.mod file is found a wrapped
 // ErrNoModule error is returned.  I.e. after this method's first call
-// Module.Dir is the found module directory and [Module.Name] provides
+// Sources.Dir is the found module directory and [Sources.Name] provides
 // its name.  Returned ID may be used to unregister the watcher with
-// given ID, see [Module.Quit].  If a watcher is unregistered its diff
-// channel is closed.  See [Module.QuitAll] to learn how to release all
+// given ID, see [Sources.Quit].  If a watcher is unregistered its diff
+// channel is closed.  See [Sources.QuitAll] to learn how to release all
 // resources acquired by this method.
-func (m *Module) Watch() (diff <-chan *PackagesDiff, ID uint64, err error) {
+func (m *Sources) Watch() (diff <-chan *PackagesDiff, ID uint64, err error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -170,7 +192,7 @@ func (m *Module) Watch() (diff <-chan *PackagesDiff, ID uint64, err error) {
 	return _diff, ID, nil
 }
 
-func (m *Module) ensureNameAndDir() (err error) {
+func (m *Sources) ensureNameAndDir() (err error) {
 	if m.name != "" {
 		return nil
 	}
@@ -180,17 +202,18 @@ func (m *Module) ensureNameAndDir() (err error) {
 		if err != nil {
 			return err
 		}
+		m.Dir = dir
 	}
 	dir, name, err := findModule(dir)
 	if err != nil {
 		return err
 	}
 	m.name = name
-	m.Dir = dir
+	m.moduleDir = dir
 	return nil
 }
 
-func (m *Module) ensureDiffer() {
+func (m *Sources) ensureDiffer() {
 	if m.register != nil {
 		return
 	}
@@ -210,7 +233,7 @@ func (m *Module) ensureDiffer() {
 // IsWatched returns true iff at least one watcher is registered.  Note
 // a false return value doesn't mean that there is no diffing go routine
 // running.  To guarantee this see [Module.QuitAll].
-func (m *Module) IsWatched() bool {
+func (m *Sources) IsWatched() bool {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if m.isWatched == nil {
@@ -222,7 +245,7 @@ func (m *Module) IsWatched() bool {
 
 // Quit unregisters the watcher with given ID and closes its
 // diff-channel.  Quit is a no-op if no watcher with given ID exists.
-func (m *Module) Quit(ID uint64) {
+func (m *Sources) Quit(ID uint64) {
 	if ID == 0 {
 		return
 	}
@@ -234,7 +257,7 @@ func (m *Module) Quit(ID uint64) {
 // QuitAll closes all diff channels which were provided by
 // [Module.Watch] and terminates the go routine reporting package diffs
 // to watchers.
-func (m *Module) QuitAll() {
+func (m *Sources) QuitAll() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if m.quit == nil {

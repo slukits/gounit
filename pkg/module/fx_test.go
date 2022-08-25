@@ -161,7 +161,7 @@ var (
 // convenance features.  E.g. Quit which makes sure all watchers are
 // quit.
 type ModuleFX struct {
-	*Module
+	*Sources
 	t      *gounit.T
 	fxWW   []chan struct{}
 	FxDir  *fs.Dir
@@ -171,7 +171,7 @@ type ModuleFX struct {
 func NewFX(t *gounit.T) *ModuleFX {
 	d := t.FS().Tmp()
 	return &ModuleFX{
-		Module: &Module{Dir: d.Path()}, t: t, FxDir: d}
+		Sources: &Sources{Dir: d.Path()}, t: t, FxDir: d}
 }
 
 func (x *ModuleFX) Set(ff FxMask) *ModuleFX {

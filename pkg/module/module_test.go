@@ -16,22 +16,22 @@ func TestModuleDefaultsToWorkingDirectory(t *testing.T) {
 	undo := fx.CWD()
 	defer undo()
 	fx.MkMod(expMod)
-	m := Module{}
+	m := Sources{}
 	m.Watch()
 	defer m.QuitAll()
 	if fx.Path() != m.Dir {
 		t.Errorf("expected module dir %s; got %s", fx.Path(), m.Dir)
 	}
-	if expMod != m.Name() {
-		t.Errorf("expected module name %s; got %s", expMod, m.Name())
+	if expMod != m.ModuleName() {
+		t.Errorf("expected module name %s; got %s", expMod, m.ModuleName())
 	}
 }
 
-type module struct{ Suite }
+type source struct{ Suite }
 
-func (s *module) SetUp(t *T) { t.Parallel() }
+func (s *source) SetUp(t *T) { t.Parallel() }
 
-func (s *module) Fails_initial_watcher_registration_if_no_module(t *T) {
+func (s *source) Fails_initial_watcher_registration_if_no_module(t *T) {
 	fx := NewFX(t)
 	defer fx.QuitAll()
 	_, _, err := fx.Watch()
@@ -39,12 +39,12 @@ func (s *module) Fails_initial_watcher_registration_if_no_module(t *T) {
 	t.ErrIs(err, ErrNoModule)
 }
 
-func (s *module) Is_not_watched_if_no_initial_watcher(t *T) {
+func (s *source) Is_not_watched_if_no_initial_watcher(t *T) {
 	fx := NewFX(t)
 	t.False(fx.IsWatched())
 }
 
-func (s *module) Is_watched_having_registered_initial_watcher(t *T) {
+func (s *source) Is_watched_having_registered_initial_watcher(t *T) {
 	fx := NewFX(t).Set(FxMod)
 	defer fx.QuitAll()
 
@@ -54,7 +54,7 @@ func (s *module) Is_watched_having_registered_initial_watcher(t *T) {
 	t.True(fx.IsWatched())
 }
 
-func (s *module) Reports_dir_after_initial_watcher(t *T) {
+func (s *source) Reports_dir_after_initial_watcher(t *T) {
 	fx := NewFX(t).Set(FxMod)
 	defer fx.QuitAll()
 
@@ -64,17 +64,17 @@ func (s *module) Reports_dir_after_initial_watcher(t *T) {
 	t.Eq(fx.FxDir.Path(), fx.Dir)
 }
 
-func (s *module) Reports_name_after_initial_watcher(t *T) {
+func (s *source) Reports_name_after_initial_watcher(t *T) {
 	fx := NewFX(t).Set(FxMod)
 	defer fx.QuitAll()
 
 	_, _, err := fx.Watch()
 	t.FatalOn(err)
 
-	t.Eq(FxModuleName, fx.Name())
+	t.Eq(FxModuleName, fx.ModuleName())
 }
 
-func (s *module) Reports_package_diffs_to_all_watcher(t *T) {
+func (s *source) Reports_package_diffs_to_all_watcher(t *T) {
 	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	defer fx.QuitAll()
 	fx.Interval = 1 * time.Millisecond
@@ -99,7 +99,7 @@ func (s *module) Reports_package_diffs_to_all_watcher(t *T) {
 	}())
 }
 
-func (s *module) Closes_diff_channel_if_watcher_quits(t *T) {
+func (s *source) Closes_diff_channel_if_watcher_quits(t *T) {
 	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	defer fx.QuitAll()
 	fx.Interval = 1 * time.Millisecond
@@ -120,7 +120,7 @@ func (s *module) Closes_diff_channel_if_watcher_quits(t *T) {
 	})
 }
 
-func (s *module) Is_unwatched_if_all_watcher_quit(t *T) {
+func (s *source) Is_unwatched_if_all_watcher_quit(t *T) {
 	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	defer fx.QuitAll()
 	fx.Interval = 1 * time.Millisecond
@@ -136,7 +136,7 @@ func (s *module) Is_unwatched_if_all_watcher_quit(t *T) {
 	t.Within(&TimeStepper{}, func() bool { return !fx.IsWatched() })
 }
 
-func (s *module) Reserves_zero_quitting_for_quit_all(t *T) {
+func (s *source) Reserves_zero_quitting_for_quit_all(t *T) {
 	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
 
@@ -151,7 +151,7 @@ func (s *module) Reserves_zero_quitting_for_quit_all(t *T) {
 	t.False(fx.IsWatched())
 }
 
-func (s *module) Reports_initially_all_testing_packages(t *T) {
+func (s *source) Reports_initially_all_testing_packages(t *T) {
 	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Set(FxPackage | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
@@ -216,7 +216,7 @@ func testWatcher(
 	return initOnly
 }
 
-func (s *module) Reports_all_testing_packages_to_new_watcher(t *T) {
+func (s *source) Reports_all_testing_packages_to_new_watcher(t *T) {
 	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Set(FxPackage | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
@@ -245,7 +245,7 @@ func (s *module) Reports_all_testing_packages_to_new_watcher(t *T) {
 	initOnly2 <- false
 }
 
-func (s *module) Reports_added_package_to_registered_watcher(t *T) {
+func (s *source) Reports_added_package_to_registered_watcher(t *T) {
 	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
 	defer fx.QuitAll()
@@ -281,7 +281,7 @@ func (s *module) Reports_added_package_to_registered_watcher(t *T) {
 	t.Eq(1, n)
 }
 
-func (s *module) Reports_deleted_package_to_registered_watcher(t *T) {
+func (s *source) Reports_deleted_package_to_registered_watcher(t *T) {
 	fx := NewFX(t).Set(FxMod | FxTestingPackage)
 	fx.Set(FxPackage | FxTestingPackage)
 	fx.Interval = 1 * time.Millisecond
@@ -315,7 +315,7 @@ func (s *module) Reports_deleted_package_to_registered_watcher(t *T) {
 	t.Eq(1, n)
 }
 
-func TestModule(t *testing.T) {
+func TestSource(t *testing.T) {
 	t.Parallel()
-	Run(&module{}, t)
+	Run(&source{}, t)
 }
