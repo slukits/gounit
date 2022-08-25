@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/slukits/gounit"
 	"github.com/slukits/gounit/pkg/fs"
@@ -32,12 +33,16 @@ const (
 	// FxTidy runs go mod tidy in a created module fixture and caches
 	// the result for reuse.
 	FxTidy
+	// FxSuiteOrder indicates the creation of a package with three test
+	// files with different modification times whose suites should be
+	// reported in the order FxSuiteA, FxSuiteD, FxSuiteC and FxSuiteB.
+	FxSuiteOrder
 )
 
 var allFixtureSettings = []FxMask{
 	FxMod, FxTestingPackage, FxParsing,
 	// Note FxTidy must be processed after FxMod
-	FxTidy,
+	FxTidy, FxSuiteOrder,
 }
 
 const (
@@ -48,14 +53,20 @@ const (
 		"func TestFixture(t *testing.T) {}\n"
 	fxSuiteA   = "FxSuiteA"
 	fxSuiteB   = "FxSuiteB"
+	fxSuiteC   = "FxSuiteC"
+	fxSuiteD   = "FxSuiteD"
 	fxARunner  = "TestFxSuiteA"
 	fxBRunner  = "TestFxSuiteB"
+	fxCRunner  = "TestFxSuiteC"
+	fxDRunner  = "TestFxSuiteD"
 	fxTestA    = "TestFixtureA"
 	fxTestB    = "TestFixtureB"
 	fxStATest1 = "Suite_test1"
 	fxStATest2 = "SuiteA_test2"
 	fxStBTest1 = "Suite_test1"
 	fxStBTest2 = "SuiteB_test2"
+	fxStCTest  = "SuiteC_test"
+	fxStDTest  = "SuiteD_test"
 	fxCode     = "type T struct {}"
 )
 
@@ -105,6 +116,45 @@ var (
 			"func %s(t *testing.T) { gounit.Run(&%s{}, t) }\n\n",
 			fxBRunner, fxSuiteB,
 		)
+
+	fxOrderA = "import (\n" +
+		"\t\"testing\"\n\n" +
+		"\t. \"github.com/slukits/gounit\"\n" +
+		")\n\n" +
+		fmt.Sprintf("type %s struct{ Suite }\n\n", fxSuiteA) +
+		fmt.Sprintf(
+			"func (s *%s) %s(t *T) {\n", fxSuiteA, fxStATest1) +
+		"\tt.Log(\"log: suite a: one\")\n" +
+		"\tt.Log(\"log: suite a: two\")\n}\n\n" +
+		fmt.Sprintf("func %s(t *testing.T) { Run(&%s{}, t) }\n\n",
+			fxARunner, fxSuiteA)
+
+	fxOrderBCD = "import (\n" +
+		"\t\"testing\"\n\n" +
+		"\t. \"github.com/slukits/gounit\"\n" +
+		")\n\n" +
+		fmt.Sprintf("type %s struct{ Suite }\n\n", fxSuiteB) +
+		fmt.Sprintf(
+			"func (s *%s) %s(t *T) {}\n", fxSuiteB, fxStBTest1) +
+		fmt.Sprintf("func %s(t *testing.T) { Run(&%s{}, t) }\n\n",
+			fxBRunner, fxSuiteB) +
+		fmt.Sprintf("type %s struct{ Suite }\n\n", fxSuiteD) +
+		fmt.Sprintf(
+			"func (s *%s) %s(t *T) {}\n", fxSuiteD, fxStDTest) +
+		fmt.Sprintf("func %s(t *testing.T) { Run(&%s{}, t) }\n\n",
+			fxDRunner, fxSuiteD) +
+		fmt.Sprintf("type %s struct{ Suite }\n\n", fxSuiteC) +
+		fmt.Sprintf(
+			"func (s *%s) %s(t *T) {}\n", fxSuiteC, fxStCTest) +
+		fmt.Sprintf("func %s(t *testing.T) { Run(&%s{}, t) }\n\n",
+			fxCRunner, fxSuiteC)
+
+	fxOrderB = "import (\n" +
+		"\t\"testing\"\n\n" +
+		"\t. \"github.com/slukits/gounit\"\n" +
+		")\n\n" +
+		fmt.Sprintf(
+			"func (s *%s) %s(t *T) {}\n", fxSuiteB, fxStBTest2)
 )
 
 // ModuleFX wraps a Module instance and augments it with testing
@@ -154,6 +204,17 @@ func (x *ModuleFX) set(f FxMask) {
 			fmt.Sprintf("%sa", fxTestFileName), []byte(fxParseA))
 		pkgDir.MkPkgTest(
 			fmt.Sprintf("%sb", fxTestFileName), []byte(fxParseB))
+	case FxSuiteOrder:
+		packageName := x.newTestingPackageName()
+		pkgDir, _ := x.FxDir.Mk(packageName)
+		pkgDir.MkPkgTest(
+			fmt.Sprintf("%sa", fxTestFileName), []byte(fxOrderA))
+		time.Sleep(5 * time.Millisecond)
+		pkgDir.MkPkgTest(
+			fmt.Sprintf("%sbcd", fxTestFileName), []byte(fxOrderBCD))
+		time.Sleep(5 * time.Millisecond)
+		pkgDir.MkPkgTest(
+			fmt.Sprintf("%sb", fxTestFileName), []byte(fxOrderB))
 	case FxTidy:
 		x.FxDir.MkTidy()
 	}

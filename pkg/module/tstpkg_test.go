@@ -18,11 +18,11 @@ type Package struct {
 
 type fxSet struct{ Fixtures }
 
-func (fx *fxSet) TestingPackage(t *T) *TestingPackage {
-	diff, _, err := fx.Get(t).(*ModuleFX).Watch()
-	t.FatalOn(err)
+func (fx *fxSet) initTestingPackage(
+	t *T, c <-chan *PackagesDiff,
+) *TestingPackage {
 	select {
-	case diff := <-diff:
+	case diff := <-c:
 		var pkg *TestingPackage
 		diff.For(func(tp *TestingPackage) (stop bool) {
 			pkg = tp
@@ -34,6 +34,12 @@ func (fx *fxSet) TestingPackage(t *T) *TestingPackage {
 		t.Fatal("initial diff timed out")
 	}
 	return nil
+}
+
+func (fx *fxSet) TestingPackage(t *T) *TestingPackage {
+	diff, _, err := fx.Get(t).(*ModuleFX).Watch()
+	t.FatalOn(err)
+	return fx.initTestingPackage(t, diff)
 }
 
 func (fx *fxSet) Module(t *T) *ModuleFX { return fx.Get(t).(*ModuleFX) }
@@ -108,6 +114,23 @@ func (s *Package) Reports_shell_exit_error_of_tests_run(t *T) {
 
 	t.True(rslt.HasErr())
 	t.Contains(rslt.Err(), StdErr)
+}
+
+func (s *Package) fxSuiteOrder(t *T) *TestingPackage {
+	fx := NewFX(t).Set(FxMod | FxSuiteOrder)
+	fx.Interval = 1 * time.Millisecond
+	diff, _, err := fx.Watch()
+	t.FatalOn(err)
+	return s.fx.initTestingPackage(t, diff)
+}
+
+func (s *Package) Reports_suite_of_most_recent_test_file_last(t *T) {
+	fx, idx := s.fxSuiteOrder(t), 0
+	exp := []string{fxSuiteA, fxSuiteD, fxSuiteC, fxSuiteB}
+	fx.ForSuite(func(ts *TestSuite) {
+		t.Eq(exp[idx], ts.Name())
+		idx++
+	})
 }
 
 func TestPackage(t *testing.T) {

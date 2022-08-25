@@ -14,21 +14,25 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/slukits/ints"
 )
 
 // A TestingPackage provides information on a module's package's tests
 // and test suites.  As well as the feature to execute and report on a
 // package's tests.
 type TestingPackage struct {
-	ModTime time.Time
-	abs, id string
-	timeout time.Duration
-	parsed  bool
-	files   []*testFile
-	tests   tests
-	suites  suites
+	ModTime  time.Time
+	abs, id  string
+	timeout  time.Duration
+	parsed   bool
+	parseErr error
+	files    []*testFile
+	tests    tests
+	suites   suites
 }
 
 // Name returns the testing package's name.
@@ -47,20 +51,28 @@ func (tp TestingPackage) Rel() string { return filepath.Dir(tp.id) }
 // package.
 func (tp TestingPackage) ID() string { return tp.id }
 
-// ForTest provides given testing package's tests.
-func (tp *TestingPackage) ForTest(cb func(*Test)) {
-	tp.ensureParsing()
+// ForTest provides given testing package's tests.  ForTest fails in
+// case of an parse error.
+func (tp *TestingPackage) ForTest(cb func(*Test)) error {
+	if err := tp.ensureParsing(); err != nil {
+		return err
+	}
 	for _, t := range tp.tests {
 		cb(t)
 	}
+	return nil
 }
 
-// ForSuite provides given testing package's suites.
-func (tp *TestingPackage) ForSuite(cb func(*TestSuite)) {
-	tp.ensureParsing()
+// ForSuite provides given testing package's suites.  ForSuite fails in
+// case of an parse error.
+func (tp *TestingPackage) ForSuite(cb func(*TestSuite)) error {
+	if err := tp.ensureParsing(); err != nil {
+		return err
+	}
 	for _, s := range tp.suites {
 		cb(s)
 	}
+	return nil
 }
 
 const StdErr = "shell exit error: "
@@ -68,16 +80,13 @@ const StdErr = "shell exit error: "
 // Run executes go test for the testing package an returns its result.
 // Returned error if any is the error of command execution, i.e. a
 // timeout.  While Result.Err reflects errors from the error console.
-// Note right before the Run executes its command the testing package's
-// test files are parsed to increase the likeliness that the parsed
-// result matches the ran tests.  I.e. time is saved if tests and test
-// suites are accessed after the call of Run.  The output of the go
-// testing tool is sadly not enough to report tests in the order they
-// were written if tests run concurrently.  Hence to achieve the goal
-// that the test reporting outlines the documentation and thought
-// process of the production code, i.e. tests are reported in the order
-// they were written, it is necessary to parse the test files separately
-// and then match the findings to the result of the test run.
+// Note the output of the go testing tool is sadly not enough to report
+// tests in the order they were written if tests run concurrently.
+// Hence to achieve the goal that the test reporting outlines the
+// documentation and thought process of the production code, i.e. tests
+// are reported in the order they were written, it is necessary to parse
+// the test files separately and then match the findings to the result
+// of the test run.
 func (tp *TestingPackage) Run() (*Results, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(), tp.timeout)
@@ -106,50 +115,49 @@ func (tp *TestingPackage) Run() (*Results, error) {
 }
 
 type testAst struct {
+	fIdx  int
 	fs    *token.FileSet
 	af    *ast.File
-	name  string
 	guSlc string
 }
 
-func (tp *TestingPackage) ensureParsing() {
+func (tp *TestingPackage) ensureParsing() error {
 	if tp.parsed {
-		return
+		return tp.parseErr
 	}
 	tp.parsed = true
-	ee, err := os.ReadDir(tp.abs)
-	if err != nil {
-		return
-	}
 
 	ff := []*testAst{}
 	tt, ss := tests{}, suites{}
-	for _, e := range ee {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), "_test.go") {
-			continue
-		}
+	for idx, tf := range tp.files {
 		fs := token.NewFileSet()
-		flName := filepath.Join(tp.abs, e.Name())
-		af, err := parser.ParseFile(fs,
-			flName, nil, 0)
+		af, err := parser.ParseFile(fs, tf.name, tf.content, 0)
 		if err != nil {
-			continue
+			tp.parseErr = err
+			return err
 		}
 		guSlc := parseGounitSelector(af)
 		ff = append(ff, &testAst{
-			fs: fs, af: af, name: flName, guSlc: guSlc})
-		_tt, _ss := parseTestNSuites(fs, af, guSlc)
+			fIdx: idx, fs: fs, af: af, guSlc: guSlc})
+		_tt, _ss := parseTestNSuites(idx, fs, af, guSlc)
 		tt, ss = append(tt, _tt...), append(ss, _ss...)
 	}
 	parseSuiteTests(ff, ss)
+	ss.sort(tp.files)
 	tp.tests = tt
 	tp.suites = ss
+	return nil
 }
 
 const gounitPath = `"github.com/slukits/gounit"`
 
+// parseTestNSuites parses given ast file for tests and suites and
+// associates them with parsed test file.  The parsed tests and suites
+// should be used to retrieve results of a test run and the association
+// with test file makes it possible to report suites according to their
+// associated file's modification time.
 func parseTestNSuites(
-	fs *token.FileSet, af *ast.File, guSlc string,
+	fIdx int, fs *token.FileSet, af *ast.File, guSlc string,
 ) (tt tests, ss suites) {
 
 	ast.Inspect(af, func(n ast.Node) bool {
@@ -166,10 +174,10 @@ func parseTestNSuites(
 		}
 		suite, ok := isSuiteRunner(fDcl, guSlc)
 		if !ok {
-			tt.add(fs.Position(fDcl.Pos()).String(), name)
+			tt.add(fIdx, fs.Position(fDcl.Pos()).String(), name)
 			return false
 		}
-		ss.add(fs.Position(fDcl.Pos()).String(), suite, name)
+		ss.add(fIdx, fs.Position(fDcl.Pos()).String(), suite, name)
 		return false
 	})
 
@@ -191,6 +199,7 @@ func parseSuiteTests(ff []*testAst, ss suites) {
 				return false
 			}
 			ss.addTest(suite, &Test{
+				fIdx: tf.fIdx,
 				name: test,
 				pos:  int(fDcl.Pos()),
 				abs:  tf.fs.Position(fDcl.Pos()).String(),
@@ -358,7 +367,7 @@ func isIdent(fldType ast.Expr) (string, bool) {
 
 // A Test provides information about a go test, i.e. Test*-function.
 type Test struct {
-	file string
+	fIdx int
 	name string
 	pos  int
 	abs  string
@@ -372,8 +381,8 @@ func (t *Test) Pos() string { return t.abs }
 
 type tests []*Test
 
-func (tt *tests) add(pos, name string) {
-	*tt = append(*tt, &Test{abs: pos, name: name})
+func (tt *tests) add(fIdx int, pos, name string) {
+	*tt = append(*tt, &Test{fIdx: fIdx, abs: pos, name: name})
 }
 
 type TestSuite struct {
@@ -393,11 +402,36 @@ func (s *TestSuite) ForTest(cb func(*Test)) {
 	}
 }
 
+func (s *TestSuite) mostRecent(ff []*testFile) (idx int) {
+
+	ii := (&ints.Set{}).Add(s.fIdx)
+
+	for _, t := range s.tests {
+		if ii.Has(t.fIdx) {
+			continue
+		}
+		ii.Add(t.fIdx)
+	}
+
+	mostRecent := ii.ToSlice()[0]
+
+	if ii.Len() == 1 {
+		return mostRecent
+	}
+	for _, idx := range ii.ToSlice()[1:] {
+		if ff[idx].modTime.Before(ff[mostRecent].modTime) {
+			continue
+		}
+		mostRecent = idx
+	}
+	return mostRecent
+}
+
 type suites []*TestSuite
 
-func (ss *suites) add(pos, name, runner string) {
+func (ss *suites) add(fIdx int, pos, name, runner string) {
 	*ss = append(*ss, &TestSuite{
-		Test:   Test{abs: pos, name: name},
+		Test:   Test{fIdx: fIdx, abs: pos, name: name},
 		runner: runner,
 	})
 }
@@ -420,6 +454,17 @@ func (ss suites) has(name string) bool {
 		return true
 	}
 	return false
+}
+
+func (ss suites) sort(ff []*testFile) {
+	sort.Slice(ss, func(i, j int) bool {
+		iIdx, jIdx := ss[i].mostRecent(ff), ss[j].mostRecent(ff)
+		if iIdx == jIdx {
+			return ss[i].pos < ss[j].pos
+		}
+		less := ff[iIdx].modTime.Before(ff[jIdx].modTime)
+		return less
+	})
 }
 
 // A pkgStat is calculated to determine if a package changed in the
