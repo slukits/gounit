@@ -5,43 +5,52 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
-	"os"
 	"testing"
 
 	. "github.com/slukits/gounit"
+	"github.com/slukits/gounit/pkg/module"
 	"github.com/slukits/lines"
 )
 
 // Gounit tests the behavior of Controller.New which is identical with
-// the behavior of main.  Since we manipulate for each test the global
-// variable "os.Args" we can neither run this suite nor it's tests in
-// parallel.
-type Gounit struct {
-	Suite
-	osArgs []string
+// the behavior of main.
+type Gounit struct{ Suite }
+
+func (s *Gounit) SetUp(t *T) { t.Parallel() }
+
+type watcherMock struct {
+	watch func() (<-chan *module.PackagesDiff, uint64, error)
 }
 
-func (s *Gounit) Init(t *S) { s.osArgs = os.Args }
+const (
+	mckModule    = "mock-module"
+	mckModuleDir = "mock/module/dir"
+	mckSourceDir = "mock/source/dir"
+)
 
-func (s *Gounit) SetUp(t *T) { os.Args = s.osArgs }
-
-func (s *Gounit) Fatales_not_implement_if_p_argument(t *T) {
-	// TODO: needs removing if implemented
-	args := []string{"p", "--p", "-p"}
-	for _, a := range args {
-		os.Args = []string{s.osArgs[0], a}
-		New(func(i ...interface{}) {
-			t.Contains(fmt.Sprint(i...), NotImplemented)
-		}, lines.New)
+func (m *watcherMock) ModuleName() string { return mckModule }
+func (m *watcherMock) ModuleDir() string  { return mckModuleDir }
+func (m *watcherMock) SourcesDir() string { return mckSourceDir }
+func (m *watcherMock) Watch() (
+	<-chan *module.PackagesDiff, uint64, error,
+) {
+	if m.watch != nil {
+		return m.watch()
 	}
+	return make(<-chan *module.PackagesDiff), 1, nil
 }
 
-func (s *Gounit) Fatales_not_supported_if_other_arg_than_p(t *T) {
-	os.Args = []string{s.osArgs[0], "42"}
-	New(func(i ...interface{}) {
-		t.Contains(fmt.Sprint(i...), fmt.Sprintf(NotSupported, "42"))
-	}, lines.New)
+func (s *Gounit) Fails_if_watching_fails(t *T) {
+	mck := &watcherMock{watch: func() (<-chan *module.PackagesDiff, uint64, error) {
+		return nil, 0, errors.New("mock-err")
+	}}
+	fatale := false
+
+	New(func(_ ...interface{}) { fatale = true }, mck, nil)
+
+	t.True(fatale)
 }
 
 func mockLinesNew(
@@ -59,11 +68,10 @@ func mockLinesNew(
 }
 
 func (s *Gounit) Listens_to_events_if_not_fatale(t *T) {
-	os.Args = []string{s.osArgs[0]}
-	events, newMock := mockLinesNew(t)
+	events, linesMock := mockLinesNew(t)
 	go New(func(i ...interface{}) {
 		t.Fatalf("unexpected error: %s", fmt.Sprint(i...))
-	}, newMock)
+	}, &watcherMock{}, linesMock)
 	ee := <-events
 	defer ee.QuitListening()
 	t.Within(&TimeStepper{}, func() bool {
@@ -71,8 +79,7 @@ func (s *Gounit) Listens_to_events_if_not_fatale(t *T) {
 	})
 }
 
-func (s *Gounit) Finalize(t *S) { os.Args = s.osArgs }
-
 func TestGounit(t *testing.T) {
+	t.Parallel()
 	Run(&Gounit{}, t)
 }

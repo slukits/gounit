@@ -5,35 +5,36 @@
 package controller
 
 import (
-	"fmt"
-	"os"
-	"strings"
-
+	"github.com/slukits/gounit/pkg/module"
 	"github.com/slukits/lines"
 )
 
 const (
-	NotImplemented = "gounit: package support not implemented yet"
-	NotSupported   = "gounit: argument %s: is not supported; only -p"
+	WatcherErr = "gounit: watcher: %s: %v"
 )
+
+// Events is a function to initialize the terminal ui with components
+// returning an Events-instance to listen for events.
+type Events func(lines.Componenter) *lines.Events
+
+// Watcher is a function whose returned channel watches a go modules
+// packages sources whose tests runs are reported to a terminal ui.
+type Watcher interface {
+	ModuleName() string
+	ModuleDir() string
+	SourcesDir() string
+	Watch() (<-chan *module.PackagesDiff, uint64, error)
+}
 
 // New starts the application and blocks until a quit event occurs.
 // Fatale errors are reported to ftl while ll is used to initialize the
 // ui and start the event loop.
-func New(
-	ftl func(...interface{}),
-	ll func(lines.Componenter) *lines.Events,
-) {
-
-	if len(os.Args) > 1 {
-		if strings.HasSuffix(os.Args[1], "p") && strings.Contains(
-			"--p", os.Args[1],
-		) { // TODO: implement
-			ftl(NotImplemented)
-			return
-		}
-		ftl(fmt.Sprintf(NotSupported, os.Args[1]))
+func New(ftl func(...interface{}), w Watcher, ee Events) {
+	diff, _, err := w.Watch()
+	if err != nil {
+		ftl(WatcherErr, w.SourcesDir(), err)
 		return
 	}
-	ll(nil).Listen()
+	_ = diff
+	ee(nil).Listen()
 }
