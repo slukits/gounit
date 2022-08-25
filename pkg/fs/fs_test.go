@@ -498,6 +498,8 @@ func (s *Testdata) fxMoveTestdata(t *T) func() {
 func (s *Testdata) Directory_is_created_if_not_existing(t *T) {
 	if _, err := os.Stat(fp.Join(cllDir, "testdata")); err == nil {
 		defer s.fxMoveTestdata(t)()
+	} else {
+		defer os.RemoveAll(fp.Join(cllDir, "testdata"))
 	}
 	_, err := os.Stat(fp.Join(cllDir, "testdata"))
 	t.FatalIfNot(t.ErrIs(err, os.ErrNotExist))
@@ -556,6 +558,8 @@ func (s *Testdata) Fatales_if_directory_creation_fails(t *T) {
 func (s *Testdata) Fatales_if_caller_cant_be_determined(t *T) {
 	if _, err := os.Stat(fp.Join(cllDir, "testdata")); err == nil {
 		defer s.fxMoveTestdata(t)()
+	} else {
+		defer os.RemoveAll(fp.Join(cllDir, "testdata"))
 	}
 	fx, failed := fs.NewFX(t), false
 	t.Mock().Canceler(func() { failed = true })
@@ -572,6 +576,8 @@ func (s *Testdata) Fatales_if_caller_cant_be_determined(t *T) {
 func (s *Testdata) Panics_if_testdata_creation_undoing_fails(t *T) {
 	if _, err := os.Stat(fp.Join(cllDir, "testdata")); err == nil {
 		defer s.fxMoveTestdata(t)()
+	} else {
+		defer os.RemoveAll(fp.Join(cllDir, "testdata"))
 	}
 	fx := fs.NewFX(t)
 	fx.Mock().RemoveAll(func(s string) error {
@@ -582,6 +588,19 @@ func (s *Testdata) Panics_if_testdata_creation_undoing_fails(t *T) {
 	_, undo := fx.Data()
 
 	t.Panics(undo)
+}
+
+func (s *Testdata) Is_cached(t *T) {
+	if _, err := os.Stat(fp.Join(cllDir, "testdata")); err == nil {
+		defer s.fxMoveTestdata(t)()
+	} else {
+		defer os.RemoveAll(fp.Join(cllDir, "testdata"))
+	}
+
+	td, _ := t.FS().Data()
+	cached, _ := t.FS().Data()
+
+	t.Eq(td, cached)
 }
 
 func TestTestdata(t *testing.T) {

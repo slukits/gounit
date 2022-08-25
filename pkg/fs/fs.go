@@ -45,11 +45,11 @@ func New(t Tester) *FS {
 // tls provides the file system tools to created Dir and TmpDir instances.
 func (fs *FS) tls() *fsTools { return fs.tools }
 
-// Data returns the callers testdata directory (Note not t.FS()'s but
-// the caller one before).  Associated testing instance fatales if the
-// directory doesn't exist and can't be created.  Returned undo function
-// is nil in case the testdata directory already existed, i.e. also for
-// subsequent calls to Data after it has been created at the first call.
+// Data returns the callers testdata directory.  Associated testing
+// instance fatales if the directory doesn't exist and can't be created.
+// Returned undo function is nil in case the testdata directory already
+// existed, i.e. also for subsequent calls to Data after it has been
+// created at the first call.
 func (fs *FS) Data() (_ *Dir, undo func()) {
 	if fs.td != nil {
 		if _, err := os.Stat(fs.td.path); err == nil {
