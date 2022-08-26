@@ -1,5 +1,7 @@
-// Package gounit augments the go testing framework with features aiding
-// its user on matter of:
+// Package gounit comes with a command to continuously report test
+// results and with a few types augmenting go's testing framework for a
+// test driven development style.  gounit's features aiding its user on
+// matters of:
 //   - naming
 //   - focus
 //   - documenting/specifying
@@ -86,8 +88,8 @@
 // Init and Finalize have not *gounit.T but *gounit.S as argument type.
 // The reason is that the argument of Init and Finalize has a different
 // semantic than the argument of suite tests.  S and and T wrap
-// testing.T instances of the go testing framework.  S wraps the test
-// runner's testing.T instance, i.e. in above example it is
+// testing.T instances of the go testing framework.  S wraps the suite
+// tests runner's testing.T instance, i.e. in above example it is
 // TestTestedSubject's testing.T instance.  While T wraps a testing.T
 // instance of a test runner's sub-test created to execute the suite
 // test.
