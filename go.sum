@@ -21,6 +21,8 @@ github.com/slukits/lines v0.0.0-20220826081102-4631b8b567f3 h1:7GZqV6+s4/9+Oj+P/
 github.com/slukits/lines v0.0.0-20220826081102-4631b8b567f3/go.mod h1:oDdi+5/gOj20T0ZgjuohQIS7Bw0eXK4wHwBSqPpm8uI=
 github.com/slukits/lines v0.0.0-20220826120643-d64ce9d8ceff h1:8qKCanPknvNy8T68Ky9CHfbKf+IUayCvMM+IR3Ymszs=
 github.com/slukits/lines v0.0.0-20220826120643-d64ce9d8ceff/go.mod h1:oDdi+5/gOj20T0ZgjuohQIS7Bw0eXK4wHwBSqPpm8uI=
+github.com/slukits/lines v0.0.0-20220826182228-cce2734dbfec h1:5nDc0F+s627hxfqK6zxcAFlQqd02mzsZrXqk7WU9p4M=
+github.com/slukits/lines v0.0.0-20220826182228-cce2734dbfec/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20220318055525-2edf467146b5/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab h1:2QkjZIsXupsJbJIdSjjUOgWK3aEtzyuh2mPt3l/CkeU=
