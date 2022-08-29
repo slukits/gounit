@@ -53,26 +53,39 @@ func (s *Gounit) Fails_if_watching_fails(t *T) {
 	t.True(fatale)
 }
 
+type linesTest struct {
+	ee *lines.Events
+	tt *lines.Testing
+}
+
 func mockLinesNew(
 	t *T, max ...int,
 ) (
-	chan *lines.Events,
 	func(lines.Componenter) *lines.Events,
+	func() (*lines.Events, *lines.Testing),
 ) {
-	chn := make(chan *lines.Events)
-	return chn, func(c lines.Componenter) *lines.Events {
-		ee, _ := lines.Test(t.GoT(), c, max...)
-		chn <- ee
-		return ee
-	}
+	chn := make(chan struct{})
+	var (
+		ee *lines.Events
+		tt *lines.Testing
+	)
+	return func(c lines.Componenter) *lines.Events {
+			ee, tt = lines.Test(t.GoT(), c, max...)
+			close(chn)
+			return ee
+		},
+		func() (*lines.Events, *lines.Testing) {
+			<-chn
+			return ee, tt
+		}
 }
 
 func (s *Gounit) Listens_to_events_if_not_fatale(t *T) {
-	events, linesMock := mockLinesNew(t)
+	linesMock, linesTesting := mockLinesNew(t)
 	go New(func(i ...interface{}) {
 		t.Fatalf("unexpected error: %s", fmt.Sprint(i...))
 	}, &watcherMock{}, linesMock)
-	ee := <-events
+	ee, _ := linesTesting()
 	defer ee.QuitListening()
 	t.Within(&TimeStepper{}, func() bool {
 		return ee.IsListening()
