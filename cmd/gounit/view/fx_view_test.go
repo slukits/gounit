@@ -10,10 +10,25 @@ import (
 )
 
 type fxInit struct {
-	t                                                *gounit.T
-	updateMessageBar, updateStatusbar                func(string)
+	t *gounit.T
+
+	// update *bar are holding the updaters for message- and statusbar
+	// which were received through the Status and Message implementations.
+	updateMessageBar, updateStatusbar func(string)
+
 	bttOneReported, bttTwoReported, bttThreeReported bool
-	updBtt1, updBtt2, updBtt3                        func(ButtonDef) error
+
+	// updBtt* are the button updater received through the
+	// implementation of ForButton
+	updBtt1, updBtt2, updBtt3 func(ButtonDef) error
+
+	// mainListener holds the lines listener updater received through
+	// Main implementation
+	mainListener LLUpdater
+
+	// mainLines holds the lines updater received through Main
+	// implementation
+	mainLines LinesUpdater
 }
 
 const (
@@ -38,7 +53,11 @@ func (fx *fxInit) Status(upd func(string)) string {
 	return fxStatus
 }
 
-func (fx *fxInit) Main() string { return fxMain }
+func (fx *fxInit) Main(llu LLUpdater, lu LinesUpdater) string {
+	fx.mainListener = llu
+	fx.mainLines = lu
+	return fxMain
+}
 
 func (fx *fxInit) ForButton(cb func(ButtonDef, ButtonUpdater) error) {
 	cb(ButtonDef{
@@ -82,7 +101,7 @@ func (fx *viewFX) ClickButton(tt *lines.Testing, label string) {
 		if b.label != label {
 			continue
 		}
-		tt.FireComponentClick(b)
+		tt.FireComponentClick(b, 0, 0)
 		return
 	}
 	fx.t.Fatalf("gounit: view: fixture: no button labeled %q", label)

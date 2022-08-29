@@ -28,8 +28,10 @@ type Initer interface {
 	// statusbar's content.
 	Status(update func(string)) string
 
-	// Main returns an initial content a View's main area.
-	Main() string
+	// Main returns an initial content a View's main area and is
+	// provided by a View with a function to update line-listeners and
+	// an other to update lines.
+	Main(LLUpdater, LinesUpdater) string
 
 	// ForButton implementation is provided by a View with a callback
 	// function which may be used to initialize the View's button bar.
@@ -39,6 +41,38 @@ type Initer interface {
 	// ambiguous button labels are provided.
 	ForButton(func(ButtonDef, ButtonUpdater) error)
 }
+
+// LLMod  values are used to describe to a main lines-listener what kind
+// of event is reported.
+type LLMod uint8
+
+const (
+	// Context is reported iff a line is clicked with the "right" mouse
+	// key.
+	Context LLMod = 1 << iota
+	// Default is reported iff a line is clicked or other wise selected
+	// without special conditions (its still undefined what special
+	// conditions are).
+	Default LLMod = 0
+)
+
+// LLUpdater function is provided  to an Initer implementation to update
+// lines listeners.  A lines listener (function) is informed if a particular line
+// was selected by the user, e.g. clicked.
+type LLUpdater func(func(idx int, mod LLMod))
+
+// A Liner provides line-updates for the main area.
+type Liner interface {
+	// Clearing returns true iff all remaining lines which are not set
+	// by Liner.For of the main component should be cleared.
+	Clearing() bool
+	// calls given function for each line back.
+	For(line func(idx uint, content string))
+}
+
+// UpdateLines function is provided to an Initer implementation.  It
+// expects an callback function which is defining a line.
+type LinesUpdater func(Liner)
 
 // view implements the lines Componenter interface hence an instance of
 // it can be used to initialize a lines terminal ui.  Note the view
@@ -65,7 +99,8 @@ func New(i Initer) *view {
 	new := &view{}
 	new.CC = append(new.CC, &messageBar{
 		dflt: i.Message(new.updateMessageBar)})
-	new.CC = append(new.CC, &main{dflt: i.Main()})
+	new.CC = append(new.CC, &main{dflt: i.Main(
+		new.updateLineListener, new.updateLines)})
 	new.CC = append(new.CC, &statusBar{
 		dflt: i.Status(new.updateStatusBar)})
 	initButtons(i, new)
@@ -113,6 +148,24 @@ func (v *view) updateMessageBar(s string) {
 
 func (v *view) updateStatusBar(s string) {
 	v.ee.Update(v.CC[2], s, nil)
+}
+
+func (v *view) updateLineListener(ll func(int, LLMod)) {
+	v.ee.Update(v.CC[1], ll, nil)
+}
+
+func (v *view) updateLines(l Liner) {
+	linesUpdate := map[int]string{}
+	l.For(func(idx uint, content string) {
+		linesUpdate[int(idx)] = content
+	})
+	if len(linesUpdate) == 0 {
+		return
+	}
+	if l.Clearing() {
+		linesUpdate[-1] = "clear"
+	}
+	v.ee.Update(v.CC[1], linesUpdate, nil)
 }
 
 func (v *view) addRune(r rune, b *button) {

@@ -212,6 +212,89 @@ func (s *AView) Updates_button_rune(t *T) {
 	t.Contains(tt.LastScreen, "hurz")
 }
 
+type linerFX struct {
+	content  string
+	clearing bool
+}
+
+func (l *linerFX) Clearing() bool { return l.clearing }
+
+func (l *linerFX) For(cb func(uint, string)) {
+	ll := strings.Split(l.content, "\n")
+	for idx, l := range ll {
+		if l == "" {
+			continue
+		}
+		cb(uint(idx), l)
+	}
+}
+
+func (s *AView) Updates_its_main_content(t *T) {
+	fx, exp := &fxInit{t: t}, "first\n\nthird\nforth"
+	ee, tt := lines.Test(t.GoT(), New(fx), 2)
+	ee.Listen()
+	fx.mainLines(&linerFX{content: ""}) // no-op, coverage
+
+	fx.mainLines(&linerFX{content: exp})
+
+	t.Contains(tt.LastScreen, exp)
+	t.False(ee.IsListening())
+}
+
+func (s *AView) Clears_unused_main_lines(t *T) {
+	fx, exp := &fxInit{t: t}, "first line\nsecond\nthird\nforth\nfifth"
+	ee, tt := lines.Test(t.GoT(), New(fx), 3)
+	ee.Listen()
+	fx.mainLines(&linerFX{content: exp})
+	t.Contains(tt.String(), exp)
+
+	exp = "\n\n2nd\n3rd\n4th"
+	fx.mainLines(&linerFX{content: exp, clearing: true})
+
+	t.Contains(tt.LastScreen, exp)
+	t.False(strings.Contains(tt.LastScreen, "first line"))
+	t.False(strings.Contains(tt.LastScreen, "fifth"))
+	t.False(ee.IsListening())
+}
+
+func (s *AView) Reports_a_main_line_click(t *T) {
+	fx, cnt, exp := newFX(t), "first\n\nthird\nforth", 2
+	ee, tt := lines.Test(t.GoT(), fx.view, 7)
+	ee.Listen()
+	fx.mainLines(&linerFX{content: cnt})
+	tt.FireComponentClick(fx.CC[1], 0, exp) // no-op, coverage
+
+	mainListenerCalled := false
+	fx.mainListener(func(idx int, mod LLMod) {
+		t.True(mod&Default == Default)
+		t.Eq(exp, idx)
+		mainListenerCalled = true
+	})
+
+	tt.FireComponentClick(fx.CC[1], 0, exp)
+	t.True(mainListenerCalled)
+	t.False(ee.IsListening())
+}
+
+func (s *AView) Reports_a_main_line_context(t *T) {
+	fx, cnt, exp := newFX(t), "first\n\nthird\nforth", 2
+	ee, tt := lines.Test(t.GoT(), fx.view, 7)
+	ee.Listen()
+	fx.mainLines(&linerFX{content: cnt})
+	tt.FireComponentContext(fx.CC[1], 0, exp) // no-op, coverage
+
+	mainListenerCalled := false
+	fx.mainListener(func(idx int, mod LLMod) {
+		t.True(mod&Context == Context)
+		t.Eq(exp, idx)
+		mainListenerCalled = true
+	})
+
+	tt.FireComponentContext(fx.CC[1], 0, exp)
+	t.True(mainListenerCalled)
+	t.False(ee.IsListening())
+}
+
 func TestAView(t *testing.T) {
 	t.Parallel()
 	Run(&AView{}, t)
