@@ -15,10 +15,10 @@ type statusBar struct {
 	dflt string
 }
 
-func (sb *statusBar) OnInit(env *lines.Env) {
+func (sb *statusBar) OnInit(e *lines.Env) {
 	sb.Dim().SetHeight(2)
 	if sb.dflt != "" {
-		fmt.Fprint(env, sb.dflt)
+		fmt.Fprint(e.LL(1), sb.dflt)
 	}
 }
 
@@ -26,8 +26,8 @@ func (mb *statusBar) OnUpdate(e *lines.Env) {
 	// type save because message bar update only allows string
 	s, _ := e.Evt.(*lines.UpdateEvent).Data.(string)
 	if s == "" {
-		fmt.Fprint(e, mb.dflt)
+		fmt.Fprint(e.LL(1), mb.dflt)
 		return
 	}
-	fmt.Fprint(e, s)
+	fmt.Fprint(e.LL(1), s)
 }

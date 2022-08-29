@@ -15,17 +15,17 @@ type messageBar struct {
 	dflt string
 }
 
-func (mb *messageBar) OnInit(env *lines.Env) {
+func (mb *messageBar) OnInit(e *lines.Env) {
 	mb.Dim().SetHeight(3)
-	fmt.Fprint(env, mb.dflt)
+	fmt.Fprint(e.LL(1), mb.dflt)
 }
 
 func (mb *messageBar) OnUpdate(e *lines.Env) {
 	// type save because message bar update only allows string
 	s, _ := e.Evt.(*lines.UpdateEvent).Data.(string)
 	if s == "" {
-		fmt.Fprint(e, mb.dflt)
+		fmt.Fprint(e.LL(1), mb.dflt)
 		return
 	}
-	fmt.Fprint(e, s)
+	fmt.Fprint(e.LL(1), s)
 }
