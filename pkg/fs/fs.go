@@ -347,7 +347,6 @@ func (d *Dir) FileContent(relName string) []byte {
 // MkMod adds to given directory a go.mod file with given module name.
 // It fatales/panics iff subsequent [Dir.AddFile] call fatales/panics.
 func (d *Dir) MkMod(module string) (reset func()) {
-	os.UserCacheDir()
 	return d.MkFile("go.mod", []byte(fmt.Sprintf("module %s", module)))
 }
 

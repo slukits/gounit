@@ -6,6 +6,7 @@ package fs_test
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	gofs "io/fs"
 	"os"
@@ -139,6 +140,91 @@ func (s *ADir) Panics_if_undoing_file_creation_fails(t *T) {
 	})
 
 	t.Panics(func() { undo() })
+}
+
+func (s *ADir) Provides_a_files_content(t *T) {
+	td, fx := t.FS().Tmp(), "the answer is 42"
+
+	td.MkFile("test.txt", []byte(fx))
+
+	t.Eq(fx, string(td.FileContent("test.txt")))
+}
+
+func (s *ADir) Fatales_providing_content_if_file_read_fails(t *T) {
+	fx, failed := fs.NewFX(t), false
+	t.Mock().Canceler(func() { failed = true })
+	fx.Mock().ReadFile(func(s string) ([]byte, error) {
+		return nil, ErrMock
+	})
+
+	fx.Tmp().FileContent("test.txt")
+
+	t.True(failed)
+}
+
+func (s *ADir) Adds_a_module_file(t *T) {
+	td, exp := t.FS().Tmp(), "%s"+"example.com/gounit/test/tst_mod"
+	d, _ := td.Mk("tst_mod")
+
+	d.MkMod(fmt.Sprintf(exp, ""))
+
+	t.Contains(
+		string(d.FileContent("go.mod")),
+		fmt.Sprintf(exp, "module "),
+	)
+}
+
+func (s *ADir) Fatales_tiding_if_it_is_no_go_module(t *T) {
+	td, failed := t.FS().Tmp(), false
+	t.Mock().Canceler(func() { failed = true })
+
+	td.MkTidy()
+
+	t.True(failed)
+}
+
+func fxModule(t *T) (*fs.FSfx, *fs.Dir) {
+	fx, module := fs.NewFX(t), "example.com/gounit/test/tst_mod"
+	td := fx.Tmp()
+	d, _ := td.Mk("tst_mod")
+	d.MkMod(module)
+	d.MkFile("src_test.go", []byte(
+		"package tst_mod\n\n"+
+			"import (\n"+
+			"\t\"testing\"\n\n"+
+			"\t\"github.com/slukits/gounit\"\n"+
+			")\n\n"+
+			"type MySuite struct{ gounit.Suite }\n\n"+
+			"func (s *MySuite) Suite_test(t *gounit.T) {}\n\n"+
+			"func TestMySuite(t *testing.T) { Run(&MySuite{}, t) }\n",
+	))
+	return fx, d
+}
+
+func (s *ADir) Creates_go_sum_if_it_s_a_module_and_tidied(t *T) {
+	_, d := fxModule(t)
+	exp := fp.Join(d.Path(), "go.sum")
+	_, err := os.Stat(exp)
+	t.ErrIs(err, os.ErrNotExist)
+
+	d.MkTidy()
+
+	_, err = os.Stat(exp)
+	t.True(err == nil)
+}
+
+func (s *ADir) Fatales_tiding_if_go_sum_cant_be_written(t *T) {
+	failed := false
+	fx, d := fxModule(t)
+	t.Mock().Canceler(func() { failed = true })
+	fx.Mock().WriteFile(
+		func(s string, b []byte, fm gofs.FileMode) error {
+			return ErrMock
+		})
+
+	d.MkTidy()
+
+	t.True(failed)
 }
 
 func fxFile(t *T) (
