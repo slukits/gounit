@@ -494,22 +494,24 @@ func (d *Dir) MkPkgTest(name string, content []byte) (undo func()) {
 	return d.MkPkgFile(name, content)
 }
 
-// CWD changes the current working directory to given temporary
-// directory and returns a function to undo this change.  CWD fatales
-// given testing instance if given directory if the working directory
-// change fails.  It panics if the undo fails.
-func (td *Dir) CWD() (undo func()) {
-	wd, err := os.Getwd()
+// CWD changes the current working directory to given directory and
+// returns a function to undo this change.  CWD fatales given testing
+// instance if given directory if the working directory change fails.
+// It panics if the undo fails.
+func (d *Dir) CWD() (undo func()) {
+	wd, err := d.fs().Getwd()
 	if err != nil {
-		td.t.Fatalf("gounit: fs: tmp-dir: cwd: get: %v", err)
+		d.t.Fatalf("gounit: fs: tmp-dir: cwd: get: %v", err)
+		return nil
 	}
 
-	if err := os.Chdir(td.path); err != nil {
-		td.t.Fatalf("gounit: fs: tmp-dir: cwd: %v", err)
+	if err := d.fs().Chdir(d.path); err != nil {
+		d.t.Fatalf("gounit: fs: tmp-dir: cwd: %v", err)
+		return nil
 	}
 
 	return func() {
-		if err := os.Chdir(wd); err != nil {
+		if err := d.fs().Chdir(wd); err != nil {
 			panic(fmt.Sprintf("gounit: fs: tmp-dir: cwd: reset: %v", err))
 		}
 	}
@@ -521,6 +523,12 @@ type fsTools struct {
 
 	// Stat defaults to and has the semantics of os.Stat
 	Stat func(string) (fs.FileInfo, error)
+
+	// Getwd defaults to and has the semantics of os.Getwd
+	Getwd func() (string, error)
+
+	// Chdir defaults to and has the semantics of os.Chdir
+	Chdir func(string) error
 
 	// Mkdir defaults to and has the semantics of os.Mkdir
 	Mkdir func(string, fs.FileMode) error
@@ -568,6 +576,8 @@ type fsTools struct {
 func (t *fsTools) copy() *fsTools {
 	return &fsTools{
 		Stat:      t.Stat,
+		Getwd:     t.Getwd,
+		Chdir:     t.Chdir,
 		Mkdir:     t.Mkdir,
 		MkdirAll:  t.MkdirAll,
 		Remove:    t.Remove,
@@ -588,6 +598,8 @@ func (t *fsTools) copy() *fsTools {
 var defaultFSTools = func() *fsTools {
 	return &fsTools{
 		Stat:      os.Stat,
+		Getwd:     os.Getwd,
+		Chdir:     os.Chdir,
 		Mkdir:     os.Mkdir,
 		MkdirAll:  os.MkdirAll,
 		Remove:    os.Remove,

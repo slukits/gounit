@@ -43,6 +43,16 @@ func (m *fsTMocker) Stat(f func(string) (fs.FileInfo, error)) {
 	m.fs.tools.Stat = f
 }
 
+// Getwd defaults to and has the semantics of os.Chdir
+func (m *fsTMocker) Getwd(f func() (string, error)) {
+	m.fs.tools.Getwd = f
+}
+
+// Chdir defaults to and has the semantics of os.Chdir
+func (m *fsTMocker) Chdir(f func(string) error) {
+	m.fs.tools.Chdir = f
+}
+
 // Mkdir defaults to and has the semantics of os.Mkdir
 func (m *fsTMocker) Mkdir(f func(string, fs.FileMode) error) {
 	m.fs.tools.Mkdir = f

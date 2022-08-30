@@ -339,6 +339,73 @@ func TestADir(t *testing.T) {
 	Run(&ADir{}, t)
 }
 
+// WorkingDirectory tests this aspect of a Dir-instance.  Since it
+// changes the working directory, i.e. the global state of the test
+// package it should not run it in parallel.
+type WorkingDirectory struct{ Suite }
+
+func getWD(t *T) string {
+	currentWD, err := os.Getwd()
+	t.FatalOn(err)
+	return currentWD
+}
+
+func (s *WorkingDirectory) Can_be_changed_to_a_directory(t *T) {
+	td := t.FS().Tmp()
+	t.Neq(getWD(t), td.Path())
+
+	undo := td.CWD()
+	defer undo()
+
+	t.Eq(getWD(t), td.Path())
+}
+
+func (s *WorkingDirectory) Change_can_be_undone(t *T) {
+	td, origin := t.FS().Tmp(), getWD(t)
+	t.Neq(origin, td.Path())
+
+	undo := td.CWD()
+	t.Eq(getWD(t), td.Path())
+	undo()
+
+	t.Eq(origin, getWD(t))
+}
+
+func (s *WorkingDirectory) Change_fails_if_wd_cant_be_obtained(t *T) {
+	fx, failed := fs.NewFX(t), false
+	t.Mock().Canceler(func() { failed = true })
+	fx.Mock().Getwd(func() (string, error) { return "", ErrMock })
+
+	fx.Tmp().CWD()
+
+	t.True(failed)
+}
+
+func (s *WorkingDirectory) Change_fails_if_wd_cant_be_changed(t *T) {
+	fx, failed := fs.NewFX(t), false
+	t.Mock().Canceler(func() { failed = true })
+	fx.Mock().Chdir(func(s string) error { return ErrMock })
+
+	fx.Tmp().CWD()
+
+	t.True(failed)
+}
+
+func (s *WorkingDirectory) Change_panics_if_undoing_dir_change_fails(
+	t *T,
+) {
+	fx := fs.NewFX(t)
+	td, origin := fx.Tmp(), getWD(t)
+	t.Neq(origin, td.Path())
+	undo := td.CWD()
+	t.Eq(getWD(t), td.Path())
+	fx.Mock().Chdir(func(s string) error { return ErrMock })
+
+	t.Panics(undo)
+}
+
+func TestWorkingDirectory(t *testing.T) { Run(&WorkingDirectory{}, t) }
+
 type ADirDiff struct{ Suite }
 
 func (s *ADirDiff) Fails_if_given_directories_have_different_bases(t *T) {
