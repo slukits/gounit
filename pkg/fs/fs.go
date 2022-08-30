@@ -362,6 +362,19 @@ func (d *Dir) MkTidy() {
 	d.mkGoModSum(mdlName)
 }
 
+// HasCachedModSum returns true if current directory is a go module and
+// there are go.mod and go.sum files cached for this module; otherwise
+// false.
+func (d *Dir) HasCachedModSum() bool {
+	mdlName := d.moduleName()
+	if mdlName == "" {
+		return false
+	}
+	_, _, ok := goModSumFromCache(d.fs(), mdlName)
+
+	return ok
+}
+
 // goModSumFromCache tries to read given modules go.mod and go.sum from
 // the user's caching path's gounit directory.  If that is not possible
 // it is tried to created needed files by calling go mod tidy and to

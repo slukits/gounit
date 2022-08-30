@@ -216,6 +216,9 @@ func (s *ADir) Creates_go_sum_if_it_s_a_module_and_tidied(t *T) {
 func (s *ADir) Fatales_tiding_if_go_sum_cant_be_written(t *T) {
 	failed := false
 	fx, d := fxModule(t)
+	if !d.HasCachedModSum() {
+		t.GoT().SkipNow()
+	}
 	t.Mock().Canceler(func() { failed = true })
 	fx.Mock().WriteFile(
 		func(s string, b []byte, fm gofs.FileMode) error {
@@ -230,7 +233,6 @@ func (s *ADir) Fatales_tiding_if_go_sum_cant_be_written(t *T) {
 func fxFile(t *T) (
 	fx *fs.FSfx, td *fs.Dir, name string, content []byte,
 ) {
-
 	name, content, fx = "test.txt", []byte("joyful\n"), fs.NewFX(t)
 	td = fx.Tmp()
 	td.MkFile(name, content)
