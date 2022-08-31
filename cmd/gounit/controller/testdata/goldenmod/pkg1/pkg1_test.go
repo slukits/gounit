@@ -1,3 +1,5 @@
+// Package pkg1 provides several nested packages with several suites of
+// passing tests.
 package pkg1
 
 import (
@@ -6,14 +8,12 @@ import (
 	. "github.com/slukits/gounit"
 )
 
-// suite tests; few of them failing
-
 type Suite1 struct{ Suite }
 
 func (s *Suite1) TestSuite1_1(t *T) {}
-func (s *Suite1) TestSuite1_2(t *T) { t.True(false) }
+func (s *Suite1) TestSuite1_2(t *T) {}
 func (s *Suite1) TestSuite1_3(t *T) {}
-func (s *Suite1) TestSuite1_4(t *T) { t.True(false) }
+func (s *Suite1) TestSuite1_4(t *T) {}
 func (s *Suite1) TestSuite1_5(t *T) {}
 
 func TestSuite1(t *testing.T) { Run(&Suite1{}, t) }

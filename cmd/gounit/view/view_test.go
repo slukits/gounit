@@ -12,29 +12,29 @@ import (
 	"github.com/slukits/lines"
 )
 
-type ANewView struct{ Suite }
+type ANewViewDisplaysInitiallyGiven struct{ Suite }
 
-func (s *ANewView) SetUp(t *T) { t.Parallel() }
+func (s *ANewViewDisplaysInitiallyGiven) SetUp(t *T) { t.Parallel() }
 
-func (s *ANewView) Displays_initially_given_message(t *T) {
+func (s *ANewViewDisplaysInitiallyGiven) Message(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
 	ee.Listen()
 	t.Contains(tt.LastScreen, fxMsg)
 }
 
-func (s *ANewView) Displays_initially_given_status(t *T) {
+func (s *ANewViewDisplaysInitiallyGiven) Status(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
 	ee.Listen()
 	t.Contains(tt.LastScreen, fxStatus)
 }
 
-func (s *ANewView) Displays_initially_given_main_info(t *T) {
+func (s *ANewViewDisplaysInitiallyGiven) Main_info(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
 	ee.Listen()
 	t.Contains(tt.LastScreen, fxMain)
 }
 
-func (s *ANewView) Displays_initially_given_buttons(t *T) {
+func (s *ANewViewDisplaysInitiallyGiven) Buttons(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
 	ee.Listen()
 	t.Contains(tt.LastScreen, fxBtt1)
@@ -43,7 +43,7 @@ func (s *ANewView) Displays_initially_given_buttons(t *T) {
 
 func TestANewView(t *testing.T) {
 	t.Parallel()
-	Run(&ANewView{}, t)
+	Run(&ANewViewDisplaysInitiallyGiven{}, t)
 }
 
 type AView struct{ Suite }

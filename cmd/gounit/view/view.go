@@ -2,6 +2,35 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
+/*
+Package view utilizes the github.com/slukits/lines package to provide
+gounit's terminal user interface (note: the actual ui has no frames)
+
+	+------------------------------------------------------------------+
+	|                                                                  |
+	| github.com/slukits/gounit: cmd/gounit                            |
+	|                                                                  |
+	+------------------------------------------------------------------+
+	|                                                                  |
+	| view: 21/0 243ms, 10/5, 1454/684 340                             |
+	|                                                                  |
+	| A new view displays initially given (4/0 8ms)                    |
+	|     message                                                      |
+	|     status                                                       |
+	|     main_info                                                    |
+	|     buttons                                                      |
+	|                                                                  |
+	| A view 17/0 13ms                                                 |
+	|                                                                  |
+	| ...                                                              |
+	|                                                                  |
+	+------------------------------------------------------------------+
+	|                                                                  |
+	| packages: n; tests: t/f; stat: c/t d                             |
+	+------------------------------------------------------------------+
+	|  [p]kgs   [s]uites   [v]et=off   [r]ace=off   [s]ats=on  [q]uit  |
+	+------------------------------------------------------------------+
+*/
 package view
 
 import (
@@ -99,7 +128,7 @@ func New(i Initer) *view {
 	new := &view{}
 	new.CC = append(new.CC, &messageBar{
 		dflt: i.Message(new.updateMessageBar)})
-	new.CC = append(new.CC, &main{dflt: i.Main(
+	new.CC = append(new.CC, &report{dflt: i.Main(
 		new.updateLineListener, new.updateLines)})
 	new.CC = append(new.CC, &statusBar{
 		dflt: i.Status(new.updateStatusBar)})

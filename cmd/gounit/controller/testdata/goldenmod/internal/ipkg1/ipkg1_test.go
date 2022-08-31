@@ -1,3 +1,4 @@
+// Package ipkg1 fails to compile its test binary.
 package ipkg1
 
 import (
