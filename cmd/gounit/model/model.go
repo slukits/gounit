@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-// Package Module allows its client to watch a go source folder for
+// Package Model allows its client to watch a go source folder for
 // changes of its testing packages.  A testing package is a package
 // which contains at least one *_test.go source file having at least one
 // Test*-function.
@@ -44,7 +44,7 @@
 //
 //	    mdl.QuitAll() // terminate reporting go routine; release resources
 //	}
-package module
+package model
 
 import (
 	"errors"

@@ -4,7 +4,7 @@
 
 // Module fixture creation.
 
-package module
+package model
 
 import (
 	"fmt"

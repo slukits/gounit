@@ -5,7 +5,7 @@
 package controller
 
 import (
-	"github.com/slukits/gounit/pkg/module"
+	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/lines"
 )
 
@@ -23,7 +23,7 @@ type Watcher interface {
 	ModuleName() string
 	ModuleDir() string
 	SourcesDir() string
-	Watch() (<-chan *module.PackagesDiff, uint64, error)
+	Watch() (<-chan *model.PackagesDiff, uint64, error)
 }
 
 // New starts the application and blocks until a quit event occurs.

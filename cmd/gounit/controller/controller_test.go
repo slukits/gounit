@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	. "github.com/slukits/gounit"
-	"github.com/slukits/gounit/pkg/module"
+	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/lines"
 )
 
@@ -21,7 +21,7 @@ type Gounit struct{ Suite }
 func (s *Gounit) SetUp(t *T) { t.Parallel() }
 
 type watcherMock struct {
-	watch func() (<-chan *module.PackagesDiff, uint64, error)
+	watch func() (<-chan *model.PackagesDiff, uint64, error)
 }
 
 const (
@@ -34,16 +34,16 @@ func (m *watcherMock) ModuleName() string { return mckModule }
 func (m *watcherMock) ModuleDir() string  { return mckModuleDir }
 func (m *watcherMock) SourcesDir() string { return mckSourceDir }
 func (m *watcherMock) Watch() (
-	<-chan *module.PackagesDiff, uint64, error,
+	<-chan *model.PackagesDiff, uint64, error,
 ) {
 	if m.watch != nil {
 		return m.watch()
 	}
-	return make(<-chan *module.PackagesDiff), 1, nil
+	return make(<-chan *model.PackagesDiff), 1, nil
 }
 
 func (s *Gounit) Fails_if_watching_fails(t *T) {
-	mck := &watcherMock{watch: func() (<-chan *module.PackagesDiff, uint64, error) {
+	mck := &watcherMock{watch: func() (<-chan *model.PackagesDiff, uint64, error) {
 		return nil, 0, errors.New("mock-err")
 	}}
 	fatale := false
