@@ -2,7 +2,37 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package fs
+/*
+Package tfs provides complex filesystem operations for testing.  I.e.
+an operation is usually at least comprised of two (potentially
+failing) standard lib filesystem operations.  Error handling is
+fully replaced by the assumption that it's not worth to run a
+test whose filesystem operations fail since the typical use case is a
+fixture setup.  Hence if a filesystem operation fails it fatales the
+associated test.  All used failing standard lib filesystem operation can
+be mocked by obtaining a wrapped FS-instance using [NewFX]. allowing
+
+An FS instance is usually obtained from a [gounit.T] instance
+
+	import (
+		"testing"
+
+		"github.com/slukits/gounit"
+	)
+
+	type MySuite { gounit.Suite }
+
+	func (s *MySuite) Suite_test(t *gounit.T) {
+		td := t.FS().Tmp() // create temp-dir
+		gd := t.FS().Data().Child("golden_dir") // golden_dir from testdata
+		gd.Copy(td) // copied to temp dir
+		t.FatalIfNot(t.True(td.Child("golden_dir").Eq(gd)))
+		// ...
+	}
+
+	func TestMySuite(t *testing.T) { Run(&MySuite{}, t) }
+*/
+package tfs
 
 import (
 	"bufio"
@@ -27,11 +57,11 @@ type Tester interface {
 	FS() *FS
 }
 
-// FS provides filesystem operation specifically for testing, e.g.
-// without error handling, preset file/dir-mod, restricted to temporary
-// or testdata directories with undo functionality.  In general failing
-// file system operations fatal associated testing instance; failing
-// undo function calls panic.
+// FS provides directory relative filesystem operation specifically for
+// testing, e.g.  without error handling, preset file/dir-mod,
+// constructors for unique temp-dir as well as testdata directory, and
+// with undo functionality.  In general failing file system operations
+// fatal associated testing instance; failing undo function calls panic.
 type FS struct {
 	t     Tester
 	td    *Dir
@@ -49,7 +79,8 @@ func (fs *FS) tls() *fsTools { return fs.tools }
 // instance fatales if the directory doesn't exist and can't be created.
 // Returned undo function is nil in case the testdata directory already
 // existed, i.e. also for subsequent calls to Data after it has been
-// created at the first call.
+// created at the first call.  Returned undo function panics if its
+// execution fails.
 func (fs *FS) Data() (_ *Dir, undo func()) {
 	if fs.td != nil {
 		if _, err := os.Stat(fs.td.path); err == nil {
@@ -98,7 +129,12 @@ func (fs *FS) Tmp() *Dir {
 // Dir provides file system operations inside its path, i.e. either a
 // temporary directory or (in) a a package's testdata directory.  It
 // replaces error handling by failing the test.  The zero value of a Dir
-// instance is *NOT* usable.  Use [T.FS] to obtain a Dir-instance.
+// instance is *NOT* usable.  Use [gounit.T.FS] to obtain a Dir-instance.
+//
+//	func (s *MySuite) Suite_test(t *gounit.T) {
+//		td := t.FS().Tmp() // create temporary Dir-instance
+//		// ...
+//	}
 type Dir struct {
 	t    Tester
 	fs   func() *fsTools
@@ -109,7 +145,7 @@ type Dir struct {
 func (d *Dir) Path() string { return d.path }
 
 // Child returns a Dir from given directory with given name.  Child
-// fatales if child's file info can't be obtained of if child is not a
+// fatales if child's file info can't be obtained or if child is not a
 // directory.
 func (d *Dir) Child(name string) *Dir {
 	stt, err := d.fs().Stat(fp.Join(d.path, name))
@@ -124,10 +160,10 @@ func (d *Dir) Child(name string) *Dir {
 
 type Pather interface{ Path() string }
 
-// Copy copies given (base) directory to given path.  Note next to
-// directories only regular files and symlinks are supported.  Copy
-// fatales on other irregular files as well as on any failing filesystem
-// operation.  A failing undo panics.
+// Copy copies given directory to given path and returns a function to
+// undo this operation.  Note next to directories only regular files and
+// symlinks are supported.  Copy fatales on other irregular files as
+// well as on any failing filesystem operation.  A failing undo panics.
 func (d *Dir) Copy(toDir Pather) (undo func()) {
 
 	err := d.fs().Walk(d.path, func(
@@ -274,25 +310,6 @@ func (d *Dir) replaceDirWithContent(
 	}
 }
 
-// CopyFl copies the content of given file from given directory to given
-// Path().  CopyFl fatales associated testing instance if ReadFile or
-// WriteFile fails.  Returned undo function removes the copy.
-func (d *Dir) CopyFl(file string, toDir Pather) (undo func()) {
-	bb, err := d.fs().ReadFile(fp.Join(d.path, file))
-	if err != nil {
-		d.t.Fatalf("gounit: fs: dir: copy: read: %s: %v", file, err)
-	}
-	err = d.fs().WriteFile(fp.Join(toDir.Path(), file), bb, 0644)
-	if err != nil {
-		d.t.Fatalf("gounit: fs: dir: copy: write: %s: %v", file, err)
-	}
-	return func() {
-		if err := d.fs().Remove(fp.Join(toDir.Path(), file)); err != nil {
-			panic(err)
-		}
-	}
-}
-
 // Mk crates a new directory inside given directory's path by combining
 // given strings to a (relative) path.  The returned function removes
 // the root directory of given path and resets returned Dir instance.
@@ -334,14 +351,65 @@ func (d *Dir) MkFile(name string, content []byte) (undo func()) {
 	}
 }
 
+// FileCopy copies the content of given file from given directory to given
+// Path().  FileCopy fatales associated testing instance if ReadFile or
+// WriteFile fails.  Returned undo function removes the copy and panics
+// if its execution fails.
+func (d *Dir) FileCopy(file string, toDir Pather) (undo func()) {
+	bb, err := d.fs().ReadFile(fp.Join(d.path, file))
+	if err != nil {
+		d.t.Fatalf("gounit: fs: dir: copy: read: %s: %v", file, err)
+	}
+	err = d.fs().WriteFile(fp.Join(toDir.Path(), file), bb, 0644)
+	if err != nil {
+		d.t.Fatalf("gounit: fs: dir: copy: write: %s: %v", file, err)
+	}
+	return func() {
+		if err := d.fs().Remove(fp.Join(toDir.Path(), file)); err != nil {
+			panic(err)
+		}
+	}
+}
+
 // FileContent joins given directory with given file name and returns
 // its content.  FileContent fatales if it cant be read.
 func (d *Dir) FileContent(relName string) []byte {
 	bb, err := d.fs().ReadFile(fp.Join(d.path, relName))
 	if err != nil {
-		d.t.Fatalf("gounit: fs: dir: copy: read: %s: %v", relName, err)
+		d.t.Fatalf("gounit: fs: dir: file-copy: read: %s: %v", relName, err)
 	}
 	return bb
+}
+
+// FileMod returns a directory-file's modification time.  It fatales iff
+// stats can't be obtained.
+func (d *Dir) FileMod(relName string) time.Time {
+	stat, err := d.fs().Stat(fp.Join(d.path, relName))
+	if err != nil {
+		d.t.Fatalf("gounit: fs: dir: file: mod-stat: %s: %v", relName, err)
+	}
+	return stat.ModTime()
+}
+
+// Touch sets given directory-file's modification (access) time to the
+// current time; let d be a Dir-instance:
+//
+//	mt := d.FileMod("my_file")
+//	time.Sleep(1*time.Millisecond)
+//	d.Touch("my_file")
+//	fmt.Println(mt.Before(d.FileMod("my_file")) // => prints "true"
+//
+// Touch fatales iff given file doesn't exist in given directory or if
+// its modification time can't be updated.
+func (d *Dir) Touch(relName string) {
+	fileName := fp.Join(d.path, relName)
+	if _, err := os.Stat(fileName); err != nil {
+		d.t.Fatalf("gounit: fs: dir: touch: %s: %v", relName, err)
+	}
+	now := time.Now()
+	if err := os.Chtimes(fileName, now, now); err != nil {
+		d.t.Fatalf("gounit: fs: dir: touch: %s: %v", relName, err)
+	}
 }
 
 // MkMod adds to given directory a go.mod file with given module name.
@@ -375,10 +443,13 @@ func (d *Dir) HasCachedModSum() bool {
 	return ok
 }
 
-// goModSumFromCache tries to read given modules go.mod and go.sum from
-// the user's caching path's gounit directory.  If that is not possible
-// it is tried to created needed files by calling go mod tidy and to
-// cache them.
+// mkGoModSum creates needed go.mod and go.sum file for give module in
+// its root directory.  mkGoModSum first tries to obtain these files
+// from the cache; is that no possible it ties to created them by
+// executing "go mod tidy"; updated go.mod and created go.sum file are
+// tried to be cached for the next call.  Note we can not depend on
+// functioning caching since it will never work for example on github
+// during a workflow which runs all tests.
 func (d *Dir) mkGoModSum(module string) {
 	modFl := fp.Join(d.path, "go.mod")
 	sumFl := fp.Join(d.path, "go.sum")
@@ -411,6 +482,9 @@ func (d *Dir) mkGoModSum(module string) {
 	goModSumToCache(d.fs(), module, bbMod, bbSum)
 }
 
+// goModSumFromCache tries to read given modules go.mod and go.sum from
+// the user's caching path's gounit directory and returning.  In case of
+// success return ok is true otherwise it is false.
 func goModSumFromCache(
 	fs *fsTools, module string,
 ) (bbMod, bbSum []byte, ok bool) {
@@ -508,8 +582,8 @@ func (d *Dir) MkPkgTest(name string, content []byte) (undo func()) {
 
 // CWD changes the current working directory to given directory and
 // returns a function to undo this change.  CWD fatales given testing
-// instance if given directory if the working directory change fails.
-// It panics if the undo fails.
+// instance if the working directory change fails.  It panics if the
+// undo fails.
 func (d *Dir) CWD() (undo func()) {
 	wd, err := d.fs().Getwd()
 	if err != nil {

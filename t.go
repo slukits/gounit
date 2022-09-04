@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/slukits/gounit/pkg/fs"
+	"github.com/slukits/gounit/pkg/tfs"
 )
 
 // A TMock instance is obtained by [T.Mock] and provides the
@@ -56,7 +56,7 @@ type T struct {
 	logger   func(...interface{})
 	errorer  func(...interface{})
 	canceler func()
-	fs       *fs.FS
+	fs       *tfs.FS
 }
 
 // NewT wraps given go testing.T instance into a gounit.T instance.
@@ -190,9 +190,9 @@ func (t *T) Timeout(d time.Duration) chan struct{} {
 //
 // It also removes error handling for file system operations by simply
 // failing the test in case of an error.
-func (t *T) FS() *fs.FS {
+func (t *T) FS() *tfs.FS {
 	if t.fs == nil {
-		t.fs = fs.New(t)
+		t.fs = tfs.New(t)
 	}
 	return t.fs
 }

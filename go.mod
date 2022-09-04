@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/google/go-cmp v0.5.8
-	github.com/slukits/lines v0.0.0-20220829074827-d446f92d0c1f
+	github.com/slukits/lines v0.0.0-20220904101338-4dd2d0dad2f0
 )
 
 require (
