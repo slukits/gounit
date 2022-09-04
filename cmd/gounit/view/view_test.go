@@ -19,26 +19,26 @@ func (s *ANewViewDisplaysInitiallyGiven) SetUp(t *T) { t.Parallel() }
 func (s *ANewViewDisplaysInitiallyGiven) Message(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
 	ee.Listen()
-	t.Contains(tt.LastScreen, fxMsg)
+	t.Contains(tt.LastScreen.String(), fxMsg)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Status(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
 	ee.Listen()
-	t.Contains(tt.LastScreen, fxStatus)
+	t.Contains(tt.LastScreen.String(), fxStatus)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Main_info(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
 	ee.Listen()
-	t.Contains(tt.LastScreen, fxMain)
+	t.Contains(tt.LastScreen.String(), fxMain)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Buttons(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
 	ee.Listen()
-	t.Contains(tt.LastScreen, fxBtt1)
-	t.Contains(tt.LastScreen, fxBtt2)
+	t.Contains(tt.LastScreen.String(), fxBtt1)
+	t.Contains(tt.LastScreen.String(), fxBtt2)
 }
 
 func TestANewView(t *testing.T) {
@@ -55,7 +55,7 @@ func (s *AView) Updates_message_bar_with_given_message(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(fx), 2)
 	ee.Listen()
 	fx.updateMessageBar(exp)
-	t.Contains(tt.LastScreen, exp)
+	t.Contains(tt.LastScreen.String(), exp)
 }
 
 func (s *AView) Resets_message_bar_to_default_if_zero_update(t *T) {
@@ -63,9 +63,9 @@ func (s *AView) Resets_message_bar_to_default_if_zero_update(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(fx), 3)
 	ee.Listen()
 	fx.updateMessageBar(exp)
-	t.False(strings.Contains(tt.String(), fxMsg))
+	t.False(strings.Contains(tt.Screen().String(), fxMsg))
 	fx.updateMessageBar("")
-	t.Contains(tt.LastScreen, fxMsg)
+	t.Contains(tt.LastScreen.String(), fxMsg)
 }
 
 func (s *AView) Updates_statusbar_with_given_message(t *T) {
@@ -73,7 +73,7 @@ func (s *AView) Updates_statusbar_with_given_message(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(fx), 2)
 	ee.Listen()
 	fx.updateStatusbar(exp)
-	t.Contains(tt.LastScreen, exp)
+	t.Contains(tt.LastScreen.String(), exp)
 }
 
 func (s *AView) Resets_statusbar_to_default_if_zero_update(t *T) {
@@ -81,9 +81,9 @@ func (s *AView) Resets_statusbar_to_default_if_zero_update(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(fx), 3)
 	ee.Listen()
 	fx.updateStatusbar(exp)
-	t.False(strings.Contains(tt.String(), fxStatus))
+	t.False(strings.Contains(tt.Screen().String(), fxStatus))
 	fx.updateStatusbar("")
-	t.Contains(tt.LastScreen, fxStatus)
+	t.Contains(tt.LastScreen.String(), fxStatus)
 }
 
 type fxFailButtonInitLabels struct {
@@ -209,7 +209,7 @@ func (s *AView) Updates_button_rune(t *T) {
 	tt.FireRune('x')
 
 	t.True(fx.bttTwoReported)
-	t.Contains(tt.LastScreen, "hurz")
+	t.Contains(tt.LastScreen.String(), "hurz")
 }
 
 type linerFX struct {
@@ -237,7 +237,7 @@ func (s *AView) Updates_its_main_content(t *T) {
 
 	fx.mainLines(&linerFX{content: exp})
 
-	t.Contains(tt.LastScreen, exp)
+	t.SpaceMatched(tt.LastScreen.String(), "first", "third", "forth")
 	t.False(ee.IsListening())
 }
 
@@ -246,14 +246,14 @@ func (s *AView) Clears_unused_main_lines(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(fx), 3)
 	ee.Listen()
 	fx.mainLines(&linerFX{content: exp})
-	t.Contains(tt.String(), exp)
+	t.SpaceMatched(tt.Screen().String(), strings.Split(exp, "\n")...)
 
 	exp = "\n\n2nd\n3rd\n4th"
 	fx.mainLines(&linerFX{content: exp, clearing: true})
 
-	t.Contains(tt.LastScreen, exp)
-	t.False(strings.Contains(tt.LastScreen, "first line"))
-	t.False(strings.Contains(tt.LastScreen, "fifth"))
+	t.SpaceMatched(tt.LastScreen.String(), strings.Split(exp, "\n")...)
+	t.False(strings.Contains(tt.LastScreen.String(), "first line"))
+	t.False(strings.Contains(tt.LastScreen.String(), "fifth"))
 	t.False(ee.IsListening())
 }
 
