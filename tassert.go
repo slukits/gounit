@@ -349,6 +349,16 @@ func (t *T) Within(d *TimeStepper, cond func() bool) (fulfilled bool) {
 		t.Errorf(assertErr, "within", withinErr)
 		return false
 	}
+	// select {
+	// case success := <-done:
+	// 	if success {
+	// 		return
+	// 	}
+	// 	t.Errorf(assertErr, "within", withinErr)
+	// 	return false
+	// case <-t.Timeout(2 * d.Duration()):
+	// 	panic("gounit: within: should have concluded by now")
+	// }
 	return true
 }
 

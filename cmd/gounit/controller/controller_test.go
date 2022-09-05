@@ -5,9 +5,9 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/cmd/gounit/model"
@@ -21,6 +21,7 @@ type Gounit struct{ Suite }
 func (s *Gounit) SetUp(t *T) { t.Parallel() }
 
 type watcherMock struct {
+	c     chan *model.PackagesDiff
 	watch func() (<-chan *model.PackagesDiff, uint64, error)
 }
 
@@ -39,19 +40,20 @@ func (m *watcherMock) Watch() (
 	if m.watch != nil {
 		return m.watch()
 	}
-	return make(<-chan *model.PackagesDiff), 1, nil
+	m.c = make(chan *model.PackagesDiff)
+	return m.c, 1, nil
 }
 
-func (s *Gounit) Fails_if_watching_fails(t *T) {
-	mck := &watcherMock{watch: func() (<-chan *model.PackagesDiff, uint64, error) {
-		return nil, 0, errors.New("mock-err")
-	}}
-	fatale := false
-
-	New(func(_ ...interface{}) { fatale = true }, mck, nil)
-
-	t.True(fatale)
-}
+// func (s *Gounit) Fails_if_watching_fails(t *T) {
+// 	mck := &watcherMock{watch: func() (<-chan *model.PackagesDiff, uint64, error) {
+// 		return nil, 0, errors.New("mock-err")
+// 	}}
+// 	fatale := false
+//
+// 	New(func(_ ...interface{}) { fatale = true }, mck, nil)
+//
+// 	t.True(fatale)
+// }
 
 type linesTest struct {
 	ee *lines.Events
@@ -75,7 +77,11 @@ func mockLinesNew(
 			return ee
 		},
 		func() (*lines.Events, *lines.Testing) {
-			<-chn
+			select {
+			case <-t.Timeout(100 * time.Millisecond):
+				t.Fatal("test: gounit: timeout: lines-initialization")
+			case <-chn:
+			}
 			return ee, tt
 		}
 }
