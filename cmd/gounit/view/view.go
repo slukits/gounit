@@ -45,6 +45,10 @@ import (
 // manipulate view, i.e. the screen content.
 type Initer interface {
 
+	// Fatal provides the function to which a view reports fatal
+	// view-errors to.
+	Fatal() func(...interface{})
+
 	// Message returns the message bar's default content and is provided
 	// by a View with a function to update or reset the message bar's
 	// content.  Calling update with the empty string resets the message
@@ -57,10 +61,10 @@ type Initer interface {
 	// statusbar's content.
 	Status(update func(string)) string
 
-	// Main returns an initial content a View's main area and is
+	// Report returns an initial content a View's main area and is
 	// provided by a View with a function to update line-listeners and
 	// an other to update lines.
-	Main(LLUpdater, LinesUpdater) string
+	Report(LLUpdater, LinesUpdater) string
 
 	// ForButton implementation is provided by a View with a callback
 	// function which may be used to initialize the View's button bar.
@@ -112,6 +116,7 @@ type LinesUpdater func(Liner)
 type view struct {
 	lines.Component
 	lines.Stacking
+	fatal       func(...interface{})
 	ee          *lines.Events
 	runeButtons map[rune]*button
 }
@@ -125,10 +130,10 @@ type view struct {
 //
 //	lines.New(view.New(i))
 func New(i Initer) *view {
-	new := &view{}
+	new := &view{fatal: i.Fatal()}
 	new.CC = append(new.CC, &messageBar{
 		dflt: i.Message(new.updateMessageBar)})
-	new.CC = append(new.CC, &report{dflt: i.Main(
+	new.CC = append(new.CC, &report{dflt: i.Report(
 		new.updateLineListener, new.updateLines)})
 	new.CC = append(new.CC, &statusBar{
 		dflt: i.Status(new.updateStatusBar)})
@@ -161,6 +166,9 @@ func initButtons(i Initer, v *view) *buttonBar {
 
 func (v *view) OnInit(e *lines.Env) {
 	v.ee = e.EE
+	if err := e.EE.MoveFocus(v.CC[1]); err != nil {
+		v.fatal(fmt.Sprintf("gounit: view: move focus: %v", err))
+	}
 }
 
 func (v *view) OnRune(_ *lines.Env, r rune) {
@@ -172,15 +180,23 @@ func (v *view) OnRune(_ *lines.Env, r rune) {
 }
 
 func (v *view) updateMessageBar(s string) {
-	v.ee.Update(v.CC[0], s, nil)
+	if err := v.ee.Update(v.CC[0], s, nil); err != nil {
+		v.fatal(fmt.Sprintf(
+			"gounit: view update: message-bar: %v", err))
+	}
 }
 
 func (v *view) updateStatusBar(s string) {
-	v.ee.Update(v.CC[2], s, nil)
+	if err := v.ee.Update(v.CC[2], s, nil); err != nil {
+		v.fatal(fmt.Sprintf("gounit: view: update: statusbar: %v", err))
+	}
 }
 
 func (v *view) updateLineListener(ll func(int, LLMod)) {
-	v.ee.Update(v.CC[1], ll, nil)
+	if err := v.ee.Update(v.CC[1], ll, nil); err != nil {
+		v.fatal(fmt.Sprintf(
+			"gounit: view: update: line-listener: %v", err))
+	}
 }
 
 func (v *view) updateLines(l Liner) {
@@ -194,7 +210,10 @@ func (v *view) updateLines(l Liner) {
 	if l.Clearing() {
 		linesUpdate[-1] = "clear"
 	}
-	v.ee.Update(v.CC[1], linesUpdate, nil)
+	if err := v.ee.Update(v.CC[1], linesUpdate, nil); err != nil {
+		v.fatal(fmt.Sprintf("gounit: view: update: lines: %v", err))
+		panic(err)
+	}
 }
 
 func (v *view) addRune(r rune, b *button) {

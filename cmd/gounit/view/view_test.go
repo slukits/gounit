@@ -50,6 +50,18 @@ type AView struct{ Suite }
 
 func (s *AView) SetUp(t *T) { t.Parallel() }
 
+func (s *AView) Focuses_the_reporting_component(t *T) {
+	vw := New(&fxInit{t: t})
+	ee, _ := lines.Test(t.GoT(), vw, 2)
+	ee.Listen()
+
+	ee.Update(vw, nil, func(e *lines.Env) {
+		t.Eq(vw.CC[1], e.Focused())
+	})
+
+	t.False(ee.IsListening())
+}
+
 func (s *AView) Updates_message_bar_with_given_message(t *T) {
 	fx, exp := &fxInit{t: t}, "updated message"
 	ee, tt := lines.Test(t.GoT(), New(fx), 2)
@@ -257,9 +269,16 @@ func (s *AView) Clears_unused_main_lines(t *T) {
 	t.False(ee.IsListening())
 }
 
+type dbg struct{ Suite }
+
+func (s *dbg) Dbg(t *T) {
+}
+
+func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+
 func (s *AView) Reports_a_main_line_click(t *T) {
 	fx, cnt, exp := newFX(t), "first\n\nthird\nforth", 2
-	ee, tt := lines.Test(t.GoT(), fx.view, 7)
+	ee, tt := lines.Test(t.GoT(), fx.view, 5)
 	ee.Listen()
 	fx.mainLines(&linerFX{content: cnt})
 	tt.FireComponentClick(fx.CC[1], 0, exp) // no-op, coverage
@@ -278,7 +297,7 @@ func (s *AView) Reports_a_main_line_click(t *T) {
 
 func (s *AView) Reports_a_main_line_context(t *T) {
 	fx, cnt, exp := newFX(t), "first\n\nthird\nforth", 2
-	ee, tt := lines.Test(t.GoT(), fx.view, 7)
+	ee, tt := lines.Test(t.GoT(), fx.view, 5)
 	ee.Listen()
 	fx.mainLines(&linerFX{content: cnt})
 	tt.FireComponentContext(fx.CC[1], 0, exp) // no-op, coverage

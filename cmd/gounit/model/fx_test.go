@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/slukits/gounit"
-	"github.com/slukits/gounit/pkg/fs"
+	"github.com/slukits/gounit/pkg/tfs"
 )
 
 type FxMask uint64
@@ -164,7 +164,7 @@ type ModuleFX struct {
 	*Sources
 	t      *gounit.T
 	fxWW   []chan struct{}
-	FxDir  *fs.Dir
+	FxDir  *tfs.Dir
 	n, tpN int
 }
 

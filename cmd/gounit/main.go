@@ -11,13 +11,13 @@ Usage:
 By default gounit reports of watched sources always the latest test
 results associated with latest modifications.  A user can request to get
 all packages of a watch sources directory listed.  While a requested
-suite view shows all test-suites of the "current" package.  Finally the
-user can choose to switch on/off: race, vet and stats.  The later
-reports about a package and the watched sources how many source files
-are there and how many of them are for testing; it reports how many
-lines of code, how many of them are for testing and how many lines of
-documentation are found in a package and overall in the watched sources.
-If stats are on gounit also reports a diff of the first stats
+suite view shows all test-suites of the "current" package.  Finally in
+the settings a user can choose to switch on/off: race, vet and stats.
+The later reports about a package and the watched sources how many
+source files are there and how many of them are for testing; it reports
+how many lines of code, how many of them are for testing and how many
+lines of documentation are found in a package and overall in the watched
+sources.  If stats are on gounit also reports a diff of the first stats
 calculations and the last when it is quit by the user.  Sample ui:
 
 	github.com/slukits/gounit: cmd/gounit

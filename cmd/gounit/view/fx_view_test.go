@@ -5,12 +5,18 @@
 package view
 
 import (
+	"log"
+
 	"github.com/slukits/gounit"
 	"github.com/slukits/lines"
 )
 
 type fxInit struct {
 	t *gounit.T
+
+	// fatal is provided to the view to report fatal errors; it defaults
+	// to log.Fatal
+	fatal func(...interface{})
 
 	// update *bar are holding the updaters for message- and statusbar
 	// which were received through the Status and Message implementations.
@@ -43,6 +49,15 @@ const (
 	fxRnBtt3 = '3'
 )
 
+// Fatal provides the function for fatal view-errors and defaults to
+// log.Fatal.
+func (fx *fxInit) Fatal() func(...interface{}) {
+	if fx.fatal == nil {
+		return log.Fatal
+	}
+	return fx.fatal
+}
+
 func (fx *fxInit) Message(upd func(string)) string {
 	fx.updateMessageBar = upd
 	return fxMsg
@@ -53,7 +68,7 @@ func (fx *fxInit) Status(upd func(string)) string {
 	return fxStatus
 }
 
-func (fx *fxInit) Main(llu LLUpdater, lu LinesUpdater) string {
+func (fx *fxInit) Report(llu LLUpdater, lu LinesUpdater) string {
 	fx.mainListener = llu
 	fx.mainLines = lu
 	return fxMain
