@@ -28,7 +28,7 @@ gounit's terminal user interface (note: the actual ui has no frames)
 	|                                                                  |
 	| packages: n; tests: t/f; stat: c/t d                             |
 	+------------------------------------------------------------------+
-	|  [p]kgs   [s]uites   [v]et=off   [r]ace=off   [s]ats=on  [q]uit  |
+	|     [p]kgs     [s]uites     se[t]tings     [h]elp     [q]uit     |
 	+------------------------------------------------------------------+
 */
 package view
@@ -40,72 +40,81 @@ import (
 	"github.com/slukits/lines"
 )
 
-// An Initer implementation initializes a new view provided to the
-// [View.New] constructor and it is provided with the functionality to
-// manipulate view, i.e. the screen content.
+// An Initer implementation initializes a new view and receives from
+// initialized view function for updating view components.  See New.
 type Initer interface {
 
-	// Fatal provides the function to which a view reports fatal
-	// view-errors to.
+	// Fatal is expected to provide a function to which initializing
+	// view can report fatal view-errors to.
 	Fatal() func(...interface{})
 
-	// Message returns the message bar's default content and is provided
-	// by a View with a function to update or reset the message bar's
-	// content.  Calling update with the empty string resets the message
-	// bar's content.
+	// Message is by initializing view provided with an update function
+	// for the message bar's content and expects an initial content.
+	// Calling update with the empty string resets the message bar's
+	// content.
 	Message(update func(string)) string
 
-	// Status returns the statusbar's default content and is provided by
-	// a View with a function to update or reset the statusbar's
-	// content.  Calling update with the empty string resets the
-	// statusbar's content.
+	// Status is by initializing view provided with an update function
+	// for the status bar's content and expects an initial content.
+	// Calling update with the empty string resets the statusbar's
+	// content.
 	Status(update func(string)) string
 
-	// Report returns an initial content a View's main area and is
-	// provided by a View with a function to update line-listeners and
-	// an other to update lines.
-	Report(LLUpdater, LinesUpdater) string
+	// Reporting is by initializing view provided with an update
+	// function for the reporting component's lines and expects an initial
+	// content string as well as a listener which is notified if a user
+	// selects a line.
+	Reporting(ReportingUpd) (string, ReportingLst)
 
-	// ForButton implementation is provided by a View with a callback
-	// function which may be used to initialize the View's button bar.
-	// Such a callback may be called with a [View.ButtonUpdater]
-	// callback which provides to the Initer implementation a function
-	// to update a button definition.  A button definition fails if
-	// ambiguous button labels are provided.
-	ForButton(func(ButtonDef, ButtonUpdater) error)
+	// Buttons is by initializing view provided with an update function
+	// for buttons and expects a function for initial button definitions
+	// and a listener function which is notified if a button was
+	// selected.
+	Buttons(_ ButtonUpd, bb func(ButtonDef) error) ButtonLst
 }
 
-// LLMod  values are used to describe to a main lines-listener what kind
-// of event is reported.
-type LLMod uint8
+// LineMask  values are used to describe to a reporting component how a
+// particular line should be displayed.
+type LineMask uint8
 
 const (
-	// Context is reported iff a line is clicked with the "right" mouse
-	// key.
-	Context LLMod = 1 << iota
-	// Default is reported iff a line is clicked or other wise selected
-	// without special conditions (its still undefined what special
-	// conditions are).
-	Default LLMod = 0
+
+	// Failed sets error formattings for a reporting component's line
+	// like a red background and a white foreground.
+	Failed LineMask = 1 << iota
+
+	// Passed sets a lines as the "green bar", i.e. a green background
+	// and a black foreground.
+	Passed
+
+	// ZeroLineMode indicates no other than default formattings for a
+	// line of a reporting component.
+	ZeroLineMod LineMask = 0
 )
 
-// LLUpdater function is provided  to an Initer implementation to update
-// lines listeners.  A lines listener (function) is informed if a particular line
-// was selected by the user, e.g. clicked.
-type LLUpdater func(func(idx int, mod LLMod))
+// LstUpdater function is provided  to an Initer implementation to
+// update the lines listener.  A lines listener (function) is informed
+// if a particular line was selected by the user, e.g. clicked.
+type LstUpdater func(func(idx int))
 
 // A Liner provides line-updates for the main area.
 type Liner interface {
+
 	// Clearing returns true iff all remaining lines which are not set
 	// by Liner.For of the main component should be cleared.
 	Clearing() bool
-	// calls given function for each line back.
-	For(line func(idx uint, content string))
-}
 
-// UpdateLines function is provided to an Initer implementation.  It
-// expects an callback function which is defining a line.
-type LinesUpdater func(Liner)
+	// For is provided with the reporting component instance and a
+	// callback function which must be called for each line which should
+	// be updated.  If Clearing all other lines of reporting component
+	// are reset to zero.  For each updated line Mask is called for
+	// optional formatting information.
+	For(_ lines.Componenter, line func(idx uint, content string))
+
+	// Mask may provide for an updated line additional formatting
+	// information like "Failed" or "Passed".
+	Mask(idx uint) LineMask
+}
 
 // view implements the lines Componenter interface hence an instance of
 // it can be used to initialize a lines terminal ui.  Note the view
@@ -129,12 +138,19 @@ type view struct {
 // instance, e.g.:
 //
 //	lines.New(view.New(i))
+//
+// or a testing instance
+//
+//	func (s *MySuite) My_suite_test(t *T) {
+//		tt := view.Test{t, view.New(i)}
+//		ee, lt := lines.Test(tt)
+//	}
 func New(i Initer) *view {
 	new := &view{fatal: i.Fatal()}
 	new.CC = append(new.CC, &messageBar{
 		dflt: i.Message(new.updateMessageBar)})
-	new.CC = append(new.CC, &report{dflt: i.Report(
-		new.updateLineListener, new.updateLines)})
+	dflt, lst := i.Reporting(new.updateLines)
+	new.CC = append(new.CC, &report{dflt: dflt, listener: lst})
 	new.CC = append(new.CC, &statusBar{
 		dflt: i.Status(new.updateStatusBar)})
 	initButtons(i, new)
@@ -143,24 +159,18 @@ func New(i Initer) *view {
 
 func initButtons(i Initer, v *view) *buttonBar {
 	bb := &buttonBar{}
-	v.CC = append(v.CC, bb)
-	i.ForButton(func(bd ButtonDef, bu ButtonUpdater) error {
-
-		if err := v.validateButtonDef(bd, nil); err != nil {
+	v.CC = append(v.CC, bb) // necessary for button-def validation
+	lst := i.Buttons(v.updateButton, func(bd ButtonDef) error {
+		if err := v.validateButtonDef("", bd); err != nil {
 			return err
 		}
-
-		// add button for valid button definition
-		bb.bb = append(bb.bb, &button{
-			label: bd.Label, listener: bd.Listener})
-		if bd.Rune != 0 {
+		bb.append(bd)
+		if bd.Rune != 0 && bd.Label != "" {
 			v.addRune(bd.Rune, bb.bb[len(bb.bb)-1])
-		}
-		if bu != nil {
-			bu(v.updateButtonClosure(bb.bb[len(bb.bb)-1]))
 		}
 		return nil
 	})
+	bb.setListener(lst)
 	return bb
 }
 
@@ -192,27 +202,9 @@ func (v *view) updateStatusBar(s string) {
 	}
 }
 
-func (v *view) updateLineListener(ll func(int, LLMod)) {
-	if err := v.ee.Update(v.CC[1], ll, nil); err != nil {
-		v.fatal(fmt.Sprintf(
-			"gounit: view: update: line-listener: %v", err))
-	}
-}
-
 func (v *view) updateLines(l Liner) {
-	linesUpdate := map[int]string{}
-	l.For(func(idx uint, content string) {
-		linesUpdate[int(idx)] = content
-	})
-	if len(linesUpdate) == 0 {
-		return
-	}
-	if l.Clearing() {
-		linesUpdate[-1] = "clear"
-	}
-	if err := v.ee.Update(v.CC[1], linesUpdate, nil); err != nil {
+	if err := v.ee.Update(v.CC[1], l, nil); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: update: lines: %v", err))
-		panic(err)
 	}
 }
 
@@ -223,31 +215,49 @@ func (v *view) addRune(r rune, b *button) {
 	v.runeButtons[r] = b
 }
 
-func (v *view) updateButtonClosure(btt *button) func(ButtonDef) error {
-	return func(bd ButtonDef) error {
-
-		if err := v.validateButtonDef(bd, btt); err != nil {
-			return err
-		}
-		if err := v.ee.Update(btt, &bd, nil); err != nil {
-			return err
-		}
-		if v.runeButtons[bd.Rune] == btt {
-			return nil
-		}
-		for r, b := range v.runeButtons { // NOTE: not concurrency save
-			if btt != b {
-				continue
-			}
-			delete(v.runeButtons, r)
-			if bd.Rune == 0 {
-				break
-			}
-			v.runeButtons[bd.Rune] = b
-		}
-		return nil
-	}
+type buttonUpdate struct {
+	label   string
+	def     ButtonDef
+	setRune func(rune, *button)
 }
+
+func (v *view) updateButton(label string, def ButtonDef) error {
+	if err := v.validateButtonDef(label, def); err != nil {
+		return err
+	}
+	err := v.ee.Update(v.CC[3], &buttonUpdate{label: label, def: def,
+		setRune: func(r rune, btt *button) {
+			if btt == nil { // button deleted
+				for r, b := range v.runeButtons {
+					if b.label != label {
+						continue
+					}
+					delete(v.runeButtons, r)
+					break
+				}
+				return
+			}
+			if v.runeButtons[r] == btt { // rune not updated
+				return
+			}
+			for r, b := range v.runeButtons { // rune updated
+				if btt != b {
+					continue
+				}
+				delete(v.runeButtons, r)
+			}
+			if r == 0 { // rune deleted
+				return
+			}
+			v.runeButtons[r] = btt
+		}}, nil)
+	return err
+}
+
+// ErrButtonNotFound is returned if a button with given label is
+// requested for update and no button with that label can be found.
+var ErrButtonNotFound = errors.New(
+	"view: update button: not found: ")
 
 // ErrButtonLabelAmbiguity is returned during a view's initialization or
 // from a button update iff a button should be created/updated to a
@@ -261,16 +271,28 @@ var ErrButtonLabelAmbiguity = errors.New(
 var ErrButtonRuneAmbiguity = errors.New(
 	"view: define button: ambiguous rune: ")
 
-func (v *view) validateButtonDef(bd ButtonDef, btt *button) error {
+func (v *view) validateButtonDef(
+	label string, bd ButtonDef,
+) error {
+
+	var btt *button
+	if label != "" {
+		for _, b := range v.CC[3].(*buttonBar).bb {
+			if b.label != label {
+				continue
+			}
+			btt = b
+		}
+		if btt == nil {
+			return fmt.Errorf("%w%s", ErrButtonNotFound, label)
+		}
+	}
 	if b, ok := v.runeButtons[bd.Rune]; ok && b != btt {
 		return fmt.Errorf(
 			"%w%c", ErrButtonRuneAmbiguity, bd.Rune)
 	}
-	if bd.Label == "" {
-		return nil
-	}
 	for _, b := range v.CC[3].(*buttonBar).bb {
-		if btt != nil && btt == b {
+		if b.label == label {
 			continue
 		}
 		if b.label == bd.Label {

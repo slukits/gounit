@@ -31,7 +31,7 @@ func (s *ANewViewDisplaysInitiallyGiven) Status(t *T) {
 func (s *ANewViewDisplaysInitiallyGiven) Main_info(t *T) {
 	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
 	ee.Listen()
-	t.Contains(tt.LastScreen.String(), fxMain)
+	t.Contains(tt.LastScreen.String(), fxReporting)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Buttons(t *T) {
@@ -46,56 +46,86 @@ func TestANewView(t *testing.T) {
 	Run(&ANewViewDisplaysInitiallyGiven{}, t)
 }
 
-type AView struct{ Suite }
+type AView struct {
+	Suite
+	Fixtures
+}
 
 func (s *AView) SetUp(t *T) { t.Parallel() }
 
-func (s *AView) Focuses_the_reporting_component(t *T) {
-	vw := New(&fxInit{t: t})
-	ee, _ := lines.Test(t.GoT(), vw, 2)
+func (s *AView) TearDown(t *T) {
+	quit := s.Get(t)
+	if quit == nil {
+		return
+	}
+	quit.(func())()
+}
+
+// fx creates a new view fixture (see newFX) and initializes with it a
+// lines.Test whose returned Events and Testing instances are returned
+// along with the view fixture.  A so obtained Events instance listens
+// for ever and is quit by TearDown.
+func (s *AView) fx(t *T) (*lines.Events, *lines.Testing, *viewFX) {
+	fx := newFX(t)
+	ee, tt := lines.Test(t.GoT(), fx, 0)
 	ee.Listen()
+	s.Set(t, ee.QuitListening)
+	return ee, tt, fx
+}
 
-	ee.Update(vw, nil, func(e *lines.Env) {
-		t.Eq(vw.CC[1], e.Focused())
+func (s *AView) Focuses_the_reporting_component(t *T) {
+	ee, _, fx := s.fx(t)
+
+	ee.Update(fx, nil, func(e *lines.Env) {
+		t.Eq(fx.Report, e.Focused())
 	})
+}
 
-	t.False(ee.IsListening())
+func (s *AView) Reporting_component_is_scrollable(t *T) {
+	ee, _, fx := s.fx(t)
+
+	ee.Update(fx.Report, nil, func(e *lines.Env) {
+		t.True(fx.Report.FF.Has(lines.Scrollable))
+	})
 }
 
 func (s *AView) Updates_message_bar_with_given_message(t *T) {
-	fx, exp := &fxInit{t: t}, "updated message"
-	ee, tt := lines.Test(t.GoT(), New(fx), 2)
-	ee.Listen()
-	fx.updateMessageBar(exp)
-	t.Contains(tt.LastScreen.String(), exp)
+	_, tt, fx := s.fx(t)
+	exp := "updated message"
+
+	fx.updateMessage(exp)
+
+	t.Contains(tt.Screen().String(), exp)
 }
 
 func (s *AView) Resets_message_bar_to_default_if_zero_update(t *T) {
-	fx, exp := &fxInit{t: t}, "updated message"
-	ee, tt := lines.Test(t.GoT(), New(fx), 3)
-	ee.Listen()
-	fx.updateMessageBar(exp)
+	_, tt, fx := s.fx(t)
+	exp := "updated message"
+
+	fx.updateMessage(exp)
 	t.False(strings.Contains(tt.Screen().String(), fxMsg))
-	fx.updateMessageBar("")
-	t.Contains(tt.LastScreen.String(), fxMsg)
+
+	fx.updateMessage("")
+	t.Contains(tt.Screen().String(), fxMsg)
 }
 
 func (s *AView) Updates_statusbar_with_given_message(t *T) {
-	fx, exp := &fxInit{t: t}, "updated status"
-	ee, tt := lines.Test(t.GoT(), New(fx), 2)
-	ee.Listen()
-	fx.updateStatusbar(exp)
-	t.Contains(tt.LastScreen.String(), exp)
+	_, tt, fx := s.fx(t)
+	exp := "updated status"
+
+	fx.updateStatus(exp)
+	t.Contains(tt.Screen().String(), exp)
 }
 
 func (s *AView) Resets_statusbar_to_default_if_zero_update(t *T) {
-	fx, exp := &fxInit{t: t}, "updated status"
-	ee, tt := lines.Test(t.GoT(), New(fx), 3)
-	ee.Listen()
-	fx.updateStatusbar(exp)
+	_, tt, fx := s.fx(t)
+	exp := "updated status"
+
+	fx.updateStatus(exp)
 	t.False(strings.Contains(tt.Screen().String(), fxStatus))
-	fx.updateStatusbar("")
-	t.Contains(tt.LastScreen.String(), fxStatus)
+
+	fx.updateStatus("")
+	t.Contains(tt.Screen().String(), fxStatus)
 }
 
 type fxFailButtonInitLabels struct {
@@ -103,15 +133,17 @@ type fxFailButtonInitLabels struct {
 	buttonInitErr error
 }
 
-func (fx *fxFailButtonInitLabels) ForButton(
-	cb func(ButtonDef, ButtonUpdater) error,
-) {
-	if err := cb(ButtonDef{Label: "b"}, nil); err != nil {
+func (fx *fxFailButtonInitLabels) Buttons(
+	upd ButtonUpd, cb func(ButtonDef) error,
+) ButtonLst {
+	fx.updButton = upd
+	if err := cb(ButtonDef{Label: "b"}); err != nil {
 		fx.t.Fatal("unexpected error: %v", err)
 	}
-	if err := cb(ButtonDef{Label: "b"}, nil); err != nil {
+	if err := cb(ButtonDef{Label: "b"}); err != nil {
 		fx.buttonInitErr = err
 	}
+	return nil
 }
 
 func (s *AView) Fails_buttons_init_if_ambiguous_labels(t *T) {
@@ -127,15 +159,17 @@ type fxFailButtonInitRunes struct {
 	buttonInitErr error
 }
 
-func (fx *fxFailButtonInitRunes) ForButton(
-	cb func(ButtonDef, ButtonUpdater) error,
-) {
-	if err := cb(ButtonDef{Label: "b1", Rune: '1'}, nil); err != nil {
+func (fx *fxFailButtonInitRunes) Buttons(
+	upd ButtonUpd, cb func(ButtonDef) error,
+) ButtonLst {
+	fx.updButton = upd
+	if err := cb(ButtonDef{Label: "b1", Rune: '1'}); err != nil {
 		fx.t.Fatal("unexpected error: %v", err)
 	}
-	if err := cb(ButtonDef{Label: "b2", Rune: '1'}, nil); err != nil {
+	if err := cb(ButtonDef{Label: "b2", Rune: '1'}); err != nil {
 		fx.buttonInitErr = err
 	}
+	return nil
 }
 
 func (s *AView) Fails_buttons_init_if_ambiguous_event_runes(t *T) {
@@ -147,171 +181,135 @@ func (s *AView) Fails_buttons_init_if_ambiguous_event_runes(t *T) {
 }
 
 func (s *AView) Reports_button_clicks(t *T) {
-	fx := newFX(t)
-	_, tt := lines.Test(t.GoT(), fx, 5)
+	_, tt, fx := s.fx(t)
 
-	fx.ClickButton(tt, fxBtt3) // first because not changing countdown
 	fx.ClickButton(tt, fxBtt1)
 	fx.ClickButton(tt, fxBtt2)
+	fx.ClickButton(tt, fxBtt3)
 
 	t.True(fx.bttOneReported)
-	// no listener provided
-	t.False(fx.bttTwoReported)
+	t.True(fx.bttTwoReported)
 	// not part of layout since zero label
 	t.False(fx.bttThreeReported)
 }
 
 func (s *AView) Reports_button_runes(t *T) {
-	fx := newFX(t)
-	_, tt := lines.Test(t.GoT(), fx, 4)
+	_, tt, fx := s.fx(t)
 
 	tt.FireRune(fxRnBtt1)
 	tt.FireRune(fxRnBtt2)
 	tt.FireRune(fxRnBtt3)
 
 	t.True(fx.bttOneReported)
-	// no listener provided
-	t.False(fx.bttTwoReported)
+	t.True(fx.bttTwoReported)
 	// not part of layout since zero label
 	t.False(fx.bttThreeReported)
 }
 
 func (s *AView) Fails_a_button_update_if_ambiguous_label_given(t *T) {
-	fx := &fxInit{t: t}
-	ee, _ := lines.Test(t.GoT(), New(fx), 1)
-	ee.Listen()
-	err := fx.updBtt1(ButtonDef{Label: fxBtt2})
+	_, _, fx := s.fx(t)
+
+	err := fx.updButton(fxBtt1, ButtonDef{Label: fxBtt2})
 	t.ErrIs(err, ErrButtonLabelAmbiguity)
 }
 
 func (s *AView) Fails_a_button_update_if_ambiguous_rune_given(t *T) {
-	fx := &fxInit{t: t}
-	ee, _ := lines.Test(t.GoT(), New(fx), 1)
-	ee.Listen()
-	err := fx.updBtt1(ButtonDef{Label: "42", Rune: fxRnBtt2})
+	_, _, fx := s.fx(t)
+
+	err := fx.updButton(fxBtt1, ButtonDef{Label: "42", Rune: fxRnBtt2})
 	t.ErrIs(err, ErrButtonRuneAmbiguity)
 }
 
 func (s *AView) Removes_button_rune_on_zero_rune_update(t *T) {
-	fx := &fxInit{t: t}
-	_, tt := lines.Test(t.GoT(), New(fx), 4)
-
+	_, tt, fx := s.fx(t)
 	tt.FireRune(fxRnBtt1)
 	t.True(fx.bttOneReported)
 	fx.bttOneReported = false
-	t.FatalOn(fx.updBtt1(ButtonDef{Label: fxBtt1, Rune: 0}))
+
+	t.FatalOn(fx.updButton(fxBtt1, ButtonDef{Label: fxBtt1, Rune: 0}))
 	tt.FireRune(fxRnBtt1)
 
 	t.False(fx.bttOneReported)
 }
 
 func (s *AView) Updates_button_rune(t *T) {
-	fx := &fxInit{t: t}
-	ee, tt := lines.Test(t.GoT(), New(fx), 5)
-	ee.Listen()
+	_, tt, fx := s.fx(t)
+
 	// rune no-op for coverage
-	t.FatalOn(fx.updBtt1(ButtonDef{Label: fxBtt1, Rune: fxRnBtt1}))
-	tt.FireRune(fxRnBtt2)
-	t.False(fx.bttTwoReported)
+	t.FatalOn(fx.updButton(
+		fxBtt1, ButtonDef{Label: fxBtt1, Rune: fxRnBtt1}))
+	t.FatalOn(fx.updButton(
+		fxBtt1, ButtonDef{Label: fxBtt1Upd, Rune: 'x'}))
 
-	t.FatalOn(fx.updBtt2(ButtonDef{Label: "hurz", Rune: 'x',
-		Listener: func(label string) {
-			fx.bttTwoReported = true
-		}}))
+	t.False(fx.bttOneReported)
 	tt.FireRune('x')
-
-	t.True(fx.bttTwoReported)
-	t.Contains(tt.LastScreen.String(), "hurz")
-}
-
-type linerFX struct {
-	content  string
-	clearing bool
-}
-
-func (l *linerFX) Clearing() bool { return l.clearing }
-
-func (l *linerFX) For(cb func(uint, string)) {
-	ll := strings.Split(l.content, "\n")
-	for idx, l := range ll {
-		if l == "" {
-			continue
-		}
-		cb(uint(idx), l)
-	}
+	t.True(fx.bttOneReported)
+	t.Contains(tt.Screen().String(), fxBtt1Upd)
 }
 
 func (s *AView) Updates_its_main_content(t *T) {
-	fx, exp := &fxInit{t: t}, "first\n\nthird\nforth"
-	ee, tt := lines.Test(t.GoT(), New(fx), 2)
-	ee.Listen()
-	fx.mainLines(&linerFX{content: ""}) // no-op, coverage
+	_, tt, fx := s.fx(t)
+	exp := "first\n\nthird\nforth"
 
-	fx.mainLines(&linerFX{content: exp})
+	fx.updateReporting(&linerFX{content: ""}) // no-op, coverage
+	fx.updateReporting(&linerFX{content: exp})
 
-	t.SpaceMatched(tt.LastScreen.String(), "first", "third", "forth")
-	t.False(ee.IsListening())
+	t.SpaceMatched(tt.Screen().String(), "first", "third", "forth")
 }
 
 func (s *AView) Clears_unused_main_lines(t *T) {
-	fx, exp := &fxInit{t: t}, "first line\nsecond\nthird\nforth\nfifth"
-	ee, tt := lines.Test(t.GoT(), New(fx), 3)
-	ee.Listen()
-	fx.mainLines(&linerFX{content: exp})
+	_, tt, fx := s.fx(t)
+	exp := "first line\nsecond\nthird\nforth\nfifth"
+	fx.updateReporting(&linerFX{content: exp})
 	t.SpaceMatched(tt.Screen().String(), strings.Split(exp, "\n")...)
 
 	exp = "\n\n2nd\n3rd\n4th"
-	fx.mainLines(&linerFX{content: exp, clearing: true})
+	fx.updateReporting(&linerFX{content: exp, clearing: true})
 
-	t.SpaceMatched(tt.LastScreen.String(), strings.Split(exp, "\n")...)
-	t.False(strings.Contains(tt.LastScreen.String(), "first line"))
-	t.False(strings.Contains(tt.LastScreen.String(), "fifth"))
-	t.False(ee.IsListening())
+	scr := tt.Screen().String()
+	t.SpaceMatched(scr, strings.Split(exp, "\n")...)
+	t.False(strings.Contains(scr, "first line"))
+	t.False(strings.Contains(scr, "fifth"))
 }
 
-type dbg struct{ Suite }
+func (s *AView) Reports_click_in_reporting_component(t *T) {
+	_, tt, fx := s.fx(t)
 
-func (s *dbg) Dbg(t *T) {
+	cnt, exp := "first\n\nthird\nforth", 2
+	fx.updateReporting(&linerFX{content: cnt})
+
+	tt.FireComponentClick(fx.Report, 0, exp)
+	t.Eq(exp, fx.reportedLine)
 }
 
-func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+func (s *AView) Reporting_component_scrolls_on_context(t *T) {
+	_, tt, fx := s.fx(t)
 
-func (s *AView) Reports_a_main_line_click(t *T) {
-	fx, cnt, exp := newFX(t), "first\n\nthird\nforth", 2
-	ee, tt := lines.Test(t.GoT(), fx.view, 5)
-	ee.Listen()
-	fx.mainLines(&linerFX{content: cnt})
-	tt.FireComponentClick(fx.CC[1], 0, exp) // no-op, coverage
+	nLines, _ := fx.twoPointFiveTimesReportedLines()
+	scr := tt.ScreenOf(fx.Report).TrimHorizontal()
+	t.Eq(nLines, 2*len(scr)+len(scr)/2) // fixture test
 
-	mainListenerCalled := false
-	fx.mainListener(func(idx int, mod LLMod) {
-		t.True(mod&Default == Default)
-		t.Eq(exp, idx)
-		mainListenerCalled = true
-	})
+	expLine := scr[len(scr)-len(scr)/10] // scroll by 90%
+	tt.FireComponentContext(fx.Report, 0, 0)
+	gotScr := tt.ScreenOf(fx.Report).TrimHorizontal()
 
-	tt.FireComponentClick(fx.CC[1], 0, exp)
-	t.True(mainListenerCalled)
-	t.False(ee.IsListening())
+	t.Eq(expLine.String(), gotScr[0].String())
 }
 
-func (s *AView) Reports_a_main_line_context(t *T) {
-	fx, cnt, exp := newFX(t), "first\n\nthird\nforth", 2
-	ee, tt := lines.Test(t.GoT(), fx.view, 5)
-	ee.Listen()
-	fx.mainLines(&linerFX{content: cnt})
-	tt.FireComponentContext(fx.CC[1], 0, exp) // no-op, coverage
+func (s *AView) Reporting_component_at_bottom_scrolls_to_top(t *T) {
+	_, tt, fx := s.fx(t)
+	_, LastLine := fx.twoPointFiveTimesReportedLines()
+	firstLine := tt.ScreenOf(fx.Report).TrimHorizontal()[0].String()
 
-	mainListenerCalled := false
-	fx.mainListener(func(idx int, mod LLMod) {
-		t.True(mod&Context == Context)
-		t.Eq(exp, idx)
-		mainListenerCalled = true
-	})
+	tt.FireComponentContext(fx.Report, 0, 0)
+	tt.FireComponentContext(fx.Report, 0, 0)
+	// fixture test: should be at bottom
+	scr := tt.ScreenOf(fx.Report).TrimHorizontal()
+	t.Eq(LastLine, scr[scr.Height()-1].String())
 
-	tt.FireComponentContext(fx.CC[1], 0, exp)
-	t.True(mainListenerCalled)
-	t.False(ee.IsListening())
+	tt.FireComponentContext(fx.Report, 0, 0)
+
+	t.Eq(firstLine, tt.ScreenOf(fx.Report).TrimHorizontal()[0].String())
 }
 
 func TestAView(t *testing.T) {
