@@ -130,6 +130,7 @@ type button struct {
 }
 
 func (b *button) OnInit(e *lines.Env) {
+	b.Dim().SetWidth(len(b.uiLabel()))
 	fmt.Fprint(e, b.uiLabel())
 }
 
@@ -153,6 +154,7 @@ func (b *button) OnUpdate(e *lines.Env) {
 	bd := e.Evt.(*lines.UpdateEvent).Data.(*buttonUpdate)
 	b.label = bd.def.Label
 	b.rn = bd.def.Rune
+	b.Dim().SetWidth(len(b.uiLabel()))
 	fmt.Fprint(e, b.uiLabel())
 	bd.setRune(b.rn, b)
 }
