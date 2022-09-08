@@ -5,9 +5,12 @@
 package view
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gdamore/tcell/v2"
 	. "github.com/slukits/gounit"
 	"github.com/slukits/lines"
 )
@@ -89,6 +92,63 @@ func (s *AView) Reporting_component_is_scrollable(t *T) {
 	})
 }
 
+func (s *AView) Sets_its_width_to_80_if_screen_bigger(t *T) {
+	ee, tt, fx := s.fx(t)
+	tt.FireResize(120, 24)
+
+	ee.Update(fx, nil, func(e *lines.Env) {
+		t.Eq(80, fx.Dim().Width())
+	})
+}
+
+type dbg struct {
+	Suite
+	Fixtures
+}
+
+func (s *dbg) TearDown(t *T) {
+	quit := s.Get(t)
+	if quit == nil {
+		return
+	}
+	quit.(func())()
+}
+
+// fx creates a new view fixture (see newFX) and initializes with it a
+// lines.Test whose returned Events and Testing instances are returned
+// along with the view fixture.  A so obtained Events instance listens
+// for ever and is quit by TearDown.
+func (s *dbg) fx(t *T) (*lines.Events, *lines.Testing, *viewFX) {
+	fx := newFX(t)
+	ee, tt := lines.Test(t.GoT(), fx, 0)
+	ee.Listen()
+	tt.Timeout = 20 * time.Minute
+	s.Set(t, ee.QuitListening)
+	return ee, tt, fx
+}
+
+func (s *dbg) Dbg(t *T) {
+	ee, tt, fx := s.fx(t)
+	tt.Timeout = 20 * time.Minute
+	tt.FireResize(120, 24)
+
+	ee.Update(fx, nil, func(e *lines.Env) {
+		t.Eq(80, fx.Dim().Width())
+	})
+}
+
+func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+
+func (s *AView) Is_quit_able(t *T) {
+	ee, tt, fx := s.fx(t)
+
+	ee.Update(fx, nil, func(e *lines.Env) {
+		t.True(fx.FF.Has(lines.Quitable))
+	})
+
+	tt.FireRune('q')
+}
+
 func (s *AView) Updates_message_bar_with_given_message(t *T) {
 	_, tt, fx := s.fx(t)
 	exp := "updated message"
@@ -109,23 +169,48 @@ func (s *AView) Resets_message_bar_to_default_if_zero_update(t *T) {
 	t.Contains(tt.Screen().String(), fxMsg)
 }
 
-func (s *AView) Updates_statusbar_with_given_message(t *T) {
+func (s *AView) Updates_statusbar_with_given_string(t *T) {
 	_, tt, fx := s.fx(t)
-	exp := "updated status"
+	exp := StatusUpdate{Str: "updated status"}
 
 	fx.updateStatus(exp)
-	t.Contains(tt.Screen().String(), exp)
+	t.Contains(tt.Screen().String(), exp.Str)
 }
 
-func (s *AView) Resets_statusbar_to_default_if_zero_update(t *T) {
+func (s *AView) Updates_statusbar_with_given_numbers(t *T) {
 	_, tt, fx := s.fx(t)
-	exp := "updated status"
+	exp := StatusUpdate{Packages: 1, Suites: 2, Tests: 5, Failed: 2}
 
 	fx.updateStatus(exp)
-	t.False(strings.Contains(tt.Screen().String(), fxStatus))
 
-	fx.updateStatus("")
-	t.Contains(tt.Screen().String(), fxStatus)
+	t.Contains(tt.Screen().String(), fmt.Sprintf(dfltStatus, 1, 2, 5, 2))
+}
+
+func (s *AView) Status_has_green_background_if_not_failing(t *T) {
+	_, tt, fx := s.fx(t)
+	vw := Test{t, fx.view}
+	sb := vw.StatusBar(tt).TrimVertical()
+	t.Eq(1, len(sb))
+
+	styles, green := sb[0].Styles(), tcell.ColorGreen
+	for i := range sb[0] {
+		t.True(styles.Of(i).HasBG(green))
+	}
+}
+
+func (s *AView) Status_has_red_background_if_failing(t *T) {
+	_, tt, fx := s.fx(t)
+	fx.updateStatus(
+		StatusUpdate{Packages: 1, Suites: 2, Tests: 5, Failed: 2})
+	vw := Test{t, fx.view}
+	sb := vw.StatusBar(tt).TrimVertical()
+	t.Eq(1, len(sb))
+
+	styles, red, white := sb[0].Styles(), tcell.ColorRed, tcell.ColorWhite
+	for i := range sb[0] {
+		t.True(styles.Of(i).HasBG(red))
+		t.True(styles.Of(i).HasFG(white))
+	}
 }
 
 type fxFailButtonInitLabels struct {

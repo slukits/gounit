@@ -58,7 +58,7 @@ type Initer interface {
 	// for the status bar's content and expects an initial content.
 	// Calling update with the empty string resets the statusbar's
 	// content.
-	Status(update func(string)) string
+	Status(update func(StatusUpdate))
 
 	// Reporting is by initializing view provided with an update
 	// function for the reporting component's lines and expects an initial
@@ -151,8 +151,8 @@ func New(i Initer) *view {
 		dflt: i.Message(new.updateMessageBar)})
 	dflt, lst := i.Reporting(new.updateLines)
 	new.CC = append(new.CC, &report{dflt: dflt, listener: lst})
-	new.CC = append(new.CC, &statusBar{
-		dflt: i.Status(new.updateStatusBar)})
+	new.CC = append(new.CC, &statusBar{})
+	i.Status(new.updateStatusBar)
 	initButtons(i, new)
 	return new
 }
@@ -179,6 +179,17 @@ func (v *view) OnInit(e *lines.Env) {
 	if err := e.EE.MoveFocus(v.CC[1]); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: move focus: %v", err))
 	}
+	width, _ := e.ScreenSize()
+	if width > 80 {
+		v.Dim().SetWidth(80)
+	}
+}
+
+func (v *view) OnLayout(e *lines.Env) {
+	width, _ := e.ScreenSize()
+	if width > 80 {
+		v.Dim().SetWidth(80)
+	}
 }
 
 func (v *view) OnRune(_ *lines.Env, r rune) {
@@ -196,8 +207,8 @@ func (v *view) updateMessageBar(s string) {
 	}
 }
 
-func (v *view) updateStatusBar(s string) {
-	if err := v.ee.Update(v.CC[2], s, nil); err != nil {
+func (v *view) updateStatusBar(upd StatusUpdate) {
+	if err := v.ee.Update(v.CC[2], upd, nil); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: update: statusbar: %v", err))
 	}
 }

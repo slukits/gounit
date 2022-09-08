@@ -20,9 +20,13 @@ type fxInit struct {
 	// to log.Fatal
 	fatal func(...interface{})
 
-	// update *bar are holding the updaters for message- and statusbar
-	// which were received through the Status and Message implementations.
-	updateMessage, updateStatus func(string)
+	// updateMessage holds the updater for the message bar which were
+	// received through the Message implementation.
+	updateMessage func(string)
+
+	// updateStatus holds the updater for the status bar which were
+	// received through the Status implementation.
+	updateStatus func(StatusUpdate)
 
 	bttOneReported, bttTwoReported, bttThreeReported bool
 
@@ -37,7 +41,7 @@ type fxInit struct {
 
 const (
 	fxMsg       = "init fixture message"
-	fxStatus    = "init fixture status"
+	fxStatus    = "pkgs/suites: 0/0; tests: 0/0"
 	fxReporting = "init fixture reporting"
 	fxBtt1      = "first"
 	fxBtt1Upd   = "hurz"
@@ -62,9 +66,8 @@ func (fx *fxInit) Message(upd func(string)) string {
 	return fxMsg
 }
 
-func (fx *fxInit) Status(upd func(string)) string {
+func (fx *fxInit) Status(upd func(StatusUpdate)) {
 	fx.updateStatus = upd
-	return fxStatus
 }
 
 func (fx *fxInit) Reporting(ru ReportingUpd) (string, ReportingLst) {

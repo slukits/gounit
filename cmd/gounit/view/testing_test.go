@@ -142,8 +142,7 @@ func (s *_test) Fails_providing_button_bar_if_not_forth_cmp(t *T) {
 
 func (s *_test) Provides_button_bar_screen_portion(t *T) {
 	_, tt, _, tv := s.fx(t, nil)
-	exp := "first                                   second"
-	t.Eq(exp, tv.Trim(tv.ButtonBar(tt)).String())
+	t.SpaceMatched(tv.Trim(tv.ButtonBar(tt)).String(), "first", "second")
 }
 
 func (s *_test) Fails_button_bar_click_if_not_forth_cmp(t *T) {
