@@ -38,7 +38,7 @@ gives you permanent redundancy free feedback about your progress
 through reporting test results, an outline of your project
 documentation, and – following above coding style – an outline of
 your thought processes in ways go test and go doc do not.  From the
-gounit package you will mainly use the types [gounit.Suite] and
+gounit package you will mainly use the types gounit.Suite and
 gounit.T (gounit.S for Init and Finalize) as well as the function
 gounit.Run:
 
@@ -145,7 +145,7 @@ reported descending by their modification time.  That is how gounit
 helps to manage complexity.
 
 Finally when it comes to maintenance: having test names together with
-their suite and package names telling a story about the behavior of
-an certain aspect of a software system while clutter free tests
-provide the specifics about the production API makes it quite easy to
-get (back) into that certain aspect of a software system.
+their suite and package names telling a story about the behavior of an
+certain aspect of a software system while clutter free tests provide the
+specifics about the production API then it is quite easy to get (back)
+into that certain aspect of a software system.

@@ -43,6 +43,16 @@ github.com/slukits/lines v0.0.0-20220906073417-f15e4377f38c h1:lm18ZwPNz9cWzK5bP
 github.com/slukits/lines v0.0.0-20220906073417-f15e4377f38c/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
 github.com/slukits/lines v0.0.0-20220907082948-fe1593a1f93a h1:NReISfsosHHRGHg2XOn9xQrZTYDJXN9+E/GTZpLjC84=
 github.com/slukits/lines v0.0.0-20220907082948-fe1593a1f93a/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220907130521-a719b48c3d5c h1:EYQmYPDuSWk0g+z0KhnwbXNuif6JrdECYGJr76qwpTU=
+github.com/slukits/lines v0.0.0-20220907130521-a719b48c3d5c/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220908032236-89d4d2f0602f h1:DzpXxMUY/QixMsibQ33B8adIuy6LT9qc8LoN1ETpvM0=
+github.com/slukits/lines v0.0.0-20220908032236-89d4d2f0602f/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220908044153-16bf1cdd9120 h1:WOVd2VwjZjrUWxiGUohfDsccy+xqEhsTI0pDxnZBciM=
+github.com/slukits/lines v0.0.0-20220908044153-16bf1cdd9120/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220908045516-fb88f34fe7ca h1:B0y3NuFnlCwiMoqrwtTNfiyzfqwteWBTjr0Kt6uL0+8=
+github.com/slukits/lines v0.0.0-20220908045516-fb88f34fe7ca/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220908052056-2410dce3e2c8 h1:tbFtFVEJclNEdLqxUqLx/ytvYiVUBUHJIGYsT6oOa3U=
+github.com/slukits/lines v0.0.0-20220908052056-2410dce3e2c8/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20220318055525-2edf467146b5/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64 h1:UiNENfZ8gDvpiWw7IpOMQ27spWmThO1RwwdQVbJahJM=
