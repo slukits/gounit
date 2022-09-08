@@ -28,7 +28,10 @@ testing and how many lines of documentation were found.
 package controller
 
 import (
+	"fmt"
+
 	"github.com/slukits/gounit/cmd/gounit/model"
+	"github.com/slukits/gounit/cmd/gounit/view"
 	"github.com/slukits/lines"
 )
 
@@ -49,6 +52,71 @@ type Watcher interface {
 	Watch() (<-chan *model.PackagesDiff, uint64, error)
 }
 
+// vwUpd collects the function to update aspects of a view.
+type vwUpd struct {
+	*lines.Events
+	// msg updates the view's message bar
+	msg func(string)
+	// stt updates the view's status bar
+	stt func(view.StatusUpdate)
+	// rprUpd updates lines of a view's reporting component.
+	rprUpd view.ReportingUpd
+	// bttUpd updates the buttons of a view's button bar.
+	bttUpd func(view.ButtonDef, view.ButtonUpdater) error
+}
+
+func (u *vwUpd) buttonListener(label string) {
+	switch label {
+	case "quit":
+		u.QuitListening()
+	}
+}
+
+type vwIniter struct {
+	w   Watcher
+	ftl func(...interface{})
+	upd *vwUpd
+}
+
+func (i *vwIniter) Fatal() func(...interface{}) { return i.ftl }
+
+func (i *vwIniter) Message(msg func(string)) string {
+	i.upd.msg = msg
+	return fmt.Sprintf("%s: %s",
+		i.w.ModuleName(), i.w.SourcesDir()[len(i.w.ModuleDir()):])
+}
+
+func (i *vwIniter) Reporting(
+	upd view.ReportingUpd,
+) (string, view.ReportingLst) {
+
+	i.upd.rprUpd = upd
+	return "waiting for testing packages being reported...",
+		func(idx int) {}
+}
+
+func (i *vwIniter) Status(upd func(view.StatusUpdate)) {
+	i.upd.stt = upd
+}
+
+func (i *vwIniter) Buttons(
+	upd view.ButtonUpd, cb func(view.ButtonDef) error,
+) view.ButtonLst {
+	dd := []view.ButtonDef{
+		{Label: "pkgs", Rune: 'p'},
+		{Label: "suites", Rune: 's'},
+		{Label: "settings", Rune: 't'},
+		{Label: "help", Rune: 'h'},
+		{Label: "quit", Rune: 'q'},
+	}
+	for _, def := range dd {
+		if err := cb(def); err != nil {
+			i.ftl(err)
+		}
+	}
+	return i.upd.buttonListener
+}
+
 // New starts the application and blocks until a quit event occurs.
 // Fatale errors are reported to ftl while ll is used to initialize the
 // ui and start the event loop.
@@ -59,5 +127,7 @@ func New(ftl func(...interface{}), w Watcher, ee Events) {
 		return
 	}
 	_ = diff
-	ee(nil).Listen()
+	uu := &vwUpd{}
+	uu.Events = ee(view.New(&vwIniter{w: w, ftl: ftl, upd: uu}))
+	uu.Listen()
 }

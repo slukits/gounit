@@ -5,6 +5,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -44,16 +45,16 @@ func (m *watcherMock) Watch() (
 	return m.c, 1, nil
 }
 
-// func (s *Gounit) Fails_if_watching_fails(t *T) {
-// 	mck := &watcherMock{watch: func() (<-chan *model.PackagesDiff, uint64, error) {
-// 		return nil, 0, errors.New("mock-err")
-// 	}}
-// 	fatale := false
-//
-// 	New(func(_ ...interface{}) { fatale = true }, mck, nil)
-//
-// 	t.True(fatale)
-// }
+func (s *Gounit) Fails_if_watching_fails(t *T) {
+	mck := &watcherMock{watch: func() (<-chan *model.PackagesDiff, uint64, error) {
+		return nil, 0, errors.New("mock-err")
+	}}
+	fatale := false
+
+	New(func(_ ...interface{}) { fatale = true }, mck, nil)
+
+	t.True(fatale)
+}
 
 type linesTest struct {
 	ee *lines.Events
@@ -96,6 +97,10 @@ func (s *Gounit) Listens_to_events_if_not_fatale(t *T) {
 	t.Within(&TimeStepper{}, func() bool {
 		return ee.IsListening()
 	})
+}
+
+func (s *Gounit) Waits_for_testing_packages_if_there_are_none(t *T) {
+
 }
 
 func TestGounit(t *testing.T) {
