@@ -30,7 +30,7 @@ type fxInit struct {
 
 	bttOneReported, bttTwoReported, bttThreeReported bool
 
-	updButton ButtonUpd
+	updButton func(Buttoner)
 
 	updateReporting ReportingUpd
 
@@ -46,7 +46,7 @@ const (
 	fxBtt1      = "first"
 	fxBtt1Upd   = "hurz"
 	fxBtt2      = "second"
-	fxBtt3      = ""
+	fxBtt3      = "third"
 	fxRnBtt1    = '1'
 	fxRnBtt2    = '2'
 	fxRnBtt3    = '3'
@@ -82,27 +82,21 @@ func (fx *fxInit) Reporting(ru ReportingUpd) (string, ReportingLst) {
 	return fxReporting, fx.listenReporting
 }
 
-func (fx *fxInit) Buttons(
-	bu ButtonUpd, For func(ButtonDef) error,
-) ButtonLst {
-
-	fx.updButton = bu
-	df := []ButtonDef{
-		{fxBtt1, fxRnBtt1}, {fxBtt2, fxRnBtt2}, {fxBtt3, fxRnBtt3}}
-	for _, d := range df {
-		if err := For(d); err != nil {
-			panic(err)
-		}
-	}
-	return func(label string) {
-		switch label {
-		case fxBtt1, fxBtt1Upd:
-			fx.bttOneReported = true
-		case fxBtt2:
-			fx.bttTwoReported = true
-		case fxBtt3:
-			fx.bttThreeReported = true
-		}
+func (fx *fxInit) Buttons(upd func(Buttoner)) Buttoner {
+	fx.updButton = upd
+	return &buttonerFX{
+		newBB: []ButtonDef{
+			{fxBtt1, fxRnBtt1}, {fxBtt2, fxRnBtt2}, {fxBtt3, fxRnBtt3}},
+		listener: func(label string) {
+			switch label {
+			case fxBtt1, fxBtt1Upd:
+				fx.bttOneReported = true
+			case fxBtt2:
+				fx.bttTwoReported = true
+			case fxBtt3:
+				fx.bttThreeReported = true
+			}
+		},
 	}
 }
 
@@ -193,4 +187,40 @@ func (l *linerFX) For(r lines.Componenter, cb func(uint, string)) {
 		}
 		cb(uint(idx), l)
 	}
+}
+
+type buttonerFX struct {
+	replace  bool
+	listener func(string)
+	newBB    []ButtonDef
+	updBB    map[string]ButtonDef
+	err      func(error)
+}
+
+func (b buttonerFX) Replace() bool { return b.replace }
+
+func (b *buttonerFX) ForUpdate(cb func(string, ButtonDef) error) {
+	for label, def := range b.updBB {
+		if err := cb(label, def); err != nil {
+			if b.err == nil {
+				panic(err)
+			}
+			b.err(err)
+		}
+	}
+}
+
+func (b *buttonerFX) ForNew(cb func(ButtonDef) error) {
+	for _, def := range b.newBB {
+		if err := cb(def); err != nil {
+			if b.err == nil {
+				panic(err)
+			}
+			b.err(err)
+		}
+	}
+}
+
+func (b *buttonerFX) Listener() ButtonLst {
+	return b.listener
 }

@@ -4,6 +4,8 @@ github.com/gdamore/tcell/v2 v2.5.3 h1:b9XQrT6QGbgI7JvZOJXFNczOQeIYbo8BfeSMzt2sAV
 github.com/gdamore/tcell/v2 v2.5.3/go.mod h1:wSkrPaXoiIWZqW/g7Px4xc79di6FTcpB8tvaKJ6uGBo=
 github.com/google/go-cmp v0.5.8 h1:e6P7q2lk1O+qJJb4BtCQXlK8vWEO8V1ZeuEdJNOqZyg=
 github.com/google/go-cmp v0.5.8/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
+github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
+github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/lucasb-eyer/go-colorful v1.2.0 h1:1nnpGOrhyZZuNyfu1QjKiUICQ74+3FNCN69Aj6K7nkY=
 github.com/lucasb-eyer/go-colorful v1.2.0/go.mod h1:R4dSotOR9KMtayYi1e77YzuveK+i7ruzyGqttikkLy0=
 github.com/mattn/go-runewidth v0.0.13 h1:lTGmDsbAYt5DmK6OnoV7EuIF1wEIFAcxld6ypU4OSgU=
@@ -53,6 +55,14 @@ github.com/slukits/lines v0.0.0-20220908045516-fb88f34fe7ca h1:B0y3NuFnlCwiMoqrw
 github.com/slukits/lines v0.0.0-20220908045516-fb88f34fe7ca/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
 github.com/slukits/lines v0.0.0-20220908052056-2410dce3e2c8 h1:tbFtFVEJclNEdLqxUqLx/ytvYiVUBUHJIGYsT6oOa3U=
 github.com/slukits/lines v0.0.0-20220908052056-2410dce3e2c8/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220908134027-43982ed2ce77 h1:RH6ihp+v8qoVrxXDGwec8bwFUEbMiFei2btkWWe/ikY=
+github.com/slukits/lines v0.0.0-20220908134027-43982ed2ce77/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220908163121-3daf1e069504 h1:GHHj3C2ZeHHSFWU9Qe9mOuuF6GdDXPwyCIHi5jbejIk=
+github.com/slukits/lines v0.0.0-20220908163121-3daf1e069504/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220909030843-bd06a113d85a h1:cmsCasm7SxIXZARBdtHh+TEtoa+y4/RLpQpepJVfDV8=
+github.com/slukits/lines v0.0.0-20220909030843-bd06a113d85a/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220909042849-87fb88c8eee7 h1:kCUfBnkelGaCWa9WtrA+XIefKTEr5+JfDl3AOaZ6KD4=
+github.com/slukits/lines v0.0.0-20220909042849-87fb88c8eee7/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20220318055525-2edf467146b5/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64 h1:UiNENfZ8gDvpiWw7IpOMQ27spWmThO1RwwdQVbJahJM=
@@ -61,6 +71,10 @@ golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 h1:v6hYoSR9T5oet+pMXwUWkbiVq
 golang.org/x/sys v0.0.0-20220829200755-d48e67d00261/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220907062415-87db552b00fd h1:AZeIEzg+8RCELJYq8w+ODLVxFgLMMigSwO/ffKPEd9U=
 golang.org/x/sys v0.0.0-20220907062415-87db552b00fd/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.0.0-20220908150016-7ac13a9a928d h1:RoyzQTK76Rktm3p4xyZslc8T8I1tBz4UEjZCzeh57mM=
+golang.org/x/sys v0.0.0-20220908150016-7ac13a9a928d/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.0.0-20220908164124-27713097b956 h1:XeJjHH1KiLpKGb6lvMiksZ9l0fVUh+AmGcm0nOMEBOY=
+golang.org/x/sys v0.0.0-20220908164124-27713097b956/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201210144234-2321bbc49cbf/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20220722155259-a9ba230a4035 h1:Q5284mrmYTpACcm+eAKjKJH48BBwSyfJqmmGDTtT8Vc=
 golang.org/x/term v0.0.0-20220722155259-a9ba230a4035/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=

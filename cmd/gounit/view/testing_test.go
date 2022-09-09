@@ -35,7 +35,7 @@ func (s *_test) TearDown(t *T) {
 // along with the view fixture.  A so obtained Events instance listens
 // for ever and is quit by TearDown.
 func (s *_test) fx(t *T, str *string) (
-	*lines.Events, *lines.Testing, *viewFX, *Test,
+	*lines.Events, *viewFX, *Testing,
 ) {
 	fx := newFX(t)
 	ee, tt := lines.Test(t.GoT(), fx, 0)
@@ -44,7 +44,7 @@ func (s *_test) fx(t *T, str *string) (
 	if str != nil {
 		mckFtl(str, t)
 	}
-	return ee, tt, fx, &Test{t, fx.view}
+	return ee, fx, &Testing{t, tt, fx.view}
 }
 
 func mckFtl(msg *string, t *T) {
@@ -65,116 +65,116 @@ const (
 
 func (s *_test) Fails_providing_message_bar_if_not_first_cmp(t *T) {
 	var ftlMsg string
-	_, tt, _, tv := s.fx(t, &ftlMsg)
+	_, _, tv := s.fx(t, &ftlMsg)
 
 	cc := tv.CC
 	tv.CC = nil
-	tv.MessageBar(tt)
+	tv.MessageBar()
 	t.Eq(noCmp, ftlMsg)
 
 	tv.CC = cc[1:]
-	tv.MessageBar(tt)
+	tv.MessageBar()
 	t.True(strings.HasSuffix(ftlMsg, msgErr))
 }
 
 func (s *_test) Provides_message_bar_screen_portion(t *T) {
-	_, tt, _, tv := s.fx(t, nil)
-	t.Eq(fxMsg, tv.Trim(tv.MessageBar(tt)).String())
+	_, _, tv := s.fx(t, nil)
+	t.Eq(fxMsg, tv.Trim(tv.MessageBar()).String())
 }
 
 const rprErr = "expected second component to be reporting"
 
 func (s *_test) Fails_providing_reporting_if_not_second_cmp(t *T) {
 	var ftlMsg string
-	_, tt, _, tv := s.fx(t, &ftlMsg)
+	_, _, tv := s.fx(t, &ftlMsg)
 
 	cc := tv.CC
 	tv.CC = nil
-	tv.Reporting(tt)
+	tv.Reporting()
 	t.Eq(notEnough, ftlMsg)
 
 	tv.CC = append([]lines.Componenter{&button{}}, cc...)
-	tv.Reporting(tt)
+	tv.Reporting()
 	t.True(strings.HasSuffix(ftlMsg, rprErr))
 }
 
 func (s *_test) Provides_reporting_screen_portion(t *T) {
-	_, tt, _, tv := s.fx(t, nil)
-	t.Eq(fxReporting, tv.Trim(tv.Reporting(tt)).String())
+	_, _, tv := s.fx(t, nil)
+	t.Eq(fxReporting, tv.Trim(tv.Reporting()).String())
 }
 
 const sttErr = "expected third component to be the status bar"
 
 func (s *_test) Fails_providing_status_bar_if_not_third_cmp(t *T) {
 	var ftlMsg string
-	_, tt, _, tv := s.fx(t, &ftlMsg)
+	_, _, tv := s.fx(t, &ftlMsg)
 
 	cc := tv.CC
 	tv.CC = nil
-	tv.StatusBar(tt)
+	tv.StatusBar()
 	t.Eq(notEnough, ftlMsg)
 
 	tv.CC = append([]lines.Componenter{&button{}}, cc...)
-	tv.StatusBar(tt)
+	tv.StatusBar()
 	t.True(strings.HasSuffix(ftlMsg, sttErr))
 }
 
 func (s *_test) Provides_status_bar_screen_portion(t *T) {
-	_, tt, _, tv := s.fx(t, nil)
-	t.Eq(fxStatus, tv.Trim(tv.StatusBar(tt)).String())
+	_, _, tv := s.fx(t, nil)
+	t.Eq(fxStatus, tv.Trim(tv.StatusBar()).String())
 }
 
 const bbrErr = "expected forth component to be a button bar"
 
 func (s *_test) Fails_providing_button_bar_if_not_forth_cmp(t *T) {
 	var ftlMsg string
-	_, tt, _, tv := s.fx(t, &ftlMsg)
+	_, _, tv := s.fx(t, &ftlMsg)
 
 	cc := tv.CC
 	tv.CC = nil
-	tv.ButtonBar(tt)
+	tv.ButtonBar()
 	t.Eq(notEnough, ftlMsg)
 
 	tv.CC = append([]lines.Componenter{&button{}}, cc...)
-	tv.ButtonBar(tt)
+	tv.ButtonBar()
 	t.True(strings.HasSuffix(ftlMsg, bbrErr))
 }
 
 func (s *_test) Provides_button_bar_screen_portion(t *T) {
-	_, tt, _, tv := s.fx(t, nil)
-	t.SpaceMatched(tv.Trim(tv.ButtonBar(tt)).String(), "first", "second")
+	_, _, tv := s.fx(t, nil)
+	t.SpaceMatched(tv.Trim(tv.ButtonBar()).String(), "first", "second")
 }
 
 func (s *_test) Fails_button_bar_click_if_not_forth_cmp(t *T) {
 	var ftlMsg string
-	_, tt, _, tv := s.fx(t, &ftlMsg)
+	_, _, tv := s.fx(t, &ftlMsg)
 
 	cc := tv.CC
 	tv.CC = nil
-	tv.ClickButton(tt, fxBtt1)
+	tv.ClickButton(fxBtt1)
 	t.Eq(notEnough, ftlMsg)
 
 	tv.CC = append([]lines.Componenter{&button{}}, cc...)
-	tv.ClickButton(tt, fxBtt1)
+	tv.ClickButton(fxBtt1)
 	t.True(strings.HasSuffix(ftlMsg, bbrErr))
 
 	tv.CC = cc
-	tv.ClickButton(tt, fxBtt1Upd)
+	tv.ClickButton(fxBtt1Upd)
 	t.True(strings.HasPrefix(
 		ftlMsg, "gounit: view: fixture: no button labeled"))
 }
 
 func (s *_test) Clicks_requested_button(t *T) {
-	_, tt, fx, tv := s.fx(t, nil)
+	_, fx, tv := s.fx(t, nil)
 
-	tv.ClickButton(tt, fxBtt2)
+	tv.ClickButton(fxBtt2)
 	t.True(fx.bttTwoReported)
 }
 
 func (s *_test) Clicks_requested_reporting_line(t *T) {
-	_, tt, fx, tv := s.fx(t, nil)
+	_, fx, tv := s.fx(t, nil)
 
-	tv.ClickReporting(tt, 2)
+	tv.ClickReporting(2)
 	t.Eq(2, fx.reportedLine)
 }
 

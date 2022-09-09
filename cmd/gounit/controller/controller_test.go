@@ -6,9 +6,7 @@ package controller
 
 import (
 	"errors"
-	"fmt"
 	"testing"
-	"time"
 
 	. "github.com/slukits/gounit"
 	"github.com/slukits/gounit/cmd/gounit/model"
@@ -17,90 +15,90 @@ import (
 
 // Gounit tests the behavior of Controller.New which is identical with
 // the behavior of main.
-type Gounit struct{ Suite }
+type Gounit struct {
+	Suite
+	Fixtures
+}
 
 func (s *Gounit) SetUp(t *T) { t.Parallel() }
 
-type watcherMock struct {
-	c     chan *model.PackagesDiff
-	watch func() (<-chan *model.PackagesDiff, uint64, error)
-}
-
-const (
-	mckModule    = "mock-module"
-	mckModuleDir = "mock/module/dir"
-	mckSourceDir = "mock/source/dir"
-)
-
-func (m *watcherMock) ModuleName() string { return mckModule }
-func (m *watcherMock) ModuleDir() string  { return mckModuleDir }
-func (m *watcherMock) SourcesDir() string { return mckSourceDir }
-func (m *watcherMock) Watch() (
-	<-chan *model.PackagesDiff, uint64, error,
-) {
-	if m.watch != nil {
-		return m.watch()
+func (s *Gounit) TearDown(t *T) {
+	fx := s.Get(t)
+	if fx == nil {
+		return
 	}
-	m.c = make(chan *model.PackagesDiff)
-	return m.c, 1, nil
+	fx.(func())()
 }
 
 func (s *Gounit) Fails_if_watching_fails(t *T) {
-	mck := &watcherMock{watch: func() (<-chan *model.PackagesDiff, uint64, error) {
-		return nil, 0, errors.New("mock-err")
-	}}
 	fatale := false
 
-	New(func(_ ...interface{}) { fatale = true }, mck, nil)
+	fxInit(t, s, InitFactories{
+		Watcher: &watcherMock{watch: func() (
+			<-chan *model.PackagesDiff, uint64, error,
+		) {
+			return nil, 0, errors.New("mock-err")
+		}},
+		Fatal: func(_ ...interface{}) { fatale = true },
+	})
 
 	t.True(fatale)
 }
 
-type linesTest struct {
-	ee *lines.Events
-	tt *lines.Testing
-}
-
-func mockLinesNew(
-	t *T, max ...int,
-) (
-	func(lines.Componenter) *lines.Events,
-	func() (*lines.Events, *lines.Testing),
-) {
-	chn := make(chan struct{})
-	var (
-		ee *lines.Events
-		tt *lines.Testing
-	)
-	return func(c lines.Componenter) *lines.Events {
-			ee, tt = lines.Test(t.GoT(), c, max...)
-			close(chn)
-			return ee
-		},
-		func() (*lines.Events, *lines.Testing) {
-			select {
-			case <-t.Timeout(100 * time.Millisecond):
-				t.Fatal("test: gounit: timeout: lines-initialization")
-			case <-chn:
-			}
-			return ee, tt
-		}
-}
-
 func (s *Gounit) Listens_to_events_if_not_fatale(t *T) {
-	linesMock, linesTesting := mockLinesNew(t)
-	go New(func(i ...interface{}) {
-		t.Fatalf("unexpected error: %s", fmt.Sprint(i...))
-	}, &watcherMock{}, linesMock)
-	ee, _ := linesTesting()
-	defer ee.QuitListening()
-	t.Within(&TimeStepper{}, func() bool {
-		return ee.IsListening()
-	})
+	ee, _ := fx(t, s)
+	t.True(ee.IsListening())
 }
 
-func (s *Gounit) Waits_for_testing_packages_if_there_are_none(t *T) {
+func (s *Gounit) fx(t *T) (*lines.Events, *Testing) {
+	return fx(t, s)
+}
 
+func (s *Gounit) Shows_initially_default_buttons(t *T) {
+	exp := []string{"[p]kgs", "[s]uites=off", "[a]rgs", "[m]ore"}
+	_, tt := s.fx(t)
+
+	t.SpaceMatched(tt.ButtonBar().String(), exp...)
+}
+
+func (s *Gounit) Shows_initially_module_and_watched_pkg_name(t *T) {
+	exp := []string{mckModule, mckSourceDir}
+	_, tt := s.fx(t)
+
+	t.StarMatched(tt.MessageBar().String(), exp...)
+}
+
+func (s *Gounit) Shows_initially_initial_report(t *T) {
+	_, tt := s.fx(t)
+	t.Contains(tt.Reporting().String(), initReport)
+}
+
+func (s *Gounit) Shows_help_screen(t *T) {
+	_, tt := s.fx(t)
+	tt.Buttons("more", "help")
+	got := tt.SplitTrimmed(tt.Trim(tt.Reporting()).String())
+	t.SpaceMatched(help, got...)
+}
+
+func (s *Gounit) Shows_last_report_going_back_from_help(t *T) {
+	_, tt := s.fx(t)
+	exp := tt.Trim(tt.Reporting()).String()
+	tt.Buttons("more", "help", "back")
+	t.Eq(exp, tt.Trim(tt.Reporting()).String())
+}
+
+func (s *Gounit) Shows_about_screen(t *T) {
+	_, tt := s.fx(t)
+	tt.Buttons("more", "about")
+	got := tt.SplitTrimmed(tt.Trim(tt.Reporting()).String())
+	t.SpaceMatched(about, got...)
+}
+
+func (s *Gounit) Shows_last_report_going_back_from_about(t *T) {
+	_, tt := s.fx(t)
+	exp := tt.Trim(tt.Reporting()).String()
+	tt.Buttons("more", "about", "back")
+	t.Eq(exp, tt.Trim(tt.Reporting()).String())
 }
 
 func TestGounit(t *testing.T) {

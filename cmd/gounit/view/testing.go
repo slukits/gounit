@@ -9,19 +9,31 @@ import (
 	"github.com/slukits/lines"
 )
 
-// Test augments a view-instance with functionality useful for
-// testing but not meant for production.  A Test-view instance may be
+// Testing augments a view-instance with functionality useful for
+// testing but not meant for production.  A Testing-view instance may be
 // initialized by
 //
-//	tt := view.Test{t, view.New(i)}
+//	tt := view.Testing{t, view.New(i)}
 //
 // whereas t is an *gounit.T and i and view.Initier implementation.
-type Test struct {
-	t *gounit.T
+type Testing struct {
+	T *gounit.T
+	*lines.Testing
 	*view
 }
 
-func (t *Test) ClickButton(tt *lines.Testing, label string) {
+func NewTesting(
+	t *gounit.T, tt *lines.Testing, c lines.Componenter,
+) *Testing {
+	vw, ok := c.(*view)
+	if !ok {
+		t.Fatal("given component must be a view; got %T", c)
+		return nil
+	}
+	return &Testing{T: t, Testing: tt, view: vw}
+}
+
+func (t *Testing) ClickButton(label string) {
 	bb := t.getButtonBar()
 	if bb == nil {
 		return
@@ -30,92 +42,92 @@ func (t *Test) ClickButton(tt *lines.Testing, label string) {
 		if b.label != label {
 			continue
 		}
-		tt.FireComponentClick(b, 0, 0)
+		t.FireComponentClick(b, 0, 0)
 		return
 	}
-	t.t.Fatalf("gounit: view: fixture: no button labeled %q", label)
+	t.T.Fatalf("gounit: view: fixture: no button labeled %q", label)
 }
 
-func (t *Test) ClickReporting(tt *lines.Testing, idx int) {
+func (t *Testing) ClickReporting(idx int) {
 	rp := t.getReporting()
 	if rp == nil {
 		return
 	}
-	tt.FireComponentClick(rp, 0, idx)
+	t.FireComponentClick(rp, 0, idx)
 }
 
-func (t *Test) MessageBar(tt *lines.Testing) lines.TestScreen {
+func (t *Testing) MessageBar() lines.TestScreen {
 	if len(t.CC) < 1 {
-		t.t.Fatal("gounit: view: fixture: no ui components")
+		t.T.Fatal("gounit: view: fixture: no ui components")
 		return nil
 	}
 	mb, ok := t.CC[0].(*messageBar)
 	if !ok {
-		t.t.Fatal("gounit: view: fixture: " +
+		t.T.Fatal("gounit: view: fixture: " +
 			"expected first component to be the message bar")
 		return nil
 	}
-	return tt.ScreenOf(mb)
+	return t.ScreenOf(mb)
 }
 
-func (t *Test) Reporting(tt *lines.Testing) lines.TestScreen {
+func (t *Testing) Reporting() lines.TestScreen {
 	rp := t.getReporting()
 	if rp == nil {
 		return nil
 	}
-	return tt.ScreenOf(rp)
+	return t.ScreenOf(rp)
 }
 
-func (t *Test) StatusBar(tt *lines.Testing) lines.TestScreen {
+func (t *Testing) StatusBar() lines.TestScreen {
 	if len(t.CC) < 3 {
-		t.t.Fatal(notEnough)
+		t.T.Fatal(notEnough)
 		return nil
 	}
 	sb, ok := t.CC[2].(*statusBar)
 	if !ok {
-		t.t.Fatal("gounit: view: fixture: " +
+		t.T.Fatal("gounit: view: fixture: " +
 			"expected third component to be the status bar")
 		return nil
 	}
-	return tt.ScreenOf(sb)
+	return t.ScreenOf(sb)
 }
 
-func (t *Test) ButtonBar(tt *lines.Testing) lines.TestScreen {
+func (t *Testing) ButtonBar() lines.TestScreen {
 	bb := t.getButtonBar()
 	if bb == nil {
 		return nil
 	}
-	return tt.ScreenOf(bb)
+	return t.ScreenOf(bb)
 }
 
-func (t *Test) Trim(ts lines.TestScreen) lines.TestScreen {
+func (t *Testing) Trim(ts lines.TestScreen) lines.TestScreen {
 	return ts.TrimHorizontal().TrimVertical()
 }
 
 const notEnough = "gounit: view: fixture: not enough ui components"
 
-func (t *Test) getReporting() *report {
+func (t *Testing) getReporting() *report {
 	if len(t.CC) < 2 {
-		t.t.Fatal(notEnough)
+		t.T.Fatal(notEnough)
 		return nil
 	}
 	rp, ok := t.CC[1].(*report)
 	if !ok {
-		t.t.Fatal("gounit: view: fixture: " +
+		t.T.Fatal("gounit: view: fixture: " +
 			"expected second component to be reporting")
 		return nil
 	}
 	return rp
 }
 
-func (t *Test) getButtonBar() *buttonBar {
+func (t *Testing) getButtonBar() *buttonBar {
 	if len(t.CC) < 4 {
-		t.t.Fatal(notEnough)
+		t.T.Fatal(notEnough)
 		return nil
 	}
 	bb, ok := t.CC[3].(*buttonBar)
 	if !ok {
-		t.t.Fatal("gounit: view: fixture: " +
+		t.T.Fatal("gounit: view: fixture: " +
 			"expected forth component to be a button bar")
 		return nil
 	}

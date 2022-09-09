@@ -1,4 +1,18 @@
-Copyright (c) 2022 Stephan Lukits.  All rights reserved.
+// copyright (c) 2022 stephan lukits. all rights reserved.
+// use of this source code is governed by a mit-style
+// license that can be found in the license file.
+
+package controller
+
+import "strings"
+
+func viewAbout(updVW chan interface{}) {
+	a := strings.Split(strings.TrimSpace(about), "\n")
+	updVW <- &liner{clearing: true, ll: a}
+}
+
+const about = `
+gounit Copyright 2022 - present Stephan Lukits.  All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the
@@ -18,3 +32,4 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+`

@@ -18,30 +18,156 @@ becomes the currently reported package and its latest modified
 suite/test is shown.
 
 A user can request the package overview showing all packages of a watch
-sources directory.  Further more a suite view can be requested which
-shows all the "current" package's testing suits.  Finally the user can
-choose to switch on/off: race, vet and stats.  The later tells how many
-source files are in the current package/watched sources, how many of
-them are testing files how many lines of code, how many of them are for
-testing and how many lines of documentation were found.
+sources directory.  Further more a suite variant of the default or
+package view can be requested which shows all the "current" package's
+testing suits.  Finally the user can choose to switch on/off: race, vet
+and stats.  The later tells how many source files are in the current
+package/watched sources, how many of them are testing files how many
+lines of code, how many of them are for testing and how many lines of
+documentation were found.
 */
 package controller
 
 import (
 	"fmt"
+	"log"
+	"strings"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
 	"github.com/slukits/lines"
 )
 
+// InitFactories allows to overwrite the default constructors and
+// functionality needed to initialize the controller.
+type InitFactories struct {
+
+	// Fatal to report fatal errors; defaults to log.Fatal
+	Fatal func(...interface{})
+
+	// Watcher wraps a controller's model; defaults to &model.Sources{}
+	Watcher Watcher
+
+	// View returns a controller's view; defaults to view.New
+	View func(view.Initer) lines.Componenter
+
+	// Events returns a controller's events loop; defaults to lines.New
+	Events func(lines.Componenter) *lines.Events
+}
+
+// New starts the application and blocks until a quit event occurs.
+func New(i InitFactories) {
+	ensureInitArgs(&i)
+	diff, _, err := i.Watcher.Watch()
+	if err != nil {
+		i.Fatal(WatcherErr, i.Watcher.SourcesDir(), err)
+		return
+	}
+	_ = diff
+	vw := &vwUpd{upd: make(chan interface{})}
+	go viewUpdater(vw, vw.upd)
+	vwInit := &vwIniter{vw: vw}
+	vwInit.w, vwInit.ftl = i.Watcher, i.Fatal
+	ee := i.Events(i.View(vwInit))
+	ee.Listen()
+}
+
+func ensureInitArgs(i *InitFactories) {
+	if i.Fatal == nil {
+		i.Fatal = log.Fatal
+	}
+	if i.Watcher == nil {
+		i.Watcher = &model.Sources{}
+	}
+	if i.View == nil {
+		i.View = func(i view.Initer) lines.Componenter {
+			return view.New(i)
+		}
+	}
+	if i.Events == nil {
+		i.Events = lines.New
+	}
+}
+
+// vwUpd collects the functions to update aspects of a view which are
+// used by the viewUpdater to modify the view.
+type vwUpd struct {
+
+	// upd receives all updates for the views to avoid races.
+	upd chan interface{}
+
+	// msg updates the view's message bar
+	msg func(string)
+
+	// stt updates the view's status bar
+	stt func(view.StatusUpdate)
+
+	// rprUpd updates lines of a view's reporting component.
+	rprUpd view.ReportingUpd
+
+	// bttUpd updates the buttons of a view's button bar.
+	bttUpd func(view.Buttoner)
+}
+
+// viewUpdater runs concurrently and is kicked of by the controller
+// constructor.  All updates of the view should be send to its update
+// channel upd.
+func viewUpdater(vw *vwUpd, upd <-chan interface{}) {
+	for {
+		updData := <-upd
+		if updData == nil {
+			return
+		}
+		switch updData := updData.(type) {
+		case view.Buttoner:
+			vw.bttUpd(updData)
+		case view.Liner:
+			vw.rprUpd(updData)
+		}
+	}
+}
+
+const initReport = "waiting for testing packages being reported..."
+
+// vwIniter instance provides the initial data to a new view and
+// collects the provided view modifiers.
+type vwIniter struct {
+	w   Watcher
+	ftl func(...interface{})
+	vw  *vwUpd
+}
+
+func (i *vwIniter) Fatal() func(...interface{}) { return i.ftl }
+
+func (i *vwIniter) Message(msg func(string)) string {
+	i.vw.msg = msg
+	return fmt.Sprintf("%s: %s",
+		i.w.ModuleName(), strings.TrimPrefix(
+			i.w.SourcesDir(), i.w.ModuleDir()))
+}
+
+func (i *vwIniter) Reporting(
+	upd view.ReportingUpd,
+) (string, view.ReportingLst) {
+
+	i.vw.rprUpd = upd
+	return initReport, func(idx int) {}
+}
+
+func (i *vwIniter) Status(upd func(view.StatusUpdate)) {
+	i.vw.stt = upd
+}
+
+func (i *vwIniter) Buttons(upd func(view.Buttoner)) view.Buttoner {
+	i.vw.bttUpd = upd
+	return newButtons(
+		i.vw.upd, &liner{clearing: true, ll: []string{initReport}},
+	).defaultButtons()
+}
+
 const (
 	WatcherErr = "gounit: watcher: %s: %v"
 )
-
-// Events is a function to initialize the terminal ui with components
-// returning an Events-instance to listen for events.
-type Events func(lines.Componenter) *lines.Events
 
 // Watcher is a function whose returned channel watches a go modules
 // packages sources whose tests runs are reported to a terminal ui.
@@ -52,82 +178,18 @@ type Watcher interface {
 	Watch() (<-chan *model.PackagesDiff, uint64, error)
 }
 
-// vwUpd collects the function to update aspects of a view.
-type vwUpd struct {
-	*lines.Events
-	// msg updates the view's message bar
-	msg func(string)
-	// stt updates the view's status bar
-	stt func(view.StatusUpdate)
-	// rprUpd updates lines of a view's reporting component.
-	rprUpd view.ReportingUpd
-	// bttUpd updates the buttons of a view's button bar.
-	bttUpd func(view.ButtonDef, view.ButtonUpdater) error
+type liner struct {
+	clearing bool
+	ll       []string
+	mask     map[uint]view.LineMask
 }
 
-func (u *vwUpd) buttonListener(label string) {
-	switch label {
-	case "quit":
-		u.QuitListening()
+func (l *liner) Clearing() bool { return l.clearing }
+
+func (l *liner) For(_ lines.Componenter, line func(uint, string)) {
+	for idx, content := range l.ll {
+		line(uint(idx), content)
 	}
 }
 
-type vwIniter struct {
-	w   Watcher
-	ftl func(...interface{})
-	upd *vwUpd
-}
-
-func (i *vwIniter) Fatal() func(...interface{}) { return i.ftl }
-
-func (i *vwIniter) Message(msg func(string)) string {
-	i.upd.msg = msg
-	return fmt.Sprintf("%s: %s",
-		i.w.ModuleName(), i.w.SourcesDir()[len(i.w.ModuleDir()):])
-}
-
-func (i *vwIniter) Reporting(
-	upd view.ReportingUpd,
-) (string, view.ReportingLst) {
-
-	i.upd.rprUpd = upd
-	return "waiting for testing packages being reported...",
-		func(idx int) {}
-}
-
-func (i *vwIniter) Status(upd func(view.StatusUpdate)) {
-	i.upd.stt = upd
-}
-
-func (i *vwIniter) Buttons(
-	upd view.ButtonUpd, cb func(view.ButtonDef) error,
-) view.ButtonLst {
-	dd := []view.ButtonDef{
-		{Label: "pkgs", Rune: 'p'},
-		{Label: "suites", Rune: 's'},
-		{Label: "settings", Rune: 't'},
-		{Label: "help", Rune: 'h'},
-		{Label: "quit", Rune: 'q'},
-	}
-	for _, def := range dd {
-		if err := cb(def); err != nil {
-			i.ftl(err)
-		}
-	}
-	return i.upd.buttonListener
-}
-
-// New starts the application and blocks until a quit event occurs.
-// Fatale errors are reported to ftl while ll is used to initialize the
-// ui and start the event loop.
-func New(ftl func(...interface{}), w Watcher, ee Events) {
-	diff, _, err := w.Watch()
-	if err != nil {
-		ftl(WatcherErr, w.SourcesDir(), err)
-		return
-	}
-	_ = diff
-	uu := &vwUpd{}
-	uu.Events = ee(view.New(&vwIniter{w: w, ftl: ftl, upd: uu}))
-	uu.Listen()
-}
+func (l *liner) Mask(idx uint) view.LineMask { return l.mask[idx] }

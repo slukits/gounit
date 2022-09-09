@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gdamore/tcell/v2"
 	. "github.com/slukits/gounit"
@@ -101,44 +100,6 @@ func (s *AView) Sets_its_width_to_80_if_screen_bigger(t *T) {
 	})
 }
 
-type dbg struct {
-	Suite
-	Fixtures
-}
-
-func (s *dbg) TearDown(t *T) {
-	quit := s.Get(t)
-	if quit == nil {
-		return
-	}
-	quit.(func())()
-}
-
-// fx creates a new view fixture (see newFX) and initializes with it a
-// lines.Test whose returned Events and Testing instances are returned
-// along with the view fixture.  A so obtained Events instance listens
-// for ever and is quit by TearDown.
-func (s *dbg) fx(t *T) (*lines.Events, *lines.Testing, *viewFX) {
-	fx := newFX(t)
-	ee, tt := lines.Test(t.GoT(), fx, 0)
-	ee.Listen()
-	tt.Timeout = 20 * time.Minute
-	s.Set(t, ee.QuitListening)
-	return ee, tt, fx
-}
-
-func (s *dbg) Dbg(t *T) {
-	ee, tt, fx := s.fx(t)
-	tt.Timeout = 20 * time.Minute
-	tt.FireResize(120, 24)
-
-	ee.Update(fx, nil, func(e *lines.Env) {
-		t.Eq(80, fx.Dim().Width())
-	})
-}
-
-func TestDBG(t *testing.T) { Run(&dbg{}, t) }
-
 func (s *AView) Is_quit_able(t *T) {
 	ee, tt, fx := s.fx(t)
 
@@ -188,8 +149,8 @@ func (s *AView) Updates_statusbar_with_given_numbers(t *T) {
 
 func (s *AView) Status_has_green_background_if_not_failing(t *T) {
 	_, tt, fx := s.fx(t)
-	vw := Test{t, fx.view}
-	sb := vw.StatusBar(tt).TrimVertical()
+	vw := Testing{t, tt, fx.view}
+	sb := vw.StatusBar().TrimVertical()
 	t.Eq(1, len(sb))
 
 	styles, green := sb[0].Styles(), tcell.ColorGreen
@@ -202,8 +163,8 @@ func (s *AView) Status_has_red_background_if_failing(t *T) {
 	_, tt, fx := s.fx(t)
 	fx.updateStatus(
 		StatusUpdate{Packages: 1, Suites: 2, Tests: 5, Failed: 2})
-	vw := Test{t, fx.view}
-	sb := vw.StatusBar(tt).TrimVertical()
+	vw := Testing{t, tt, fx.view}
+	sb := vw.StatusBar().TrimVertical()
 	t.Eq(1, len(sb))
 
 	styles, red, white := sb[0].Styles(), tcell.ColorRed, tcell.ColorWhite
@@ -215,54 +176,48 @@ func (s *AView) Status_has_red_background_if_failing(t *T) {
 
 type fxFailButtonInitLabels struct {
 	fxInit
-	buttonInitErr error
+	newBB         []ButtonDef
+	buttonInitErr func(error)
 }
 
-func (fx *fxFailButtonInitLabels) Buttons(
-	upd ButtonUpd, cb func(ButtonDef) error,
-) ButtonLst {
+func (fx *fxFailButtonInitLabels) Buttons(upd func(Buttoner)) Buttoner {
 	fx.updButton = upd
-	if err := cb(ButtonDef{Label: "b"}); err != nil {
-		fx.t.Fatal("unexpected error: %v", err)
-	}
-	if err := cb(ButtonDef{Label: "b"}); err != nil {
-		fx.buttonInitErr = err
-	}
-	return nil
+	return &buttonerFX{err: fx.buttonInitErr, newBB: fx.newBB}
 }
 
 func (s *AView) Fails_buttons_init_if_ambiguous_labels(t *T) {
-	fx := &fxFailButtonInitLabels{fxInit: fxInit{t: t}}
-
+	fx := &fxFailButtonInitLabels{
+		fxInit: fxInit{t: t},
+		newBB:  []ButtonDef{{Label: "b"}, {Label: "b"}},
+		buttonInitErr: func(err error) {
+			t.ErrIs(err, ErrButtonLabelAmbiguity)
+		},
+	}
 	lines.Test(t.GoT(), New(fx))
-
-	t.ErrIs(fx.buttonInitErr, ErrButtonLabelAmbiguity)
 }
 
 type fxFailButtonInitRunes struct {
 	fxInit
-	buttonInitErr error
+	newBB         []ButtonDef
+	buttonInitErr func(error)
 }
 
-func (fx *fxFailButtonInitRunes) Buttons(
-	upd ButtonUpd, cb func(ButtonDef) error,
-) ButtonLst {
+func (fx *fxFailButtonInitRunes) Buttons(upd func(Buttoner)) Buttoner {
 	fx.updButton = upd
-	if err := cb(ButtonDef{Label: "b1", Rune: '1'}); err != nil {
-		fx.t.Fatal("unexpected error: %v", err)
-	}
-	if err := cb(ButtonDef{Label: "b2", Rune: '1'}); err != nil {
-		fx.buttonInitErr = err
-	}
-	return nil
+	return &buttonerFX{err: fx.buttonInitErr, newBB: fx.newBB}
 }
 
 func (s *AView) Fails_buttons_init_if_ambiguous_event_runes(t *T) {
-	fx := &fxFailButtonInitRunes{fxInit: fxInit{t: t}}
-
+	fx := &fxFailButtonInitLabels{
+		fxInit: fxInit{t: t},
+		newBB: []ButtonDef{
+			{Label: "b1", Rune: 'r'},
+			{Label: "b2", Rune: 'r'}},
+		buttonInitErr: func(err error) {
+			t.ErrIs(err, ErrButtonRuneAmbiguity)
+		},
+	}
 	lines.Test(t.GoT(), New(fx))
-
-	t.ErrIs(fx.buttonInitErr, ErrButtonRuneAmbiguity)
 }
 
 func (s *AView) Reports_button_clicks(t *T) {
@@ -274,8 +229,7 @@ func (s *AView) Reports_button_clicks(t *T) {
 
 	t.True(fx.bttOneReported)
 	t.True(fx.bttTwoReported)
-	// not part of layout since zero label
-	t.False(fx.bttThreeReported)
+	t.True(fx.bttThreeReported)
 }
 
 func (s *AView) Reports_button_runes(t *T) {
@@ -287,22 +241,30 @@ func (s *AView) Reports_button_runes(t *T) {
 
 	t.True(fx.bttOneReported)
 	t.True(fx.bttTwoReported)
-	// not part of layout since zero label
-	t.False(fx.bttThreeReported)
+	t.True(fx.bttThreeReported)
 }
 
 func (s *AView) Fails_a_button_update_if_ambiguous_label_given(t *T) {
 	_, _, fx := s.fx(t)
-
-	err := fx.updButton(fxBtt1, ButtonDef{Label: fxBtt2})
-	t.ErrIs(err, ErrButtonLabelAmbiguity)
+	fx.updButton(
+		&buttonerFX{
+			updBB: map[string]ButtonDef{fxBtt1: {Label: fxBtt2}},
+			err: func(err error) {
+				t.ErrIs(err, ErrButtonLabelAmbiguity)
+			},
+		})
 }
 
 func (s *AView) Fails_a_button_update_if_ambiguous_rune_given(t *T) {
 	_, _, fx := s.fx(t)
-
-	err := fx.updButton(fxBtt1, ButtonDef{Label: "42", Rune: fxRnBtt2})
-	t.ErrIs(err, ErrButtonRuneAmbiguity)
+	fx.updButton(
+		&buttonerFX{
+			updBB: map[string]ButtonDef{
+				fxBtt1: {Label: "42", Rune: fxRnBtt2}},
+			err: func(err error) {
+				t.ErrIs(err, ErrButtonRuneAmbiguity)
+			},
+		})
 }
 
 func (s *AView) Removes_button_rune_on_zero_rune_update(t *T) {
@@ -311,7 +273,8 @@ func (s *AView) Removes_button_rune_on_zero_rune_update(t *T) {
 	t.True(fx.bttOneReported)
 	fx.bttOneReported = false
 
-	t.FatalOn(fx.updButton(fxBtt1, ButtonDef{Label: fxBtt1, Rune: 0}))
+	fx.updButton(&buttonerFX{
+		updBB: map[string]ButtonDef{fxBtt1: {Label: fxBtt1, Rune: 0}}})
 	tt.FireRune(fxRnBtt1)
 
 	t.False(fx.bttOneReported)
@@ -321,15 +284,40 @@ func (s *AView) Updates_button_rune(t *T) {
 	_, tt, fx := s.fx(t)
 
 	// rune no-op for coverage
-	t.FatalOn(fx.updButton(
-		fxBtt1, ButtonDef{Label: fxBtt1, Rune: fxRnBtt1}))
-	t.FatalOn(fx.updButton(
-		fxBtt1, ButtonDef{Label: fxBtt1Upd, Rune: 'x'}))
+	fx.updButton(&buttonerFX{
+		updBB: map[string]ButtonDef{
+			fxBtt1: {Label: fxBtt1, Rune: fxRnBtt1}}})
+	fx.updButton(&buttonerFX{
+		updBB: map[string]ButtonDef{fxBtt1: {Label: fxBtt1Upd, Rune: 'x'}}})
 
 	t.False(fx.bttOneReported)
 	tt.FireRune('x')
 	t.True(fx.bttOneReported)
 	t.Contains(tt.Screen().String(), fxBtt1Upd)
+}
+
+func (s *AView) Replaces_its_buttons(t *T) {
+	_, tt, fx := s.fx(t)
+	upd1, upd2 := false, false
+
+	fx.updButton(&buttonerFX{
+		replace: true,
+		newBB: []ButtonDef{
+			{Label: "upd 1", Rune: '1'},
+			{Label: "upd 2", Rune: '2'}},
+		listener: func(s string) {
+			switch s {
+			case "upd 1":
+				upd1 = true
+			case "upd 2":
+				upd2 = true
+			}
+		}})
+
+	tt.FireRune('1')
+	tt.FireRune('2')
+	t.True(upd1)
+	t.True(upd2)
 }
 
 func (s *AView) Updates_its_main_content(t *T) {

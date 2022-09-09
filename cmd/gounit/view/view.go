@@ -28,7 +28,7 @@ gounit's terminal user interface (note: the actual ui has no frames)
 	|                                                                  |
 	| packages: n; tests: t/f; stat: c/t d                             |
 	+------------------------------------------------------------------+
-	|     [p]kgs     [s]uites     se[t]tings     [h]elp     [q]uit     |
+	|       [p]kgs       [s]uites=off        [a]rgs       [m]ore       |
 	+------------------------------------------------------------------+
 */
 package view
@@ -67,10 +67,9 @@ type Initer interface {
 	Reporting(ReportingUpd) (string, ReportingLst)
 
 	// Buttons is by initializing view provided with an update function
-	// for buttons and expects a function for initial button definitions
-	// and a listener function which is notified if a button was
-	// selected.
-	Buttons(_ ButtonUpd, bb func(ButtonDef) error) ButtonLst
+	// for buttons and expects a Buttoner implementation with the
+	// initial button definitions.
+	Buttons(update func(Buttoner)) Buttoner
 }
 
 // LineMask  values are used to describe to a reporting component how a
@@ -116,11 +115,11 @@ type Liner interface {
 	Mask(idx uint) LineMask
 }
 
-// view implements the lines Componenter interface hence an instance of
-// it can be used to initialize a lines terminal ui.  Note the view
+// View implements the lines Componenter interface hence an instance of
+// it can be used to initialize a lines terminal ui.  Note the View
 // package is designed in a way that there shouldn't be done anything
-// else with a view instance but initializing a lines Events instance.
-// A view instance may be modified by the provided functions to an
+// else with a View instance but initializing a lines Events instance.
+// A View instance may be modified by the provided functions to an
 // Initer implementation.
 type view struct {
 	lines.Component
@@ -157,21 +156,14 @@ func New(i Initer) *view {
 	return new
 }
 
-func initButtons(i Initer, v *view) *buttonBar {
+func initButtons(i Initer, v *view) {
 	bb := &buttonBar{}
 	v.CC = append(v.CC, bb) // necessary for button-def validation
-	lst := i.Buttons(v.updateButton, func(bd ButtonDef) error {
-		if err := v.validateButtonDef("", bd); err != nil {
-			return err
-		}
-		bb.append(bd)
-		if bd.Rune != 0 && bd.Label != "" {
-			v.addRune(bd.Rune, bb.bb[len(bb.bb)-1])
-		}
-		return nil
-	})
-	bb.setListener(lst)
-	return bb
+	bbDef := i.Buttons(v.updateButtons)
+	if err := v.validateButtoner(bbDef, true); err != nil {
+		return
+	}
+	bb.init(&buttonsUpdate{bb: bbDef, setRune: v.setRune})
 }
 
 func (v *view) OnInit(e *lines.Env) {
@@ -219,50 +211,55 @@ func (v *view) updateLines(l Liner) {
 	}
 }
 
-func (v *view) addRune(r rune, b *button) {
+type buttonsUpdate struct {
+	bb      Buttoner
+	setRune func(rune, string, *button)
+}
+
+func (v *view) updateButtons(bb Buttoner) {
+	if bb.Replace() {
+		if err := v.validateButtoner(bb, true); err != nil {
+			return
+		}
+		v.runeButtons = map[rune]*button{}
+		v.ee.Update(v.CC[3], &buttonsUpdate{
+			bb: bb, setRune: v.setRune}, nil)
+		return
+	}
+	if err := v.validateButtoner(bb, false); err != nil {
+		return
+	}
+	v.ee.Update(v.CC[3], &buttonsUpdate{
+		bb: bb, setRune: v.setRune}, nil)
+}
+
+func (v *view) setRune(r rune, label string, btt *button) {
+	if btt == nil { // button deleted
+		for r, b := range v.runeButtons {
+			if b.label != label {
+				continue
+			}
+			delete(v.runeButtons, r)
+			break
+		}
+		return
+	}
+	if v.runeButtons[r] == btt { // rune not updated
+		return
+	}
+	for r, b := range v.runeButtons { // rune updated
+		if btt != b {
+			continue
+		}
+		delete(v.runeButtons, r)
+	}
+	if r == 0 { // rune deleted
+		return
+	}
 	if v.runeButtons == nil {
 		v.runeButtons = map[rune]*button{}
 	}
-	v.runeButtons[r] = b
-}
-
-type buttonUpdate struct {
-	label   string
-	def     ButtonDef
-	setRune func(rune, *button)
-}
-
-func (v *view) updateButton(label string, def ButtonDef) error {
-	if err := v.validateButtonDef(label, def); err != nil {
-		return err
-	}
-	err := v.ee.Update(v.CC[3], &buttonUpdate{label: label, def: def,
-		setRune: func(r rune, btt *button) {
-			if btt == nil { // button deleted
-				for r, b := range v.runeButtons {
-					if b.label != label {
-						continue
-					}
-					delete(v.runeButtons, r)
-					break
-				}
-				return
-			}
-			if v.runeButtons[r] == btt { // rune not updated
-				return
-			}
-			for r, b := range v.runeButtons { // rune updated
-				if btt != b {
-					continue
-				}
-				delete(v.runeButtons, r)
-			}
-			if r == 0 { // rune deleted
-				return
-			}
-			v.runeButtons[r] = btt
-		}}, nil)
-	return err
+	v.runeButtons[r] = btt
 }
 
 // ErrButtonNotFound is returned if a button with given label is
@@ -282,34 +279,121 @@ var ErrButtonLabelAmbiguity = errors.New(
 var ErrButtonRuneAmbiguity = errors.New(
 	"view: define button: ambiguous rune: ")
 
-func (v *view) validateButtonDef(
-	label string, bd ButtonDef,
-) error {
+var ErrLabelMustNotBeZero = errors.New(
+	"view: define button: label must not be zero")
 
-	var btt *button
-	if label != "" {
-		for _, b := range v.CC[3].(*buttonBar).bb {
-			if b.label != label {
-				continue
-			}
-			btt = b
-		}
-		if btt == nil {
-			return fmt.Errorf("%w%s", ErrButtonNotFound, label)
-		}
+func (v *view) validateButtoner(bb Buttoner, init bool) error {
+	if init {
+		return v.validateInitButtoner(bb)
 	}
-	if b, ok := v.runeButtons[bd.Rune]; ok && b != btt {
-		return fmt.Errorf(
-			"%w%c", ErrButtonRuneAmbiguity, bd.Rune)
-	}
+
+	ll := map[string]*button{}
 	for _, b := range v.CC[3].(*buttonBar).bb {
-		if b.label == label {
-			continue
-		}
-		if b.label == bd.Label {
-			return fmt.Errorf(
-				"%w%s", ErrButtonLabelAmbiguity, bd.Label)
-		}
+		ll[b.label] = b
 	}
-	return nil
+	rr := map[rune]*button{}
+	for r, b := range v.runeButtons {
+		rr[r] = b
+	}
+
+	// check for ambiguities amongst new buttons
+	var err error
+	bb.ForNew(func(bd ButtonDef) error {
+		if err != nil {
+			return err
+		}
+		if bd.Label == "" {
+			err = ErrLabelMustNotBeZero
+			return err
+		}
+		if _, ok := ll[bd.Label]; !ok {
+			err = fmt.Errorf("%w%s", ErrButtonLabelAmbiguity, bd.Label)
+			return err
+		}
+		ll[bd.Label] = nil
+		if _, ok := rr[bd.Rune]; !ok {
+			err = fmt.Errorf("%w%c", ErrButtonRuneAmbiguity, bd.Rune)
+			return err
+		}
+		if bd.Rune == 0 {
+			return nil
+		}
+		rr[bd.Rune] = nil
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// check for not found buttons and removal of buttons
+	bb.ForUpdate(func(label string, bd ButtonDef) error {
+		if err != nil {
+			return err
+		}
+		if b, ok := ll[label]; !ok || b == nil {
+			err = fmt.Errorf("%w%s", ErrButtonNotFound, label)
+			return err
+		}
+		if bd.Label == "" {
+			b := ll[label]
+			for r, rb := range rr {
+				if b != rb {
+					continue
+				}
+				delete(rr, r)
+				break
+			}
+			delete(ll, label)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// check ambiguities in updated not deleted buttons
+	bb.ForUpdate(func(label string, bd ButtonDef) error {
+		if b, ok := ll[bd.Label]; ok && (b == nil || b.label != label) {
+			err = fmt.Errorf("%w%s", ErrButtonLabelAmbiguity, bd.Label)
+			return err
+		}
+		if b, ok := rr[bd.Rune]; ok && b != ll[label] {
+			err = fmt.Errorf("%w%c", ErrButtonRuneAmbiguity, bd.Rune)
+			return err
+		}
+		return nil
+	})
+
+	return err
+}
+
+func (v *view) validateInitButtoner(bb Buttoner) error {
+	ll := map[string]bool{}
+	rr := map[rune]bool{}
+	var err error
+	bb.ForNew(func(bd ButtonDef) error {
+		if err != nil {
+			return err
+		}
+		if bd.Label == "" {
+			err = ErrLabelMustNotBeZero
+			return err
+		}
+		if ll[bd.Label] {
+			err = fmt.Errorf("%w%s", ErrButtonLabelAmbiguity, bd.Label)
+			return err
+		}
+		ll[bd.Label] = true
+		if rr[bd.Rune] {
+			err = fmt.Errorf("%w%c", ErrButtonRuneAmbiguity, bd.Rune)
+			return err
+		}
+		if bd.Rune == 0 {
+			return nil
+		}
+		rr[bd.Rune] = true
+		return nil
+	})
+
+	return err
 }

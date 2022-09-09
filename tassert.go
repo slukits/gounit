@@ -190,7 +190,7 @@ func (t *T) SpaceMatched(str string, ss ...string) bool {
 	t.t.Helper()
 	spaceRe := reGen(`\s*`, "", ss...)
 	if !spaceRe.MatchString(str) {
-		t.Errorf(assertErr, "star-match", fmt.Sprintf(
+		t.Errorf(assertErr, "space-match", fmt.Sprintf(
 			matchedErr, spaceRe.String(), str))
 		return false
 	}
