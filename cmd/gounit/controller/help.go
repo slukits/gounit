@@ -28,8 +28,10 @@ currently watched packages.  Both views come also with a suites variant.
 The default-view's suites variants doesn't report the test results of
 the latest changed suite but a list of all suites in the currently 
 reported package.  The packages-view shows additional to all packages 
-also the suites of the currently selected package.  You can use the 
-buttons at the bottom of the screen to switch between views.
+also the suites of the currently selected package.  Clicking a suite 
+turns the suites variant of and makes the selected suite the currently
+reported suite.  You can use the buttons at the bottom of the screen to
+switch between views.
 
 The error-view is shown if at least one test of the watched packages
 failed reporting the failed test(s).  The error-view comes with an
