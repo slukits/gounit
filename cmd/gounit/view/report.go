@@ -72,6 +72,17 @@ func (m *report) wrt(l Liner, idx uint, e *lines.Env) io.Writer {
 // OnContext scrolls given reporting component down.  If at bottom it is
 // scrolled to the top.
 func (r *report) OnContext(e *lines.Env, x, y int) {
+	r.scroll()
+}
+
+func (r *report) OnRune(e *lines.Env, rn rune) {
+	if rn != ' ' {
+		return
+	}
+	r.scroll()
+}
+
+func (r *report) scroll() {
 	if r.Scroll.IsAtBottom() {
 		r.Scroll.ToTop()
 		return

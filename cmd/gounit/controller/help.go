@@ -14,10 +14,10 @@ func viewHelp(updVW func(interface{})) {
 const help = `
 Press 'q' or 'ctrl+d' or 'ctrl+c' key to quit this application.
 
-A right click scrolls down in circling fashion.  Page up/down scrolls
-up and down.  Clicking on a suite or test name the module relative
-file position of that suite or test is shown for IDE-terminal 
-implementations supporting to jump to the file position.
+A right click or space-key-press scrolls down in circling fashion.
+Page up/down scrolls up and down.  Clicking on a suite or test name
+the module relative file position of that suite or test is shown for
+IDE-terminal implementations supporting to jump to the file position.
 
 gounit has three main-views: the "default-view", the "packages-view" and
 the "error-view".  The default-view always reports the most recently
