@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
@@ -64,9 +65,7 @@ func New(i InitFactories) {
 		return
 	}
 	_ = diff
-	vw := &vwUpd{upd: make(chan interface{})}
-	go viewUpdater(vw, vw.upd)
-	vwInit := &vwIniter{vw: vw}
+	vwInit := &vwIniter{vw: &vwUpd{mutex: &sync.Mutex{}}}
 	vwInit.w, vwInit.ftl = i.Watcher, i.Fatal
 	ee := i.Events(i.View(vwInit))
 	ee.Listen()
@@ -92,9 +91,8 @@ func ensureInitArgs(i *InitFactories) {
 // vwUpd collects the functions to update aspects of a view which are
 // used by the viewUpdater to modify the view.
 type vwUpd struct {
-
-	// upd receives all updates for the views to avoid races.
-	upd chan interface{}
+	// mutex avoids that the view is updated concurrently.
+	mutex *sync.Mutex
 
 	// msg updates the view's message bar
 	msg func(string)
@@ -109,6 +107,20 @@ type vwUpd struct {
 	bttUpd func(view.Buttoner)
 }
 
+// Update updates the view and should be the only way the view is
+// updated to avoid data races.
+func (vw *vwUpd) Update(data interface{}) {
+	vw.mutex.Lock()
+	defer vw.mutex.Unlock()
+
+	switch updData := data.(type) {
+	case view.Buttoner:
+		vw.bttUpd(updData)
+	case view.Liner:
+		vw.rprUpd(updData)
+	}
+}
+
 // viewUpdater runs concurrently and is kicked of by the controller
 // constructor.  All updates of the view should be send to its update
 // channel upd.
@@ -117,12 +129,6 @@ func viewUpdater(vw *vwUpd, upd <-chan interface{}) {
 		updData := <-upd
 		if updData == nil {
 			return
-		}
-		switch updData := updData.(type) {
-		case view.Buttoner:
-			vw.bttUpd(updData)
-		case view.Liner:
-			vw.rprUpd(updData)
 		}
 	}
 }
@@ -161,7 +167,7 @@ func (i *vwIniter) Status(upd func(view.StatusUpdate)) {
 func (i *vwIniter) Buttons(upd func(view.Buttoner)) view.Buttoner {
 	i.vw.bttUpd = upd
 	return newButtons(
-		i.vw.upd, &liner{clearing: true, ll: []string{initReport}},
+		i.vw.Update, &liner{clearing: true, ll: []string{initReport}},
 	).defaultButtons()
 }
 
@@ -169,12 +175,24 @@ const (
 	WatcherErr = "gounit: watcher: %s: %v"
 )
 
-// Watcher is a function whose returned channel watches a go modules
-// packages sources whose tests runs are reported to a terminal ui.
+// A Watcher implementation provides the needed information about a
+// watched source directory to the controller.
 type Watcher interface {
+
+	// ModuleName is the module name of the descendant watched source
+	// directory.
 	ModuleName() string
+
+	// ModuleDir returns the absolute path of the module directory of
+	// the descendant watched source directory.
 	ModuleDir() string
+
+	// SourcesDir returns the absolute path of the watched source
+	// directory.
 	SourcesDir() string
+
+	// Watch is a function whose returned channel watches a go modules
+	// packages sources whose tests runs are reported to a terminal ui.
 	Watch() (<-chan *model.PackagesDiff, uint64, error)
 }
 

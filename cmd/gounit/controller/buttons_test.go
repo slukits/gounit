@@ -39,13 +39,13 @@ func (s *Buttons) Switch_to_more_if_more_selected(t *T) {
 	_, tt := s.fx(t)
 	t.SpaceMatched(tt.ButtonBar().String(), dfltBttFX...)
 
-	tt.waitFor(func() { tt.ClickButton("more") })
+	tt.ClickButton("more")
 	t.SpaceMatched(tt.ButtonBar().String(), moreBttFX...)
 
-	tt.waitFor(func() { tt.ClickButton("back") })
+	tt.ClickButton("back")
 	t.SpaceMatched(tt.ButtonBar().String(), dfltBttFX...)
 
-	tt.waitFor(func() { tt.FireRune('m') })
+	tt.FireRune('m')
 	t.SpaceMatched(tt.ButtonBar().String(), moreBttFX...)
 }
 
@@ -53,13 +53,13 @@ func (s *Buttons) Switch_to_args_if_args_selected(t *T) {
 	_, tt := s.fx(t)
 	t.SpaceMatched(tt.ButtonBar().String(), dfltBttFX...)
 
-	tt.waitFor(func() { tt.ClickButton("args") })
+	tt.ClickButton("args")
 	t.SpaceMatched(tt.ButtonBar().String(), argsBttFX...)
 
-	tt.waitFor(func() { tt.ClickButton("back") })
+	tt.ClickButton("back")
 	t.SpaceMatched(tt.ButtonBar().String(), dfltBttFX...)
 
-	tt.waitFor(func() { tt.FireRune('a') })
+	tt.FireRune('a')
 	t.SpaceMatched(tt.ButtonBar().String(), argsBttFX...)
 }
 

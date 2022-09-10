@@ -7,14 +7,14 @@ package controller
 import "github.com/slukits/gounit/cmd/gounit/view"
 
 type buttons struct {
-	viewUpd    chan interface{}
+	viewUpd    func(interface{})
 	lastReport view.Liner
 	dflt       *buttoner
 	more       *buttoner
 	args       *buttoner
 }
 
-func newButtons(upd chan interface{}, lastReport view.Liner) *buttons {
+func newButtons(upd func(interface{}), lastReport view.Liner) *buttons {
 	return &buttons{viewUpd: upd, lastReport: lastReport}
 }
 
@@ -28,9 +28,9 @@ func (bb *buttons) defaultButtons() *buttoner {
 func (bb *buttons) defaultListener(label string) {
 	switch label {
 	case "args":
-		bb.viewUpd <- bb.argsButtons()
+		bb.viewUpd(bb.argsButtons())
 	case "more":
-		bb.viewUpd <- bb.moreButtons()
+		bb.viewUpd(bb.moreButtons())
 	}
 }
 
@@ -44,8 +44,8 @@ func (bb *buttons) moreButtons() *buttoner {
 func (bb *buttons) moreListener(label string) {
 	switch label {
 	case "back":
-		bb.viewUpd <- bb.defaultButtons()
-		bb.viewUpd <- bb.lastReport
+		bb.viewUpd(bb.defaultButtons())
+		bb.viewUpd(bb.lastReport)
 	case "help":
 		viewHelp(bb.viewUpd)
 	case "about":
@@ -63,8 +63,8 @@ func (bb *buttons) argsButtons() *buttoner {
 func (bb *buttons) argsListener(label string) {
 	switch label {
 	case "back":
-		bb.viewUpd <- bb.defaultButtons()
-		bb.viewUpd <- bb.lastReport
+		bb.viewUpd(bb.defaultButtons())
+		bb.viewUpd(bb.lastReport)
 	}
 }
 

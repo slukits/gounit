@@ -6,9 +6,9 @@ package controller
 
 import "strings"
 
-func viewHelp(updVW chan interface{}) {
+func viewHelp(updVW func(interface{})) {
 	h := strings.Split(strings.TrimSpace(help), "\n")
-	updVW <- &liner{clearing: true, ll: h}
+	updVW(&liner{clearing: true, ll: h})
 }
 
 const help = `

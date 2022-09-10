@@ -6,9 +6,9 @@ package controller
 
 import "strings"
 
-func viewAbout(updVW chan interface{}) {
+func viewAbout(updVW func(interface{})) {
 	a := strings.Split(strings.TrimSpace(about), "\n")
-	updVW <- &liner{clearing: true, ll: a}
+	updVW(&liner{clearing: true, ll: a})
 }
 
 const about = `

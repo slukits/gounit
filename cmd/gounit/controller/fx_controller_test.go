@@ -59,18 +59,15 @@ func fx(t *gounit.T, fs fixtureSetter) (*lines.Events, *Testing) {
 	return fxInit(t, fs, InitFactories{})
 }
 
-type Testing struct{ *view.Testing }
+type Testing struct {
+	*view.Testing
+	ee *lines.Events
+}
 
-// waitFor executes given function and waits for the view's string
-// representation to change.
-func (tt *Testing) waitFor(f func()) {
-	tt.T.GoT().Helper()
-	str := tt.FullScreen().String()
-	f()
-	tt.T.Within((&gounit.TimeStepper{}).SetDuration(tt.Timeout),
-		func() bool {
-			return str != tt.FullScreen().String()
-		})
+func (tt *Testing) cleanUp() {
+	if tt.ee != nil && tt.ee.IsListening() {
+		tt.ee.QuitListening()
+	}
 }
 
 func (tt *Testing) SplitTrimmed(s string) []string {
@@ -84,7 +81,7 @@ func (tt *Testing) SplitTrimmed(s string) []string {
 func (tt *Testing) Buttons(ll ...string) {
 	tt.T.GoT().Helper()
 	for _, l := range ll {
-		tt.waitFor(func() { tt.ClickButton(l) })
+		tt.ClickButton(l)
 	}
 }
 
@@ -93,9 +90,8 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 ) {
 
 	var (
-		ct    Testing
-		ee    *lines.Events
-		vwUpd chan interface{}
+		ct Testing
+		ee *lines.Events
 	)
 
 	if i.Fatal == nil {
@@ -107,31 +103,20 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 		i.Watcher = &watcherMock{}
 	}
 	i.View = func(i view.Initer) lines.Componenter {
-		vi, ok := i.(*vwIniter)
-		if !ok {
-			t.Fatal("fx: init: expected vwIniter; got %T", i)
-		}
-		vwUpd = vi.vw.upd
 		return view.New(i)
 	}
 	i.Events = func(c lines.Componenter) *lines.Events {
 		events, tt := lines.Test(t.GoT(), c, 0)
 		ct.Testing = view.NewTesting(t, tt, c)
 		ee = events
+		ct.ee = events
 		return ee
 	}
 
 	New(i)
 
 	if fs != nil {
-		fs.Set(t, func() {
-			if ee != nil && ee.IsListening() {
-				ee.QuitListening()
-			}
-			if vwUpd != nil {
-				close(vwUpd)
-			}
-		})
+		fs.Set(t, ct.cleanUp)
 	}
 	return ee, &ct
 }
