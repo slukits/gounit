@@ -40,9 +40,19 @@ views and the error view.
 
 Default buttons
 
-[p]kgs switches to the packages-view and back.
+[p]kgs switches to the packages-view and back.  Selecting a package in
+       package view makes the package the currently reported package if
+       the suite variant is turned of or if the suite variant is turned
+       on and the selected package is the "current" package in the
+       packages view.  Is the selected package not the "current" package
+       and the packages-view's suite variant is turned on the selected
+       package becomes the "current" package.
 
-[s]uites switches the suites-variant on and off.
+[s]uites switches the suites-variant on and off.  I.e. in default-view
+       all suites are reported of the currently reported package.
+       Selecting on of the suites reports its tests.  In package-view
+       selecting a suite switches to the default-view reporting the
+       suites package and its tests.
 
 [a]rgs lets you define how test-runs are execute and their results are
        reported by providing the switches [v]et, [r]ace and [s]tats.
@@ -52,14 +62,14 @@ Default buttons
 Args buttons
 
 [v]et turns the vet switch for the next test run on/off.  The default
-      is off.
+       is off.
 
 [r]ace turns the race switch for the next test run on/off.  The default
        is off.
 
 [s]tats turns statistics on and off.  This switch extends the reported
-        numbers by the number of code lines, how many of them are for
-        testing and how many lines of documentation is found.  Stats
-        also stores the differences between starting and stopping
-        stats for later analysis.
+       numbers by the number of code lines, how many of them are for
+       testing and how many lines of documentation is found.  Stats
+       also stores the differences between starting and stopping
+       stats for later analysis.
 `
