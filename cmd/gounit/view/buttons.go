@@ -153,8 +153,13 @@ type button struct {
 }
 
 func (b *button) OnInit(e *lines.Env) {
-	b.Dim().SetWidth(len(b.uiLabel()))
-	fmt.Fprint(e, b.uiLabel())
+	lbl := b.uiLabel()
+	if strings.HasSuffix(lbl, "=on") {
+		b.Dim().SetWidth(len(lbl) + 1)
+	} else {
+		b.Dim().SetWidth(len(lbl))
+	}
+	fmt.Fprint(e, lbl)
 }
 
 func (b *button) uiLabel() string {
