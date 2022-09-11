@@ -6,12 +6,20 @@ package controller
 
 import "github.com/slukits/gounit/cmd/gounit/view"
 
+type onMask uint8
+
+const (
+	vetOn onMask = 1 << iota
+	raceOn
+	statsOn
+)
+
 type buttons struct {
 	viewUpd    func(interface{})
 	lastReport view.Liner
 	dflt       *buttoner
 	more       *buttoner
-	args       *buttoner
+	isOn       onMask
 }
 
 func newButtons(upd func(interface{}), lastReport view.Liner) *buttons {
@@ -28,7 +36,7 @@ func (bb *buttons) defaultButtons() *buttoner {
 func (bb *buttons) defaultListener(label string) {
 	switch label {
 	case "args":
-		bb.viewUpd(bb.argsButtons())
+		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
 	case "more":
 		bb.viewUpd(bb.moreButtons())
 	}
@@ -53,18 +61,29 @@ func (bb *buttons) moreListener(label string) {
 	}
 }
 
-func (bb *buttons) argsButtons() *buttoner {
-	if bb.args == nil {
-		bb.args = argsButtons(bb.argsListener)
-	}
-	return bb.args
-}
-
 func (bb *buttons) argsListener(label string) {
 	switch label {
 	case "back":
 		bb.viewUpd(bb.defaultButtons())
 		bb.viewUpd(bb.lastReport)
+	case bttVetOff:
+		bb.isOn |= vetOn
+		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
+	case bttVetOn:
+		bb.isOn &^= vetOn
+		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
+	case bttRaceOff:
+		bb.isOn |= raceOn
+		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
+	case bttRaceOn:
+		bb.isOn &^= raceOn
+		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
+	case bttStatsOff:
+		bb.isOn |= statsOn
+		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
+	case bttStatsOn:
+		bb.isOn &^= statsOn
+		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
 	}
 }
 
@@ -101,17 +120,36 @@ func moreButtons(l func(string)) *buttoner {
 	}
 }
 
-func argsButtons(l func(string)) *buttoner {
-	return &buttoner{
+const (
+	bttRaceOff  = "race=off"
+	bttRaceOn   = "race=on"
+	bttVetOff   = "vet=off"
+	bttVetOn    = "vet=on"
+	bttStatsOff = "stats=off"
+	bttStatsOn  = "stats=on"
+)
+
+func argsButtons(on onMask, l func(string)) *buttoner {
+	bb := &buttoner{
 		replace:  true,
 		listener: l,
 		newBB: []view.ButtonDef{
-			{Label: "race=off", Rune: 'r'},
-			{Label: "vet=off", Rune: 'v'},
-			{Label: "stats=off", Rune: 's'},
+			{Label: bttRaceOff, Rune: 'r'},
+			{Label: bttVetOff, Rune: 'v'},
+			{Label: bttStatsOff, Rune: 's'},
 			{Label: "back", Rune: 'b'},
 		},
 	}
+	if on&raceOn > 0 {
+		bb.newBB[0].Label = bttRaceOn
+	}
+	if on&vetOn > 0 {
+		bb.newBB[1].Label = bttVetOn
+	}
+	if on&statsOn > 0 {
+		bb.newBB[2].Label = bttStatsOn
+	}
+	return bb
 }
 
 type buttoner struct {

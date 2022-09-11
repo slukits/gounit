@@ -135,12 +135,25 @@ func viewUpdater(vw *vwUpd, upd <-chan interface{}) {
 
 const initReport = "waiting for testing packages being reported..."
 
-// vwIniter instance provides the initial data to a new view and
-// collects the provided view modifiers.
+// vwIniter instance provides the initial data to a new view,
+// collects the provided view modifiers and instantiates *buttons.
 type vwIniter struct {
-	w   Watcher
+
+	// w a Watcher instance whose module and watched source-directory
+	// information are used to initialize a view's message bar.
+	w Watcher
+
+	// ftl to report fatal errors during the initialization process.
 	ftl func(...interface{})
-	vw  *vwUpd
+
+	// vw properties are set during the view's initialization process
+	// with received update functions.
+	vw *vwUpd
+
+	// bb is the created buttons-instance for the initial button-bar
+	// definition.  They are saved in this property so they can be used
+	// after the initialization process for further processing.
+	bb *buttons
 }
 
 func (i *vwIniter) Fatal() func(...interface{}) { return i.ftl }
@@ -166,9 +179,10 @@ func (i *vwIniter) Status(upd func(view.StatusUpdate)) {
 
 func (i *vwIniter) Buttons(upd func(view.Buttoner)) view.Buttoner {
 	i.vw.bttUpd = upd
-	return newButtons(
+	i.bb = newButtons(
 		i.vw.Update, &liner{clearing: true, ll: []string{initReport}},
-	).defaultButtons()
+	)
+	return i.bb.defaultButtons()
 }
 
 const (

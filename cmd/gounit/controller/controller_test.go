@@ -75,7 +75,7 @@ func (s *Gounit) Shows_initially_initial_report(t *T) {
 
 func (s *Gounit) Shows_help_screen(t *T) {
 	_, tt := s.fx(t)
-	tt.Buttons("more", "help")
+	tt.ClickButtons("more", "help")
 	got := tt.SplitTrimmed(tt.Trim(tt.Reporting()).String())
 	t.SpaceMatched(help, got...)
 }
@@ -83,13 +83,13 @@ func (s *Gounit) Shows_help_screen(t *T) {
 func (s *Gounit) Shows_last_report_going_back_from_help(t *T) {
 	_, tt := s.fx(t)
 	exp := tt.Trim(tt.Reporting()).String()
-	tt.Buttons("more", "help", "back")
+	tt.ClickButtons("more", "help", "back")
 	t.Eq(exp, tt.Trim(tt.Reporting()).String())
 }
 
 func (s *Gounit) Shows_about_screen(t *T) {
 	_, tt := s.fx(t)
-	tt.Buttons("more", "about")
+	tt.ClickButtons("more", "about")
 	got := tt.SplitTrimmed(tt.Trim(tt.Reporting()).String())
 	t.SpaceMatched(about, got...)
 }
@@ -97,7 +97,7 @@ func (s *Gounit) Shows_about_screen(t *T) {
 func (s *Gounit) Shows_last_report_going_back_from_about(t *T) {
 	_, tt := s.fx(t)
 	exp := tt.Trim(tt.Reporting()).String()
-	tt.Buttons("more", "about", "back")
+	tt.ClickButtons("more", "about", "back")
 	t.Eq(exp, tt.Trim(tt.Reporting()).String())
 }
 

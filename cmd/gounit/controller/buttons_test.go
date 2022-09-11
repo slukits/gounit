@@ -63,6 +63,60 @@ func (s *Buttons) Switch_to_args_if_args_selected(t *T) {
 	t.SpaceMatched(tt.ButtonBar().String(), argsBttFX...)
 }
 
+func (s *Buttons) Switches_vet_arg(t *T) {
+	_, tt := s.fx(t)
+
+	tt.ClickButton("args")
+	label, vw := tt.ArgButtonLabel("vet")
+	t.Contains(tt.ButtonBar().String(), vw)
+
+	tt.ClickButton(label)
+	label, vw2 := tt.ArgButtonLabel("vet")
+	t.FatalIfNot(t.Neq(vw, vw2))
+	t.Contains(tt.ButtonBar().String(), vw2)
+
+	tt.ClickButton(label)
+	_, vw2 = tt.ArgButtonLabel("vet")
+	t.FatalIfNot(t.Eq(vw, vw2))
+	t.Contains(tt.ButtonBar().String(), vw2)
+}
+
+func (s *Buttons) Switches_race_arg(t *T) {
+	_, tt := s.fx(t)
+
+	tt.ClickButton("args")
+	label, vw := tt.ArgButtonLabel("race")
+	t.Contains(tt.ButtonBar().String(), vw)
+
+	tt.ClickButton(label)
+	label, vw2 := tt.ArgButtonLabel("race")
+	t.FatalIfNot(t.Neq(vw, vw2))
+	t.Contains(tt.ButtonBar().String(), vw2)
+
+	tt.ClickButton(label)
+	_, vw2 = tt.ArgButtonLabel("race")
+	t.FatalIfNot(t.Eq(vw, vw2))
+	t.Contains(tt.ButtonBar().String(), vw2)
+}
+
+func (s *Buttons) Switches_stats_arg(t *T) {
+	_, tt := s.fx(t)
+
+	tt.ClickButton("args")
+	label, vw := tt.ArgButtonLabel("race")
+	t.Contains(tt.ButtonBar().String(), vw)
+
+	tt.ClickButton(label)
+	label, vw2 := tt.ArgButtonLabel("race")
+	t.FatalIfNot(t.Neq(vw, vw2))
+	t.Contains(tt.ButtonBar().String(), vw2)
+
+	tt.ClickButton(label)
+	_, vw2 = tt.ArgButtonLabel("race")
+	t.FatalIfNot(t.Eq(vw, vw2))
+	t.Contains(tt.ButtonBar().String(), vw2)
+}
+
 func TestButtons(t *testing.T) {
 	t.Parallel()
 	Run(&Buttons{}, t)
