@@ -47,9 +47,9 @@ func (tt *Testing) cleanUp() {
 	if tt.ee != nil && tt.ee.IsListening() {
 		tt.ee.QuitListening()
 	}
-	if w, ok := tt.watcher.(interface{ QuitAll() }); ok {
-		w.QuitAll()
-	}
+	// if w, ok := tt.watcher.(interface{ QuitAll() }); ok {
+	// 	w.QuitAll()
+	// }
 }
 
 // isOn returns true if given button-mask represents on/off-buttons
@@ -216,7 +216,7 @@ func fxSetupSource(t *gounit.T, relDir string) (golden *tfs.Dir) {
 	golden = tmp.Child(goldenDir)
 	_, err := os.Stat(fp.Join(golden.Path(), relDir))
 	if err != nil {
-		t.Fatal("fx: watch: %s: %v", relDir, err)
+		t.Fatalf("fx: watch: %s: %v", relDir, err)
 	}
 	return golden
 }
