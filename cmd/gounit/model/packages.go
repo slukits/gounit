@@ -39,7 +39,7 @@ func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) error {
 		}
 		tp := &TestingPackage{
 			ModTime: ps.ModTime,
-			id:      ps.abs, abs: ps.abs, files: tt, timeout: d.timeout}
+			id:      ps.rel, abs: ps.abs, files: tt, timeout: d.timeout}
 		if cb(tp) {
 			return nil
 		}
@@ -58,7 +58,7 @@ func (d *PackagesDiff) ForDel(cb func(*TestingPackage) (stop bool)) {
 			continue
 		}
 		tp := &TestingPackage{
-			id: ps.abs, abs: ps.abs, parsed: true, timeout: 0}
+			id: ps.rel, abs: ps.abs, parsed: true, timeout: 0}
 		if cb(tp) {
 			return
 		}
@@ -186,14 +186,10 @@ func (s *dirStack) PushDir(dir string, ignore func(string) bool) error {
 // which contains at least one test function.  The ModTime-property is
 // the modification time of the most recently modified package.
 func calcPackagesStat(
-	dir string, ignore func(string) bool,
+	moduleDir, dir string, ignore func(string) bool,
 ) *packagesStat {
 
-	stk := dirStack{}
-	if err := stk.PushDir(dir, ignore); err != nil || len(stk) == 0 {
-		return nil
-	}
-
+	stk := dirStack{dir}
 	pp := packagesStat{}
 
 	for len(stk) > 0 {
@@ -206,7 +202,7 @@ func calcPackagesStat(
 			continue
 		}
 		tp.rel = strings.TrimLeft(
-			tp.abs[len(dir):], string(os.PathSeparator))
+			strings.TrimPrefix(tp.abs, moduleDir), string(os.PathSeparator))
 		pp.pp = append(pp.pp, tp)
 		if tp.ModTime.After(pp.ModTime) {
 			pp.ModTime = tp.ModTime

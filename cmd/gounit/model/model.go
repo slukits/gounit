@@ -32,9 +32,11 @@
 //	            tp.ForSuite(func(ts *module.TestSuite) {
 //	                fmt.Println(ts.Name())
 //	            })
+//				return
 //	        })
 //	        diff.ForDel(func(tp *module.TestingPackage) (stop bool) {
 //	            fmt.Printf("deleted: %s\n", tp.Rel())
+//				return
 //	        })
 //	        if countdown == 0 {
 //	            mdl.Quit(ID) // remove watcher from registered watchers
@@ -226,7 +228,7 @@ func (m *Sources) ensureDiffer() {
 	if m.Timeout == 0 {
 		m.Timeout = DefaultTimeout
 	}
-	m.isWatched = differ(m.Dir, m.Interval, m.Timeout,
+	m.isWatched = differ(m.moduleDir, m.Dir, m.Interval, m.Timeout,
 		ignoreClosure(m.Ignore...), m.register, m.quit)
 }
 
@@ -309,7 +311,7 @@ type watcher struct {
 // guarantee to not block and keep each watcher individually accurately
 // posted about changes independently if a watcher is polling from its
 // diff-channel or not.
-func differ(dir string,
+func differ(moduleDir string, dir string,
 	interval, timeout time.Duration,
 	ignore func(string) bool,
 	register chan *newWatcher, quit <-chan uint64,
@@ -329,7 +331,7 @@ func differ(dir string,
 				}
 			case <-time.After(interval):
 				reportDiffs(
-					calcPackagesStat(dir, ignore), ww, timeout)
+					calcPackagesStat(moduleDir, dir, ignore), ww, timeout)
 			}
 		}
 	}()
@@ -362,6 +364,9 @@ func reportDiffs(
 	ww map[uint64]*watcher,
 	timeout time.Duration,
 ) {
+	if len(snapshot.pp) == 0 {
+		return
+	}
 
 	for _, w := range ww {
 		// w.diff has a 1-buffer which is drained ...
