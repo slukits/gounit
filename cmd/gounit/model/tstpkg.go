@@ -51,6 +51,9 @@ func (tp TestingPackage) Rel() string { return filepath.Dir(tp.id) }
 // package.
 func (tp TestingPackage) ID() string { return tp.id }
 
+// LenTests returns the number of go tests of a testing package.
+func (tp *TestingPackage) LenTests() int { return len(tp.tests) }
+
 // ForTest provides given testing package's tests.  ForTest fails in
 // case of an parse error.
 func (tp *TestingPackage) ForTest(cb func(*Test)) error {
@@ -62,6 +65,9 @@ func (tp *TestingPackage) ForTest(cb func(*Test)) error {
 	}
 	return nil
 }
+
+// LenSuites returns the number of suites of a testing package.
+func (tp *TestingPackage) LenSuites() int { return len(tp.suites) }
 
 // ForSuite provides given testing package's suites.  ForSuite fails in
 // case of an parse error.
@@ -77,7 +83,7 @@ func (tp *TestingPackage) ForSuite(cb func(*TestSuite)) error {
 
 const StdErr = "shell exit error: "
 
-// Run executes go test for the testing package an returns its result.
+// Run executes go test for the testing package and returns its result.
 // Returned error if any is the error of command execution, i.e. a
 // timeout.  While Result.Err reflects errors from the error console.
 // Note the output of the go testing tool is sadly not enough to report

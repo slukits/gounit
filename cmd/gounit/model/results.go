@@ -78,12 +78,12 @@ func (r *Results) Len() int { return len(r.rr) }
 // report test logs of the suites Init- or Finalize-method.  While
 // SubResult instances can't have this.
 type Result struct {
-	Passed   bool
-	Output   []string
-	Start    time.Time
-	End      time.Time
-	testName string
-	subs     subResults
+	Passed bool
+	Output []string
+	Start  time.Time
+	End    time.Time
+	Name   string
+	subs   subResults
 }
 
 // Len is the number of executed test comprising given test result.
@@ -131,7 +131,7 @@ func (r *Result) For(cb func(*SubResult)) {
 // Sub returns the result of the sub test with given name.
 func (r *Result) OfTest(t *Test) *SubResult {
 	for _, sr := range r.subs {
-		if sr.testName != t.Name() {
+		if sr.Name != t.Name() {
 			continue
 		}
 		return sr
@@ -164,7 +164,7 @@ type subResults []*SubResult
 
 func (sr *subResults) get(test string) *SubResult {
 	for _, sr := range *sr {
-		if sr.testName != test {
+		if sr.Name != test {
 			continue
 		}
 		return sr
@@ -173,7 +173,7 @@ func (sr *subResults) get(test string) *SubResult {
 }
 
 func (sr *subResults) add(test string) *SubResult {
-	_sr := &SubResult{Result: &Result{testName: test}}
+	_sr := &SubResult{Result: &Result{Name: test}}
 	*sr = append(*sr, _sr)
 	return _sr
 }
@@ -280,7 +280,7 @@ func (r *results) get(testName string) *Result {
 	path := strings.Split(testName, "/")
 	root, ok := (*r)[path[0]]
 	if !ok {
-		root = &TestResult{Result: &Result{testName: path[0]}}
+		root = &TestResult{Result: &Result{Name: path[0]}}
 		(*r)[path[0]] = root
 	}
 	rslt := root.Result
