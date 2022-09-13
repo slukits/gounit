@@ -49,6 +49,16 @@ type InitFactories struct {
 	// Watcher wraps a controller's model; defaults to &model.Sources{}
 	Watcher Watcher
 
+	// watch waits concurrently for a watcher to report watched testing
+	// packages and updates accordingly the view; defaults to a
+	// controller internal function and is there for testing
+	// interceptions.
+	watch func(<-chan *model.PackagesDiff, func(...interface{}))
+
+	// dbgTimeouts set to true increases lines.Events.sync-timeout to
+	// 20min as well as controller.Testing.watchTimeout.
+	dbgTimeouts bool
+
 	// View returns a controller's view; defaults to view.New
 	View func(view.Initer) lines.Componenter
 
@@ -64,10 +74,11 @@ func New(i InitFactories) {
 		i.Fatal(WatcherErr, i.Watcher.SourcesDir(), err)
 		return
 	}
-	_ = diff
 	vwInit := &vwIniter{vw: &vwUpd{mutex: &sync.Mutex{}}}
 	vwInit.w, vwInit.ftl = i.Watcher, i.Fatal
 	ee := i.Events(i.View(vwInit))
+	vwInit.bb.quitter = ee.QuitListening
+	go i.watch(diff, vwInit.vw.Update)
 	ee.Listen()
 }
 
@@ -86,6 +97,9 @@ func ensureInitArgs(i *InitFactories) {
 	if i.Events == nil {
 		i.Events = lines.New
 	}
+	if i.watch == nil {
+		i.watch = watch
+	}
 }
 
 // vwUpd collects the functions to update aspects of a view which are
@@ -101,7 +115,7 @@ type vwUpd struct {
 	stt func(view.StatusUpdate)
 
 	// rprUpd updates lines of a view's reporting component.
-	rprUpd view.ReportingUpd
+	rprUpd func(view.Reporter)
 
 	// bttUpd updates the buttons of a view's button bar.
 	bttUpd func(view.Buttoner)
@@ -109,26 +123,16 @@ type vwUpd struct {
 
 // Update updates the view and should be the only way the view is
 // updated to avoid data races.
-func (vw *vwUpd) Update(data interface{}) {
+func (vw *vwUpd) Update(dd ...interface{}) {
 	vw.mutex.Lock()
 	defer vw.mutex.Unlock()
 
-	switch updData := data.(type) {
-	case view.Buttoner:
-		vw.bttUpd(updData)
-	case view.Liner:
-		vw.rprUpd(updData)
-	}
-}
-
-// viewUpdater runs concurrently and is kicked of by the controller
-// constructor.  All updates of the view should be send to its update
-// channel upd.
-func viewUpdater(vw *vwUpd, upd <-chan interface{}) {
-	for {
-		updData := <-upd
-		if updData == nil {
-			return
+	for _, d := range dd {
+		switch updData := d.(type) {
+		case view.Buttoner:
+			vw.bttUpd(updData)
+		case view.Reporter:
+			vw.rprUpd(updData)
 		}
 	}
 }
@@ -166,11 +170,11 @@ func (i *vwIniter) Message(msg func(string)) string {
 }
 
 func (i *vwIniter) Reporting(
-	upd view.ReportingUpd,
-) (string, view.ReportingLst) {
+	upd func(view.Reporter),
+) view.Reporter {
 
 	i.vw.rprUpd = upd
-	return initReport, func(idx int) {}
+	return &reporter{ll: []string{initReport}}
 }
 
 func (i *vwIniter) Status(upd func(view.StatusUpdate)) {
@@ -179,9 +183,7 @@ func (i *vwIniter) Status(upd func(view.StatusUpdate)) {
 
 func (i *vwIniter) Buttons(upd func(view.Buttoner)) view.Buttoner {
 	i.vw.bttUpd = upd
-	i.bb = newButtons(
-		i.vw.Update, &liner{clearing: true, ll: []string{initReport}},
-	)
+	i.bb = newButtons(i.vw.Update)
 	return i.bb.defaultButtons()
 }
 
@@ -210,18 +212,29 @@ type Watcher interface {
 	Watch() (<-chan *model.PackagesDiff, uint64, error)
 }
 
-type liner struct {
-	clearing bool
-	ll       []string
-	mask     map[uint]view.LineMask
+// reporter implements view.Reporter.
+type reporter struct {
+	flags view.RprtMask
+	ll    []string
+	mask  map[uint]view.LineMask
+	lst   func(int)
 }
 
-func (l *liner) Clearing() bool { return l.clearing }
+// Clearing indicates if all lines not set by this reporter's For
+// function should be cleared or not.
+func (l *reporter) Flags() view.RprtMask { return l.flags }
 
-func (l *liner) For(_ lines.Componenter, line func(uint, string)) {
+// For expects the view's reporting component and a callback to which
+// the updated lines can be provided to.
+func (l *reporter) For(_ lines.Componenter, line func(uint, string)) {
 	for idx, content := range l.ll {
 		line(uint(idx), content)
 	}
 }
 
-func (l *liner) Mask(idx uint) view.LineMask { return l.mask[idx] }
+// Mask returns for given index special formatting directives.
+func (l *reporter) LineMask(idx uint) view.LineMask { return l.mask[idx] }
+
+// Listener returns the callback which is informed about user selections
+// of lines by providing the index of the selected line.
+func (l *reporter) Listener() func(int) { return l.lst }

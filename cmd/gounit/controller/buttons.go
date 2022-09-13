@@ -15,30 +15,46 @@ const (
 )
 
 type buttons struct {
-	viewUpd    func(interface{})
-	lastReport view.Liner
-	dflt       *buttoner
-	more       *buttoner
-	isOn       onMask
+	viewUpd func(...interface{})
+	dflt    *buttoner
+	more    *buttoner
+	isOn    onMask
+	quitter func()
 }
 
-func newButtons(upd func(interface{}), lastReport view.Liner) *buttons {
-	return &buttons{viewUpd: upd, lastReport: lastReport}
+func newButtons(upd func(...interface{})) *buttons {
+	return &buttons{viewUpd: upd}
 }
 
 func (bb *buttons) defaultButtons() *buttoner {
 	if bb.dflt == nil {
-		bb.dflt = defaultButtons(bb.defaultListener)
+		bb.dflt = defaultButtons(bb.isOn, bb.defaultListener)
 	}
 	return bb.dflt
 }
 
 func (bb *buttons) defaultListener(label string) {
 	switch label {
-	case "args":
-		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
 	case "more":
 		bb.viewUpd(bb.moreButtons())
+	case bttVetOff:
+		bb.isOn |= vetOn
+		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+	case bttVetOn:
+		bb.isOn &^= vetOn
+		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+	case bttRaceOff:
+		bb.isOn |= raceOn
+		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+	case bttRaceOn:
+		bb.isOn &^= raceOn
+		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+	case bttStatsOff:
+		bb.isOn |= statsOn
+		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+	case bttStatsOn:
+		bb.isOn &^= statsOn
+		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
 	}
 }
 
@@ -52,59 +68,48 @@ func (bb *buttons) moreButtons() *buttoner {
 func (bb *buttons) moreListener(label string) {
 	switch label {
 	case "back":
-		bb.viewUpd(bb.defaultButtons())
-		bb.viewUpd(bb.lastReport)
+		bb.viewUpd(bb.defaultButtons(),
+			&reporter{flags: view.RpPop | view.RpClearing})
 	case "help":
 		viewHelp(bb.viewUpd)
+	case "quit":
+		bb.quitter()
 	case "about":
 		viewAbout(bb.viewUpd)
 	}
 }
 
-func (bb *buttons) argsListener(label string) {
-	switch label {
-	case "back":
-		bb.viewUpd(bb.defaultButtons())
-		bb.viewUpd(bb.lastReport)
-	case bttVetOff:
-		bb.isOn |= vetOn
-		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
-	case bttVetOn:
-		bb.isOn &^= vetOn
-		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
-	case bttRaceOff:
-		bb.isOn |= raceOn
-		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
-	case bttRaceOn:
-		bb.isOn &^= raceOn
-		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
-	case bttStatsOff:
-		bb.isOn |= statsOn
-		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
-	case bttStatsOn:
-		bb.isOn &^= statsOn
-		bb.viewUpd(argsButtons(bb.isOn, bb.argsListener))
-	}
-}
-
 const (
-	bttPkgs  = "pkgs"
-	bttSuits = "suites=off"
-	bttArgs  = "args"
-	bttMore  = "more"
+	bttRaceOff  = "race=off"
+	bttRaceOn   = "race=on"
+	bttVetOff   = "vet=off"
+	bttVetOn    = "vet=on"
+	bttStatsOff = "stats=off"
+	bttStatsOn  = "stats=on"
+	bttMore     = "more"
 )
 
-func defaultButtons(l func(string)) *buttoner {
-	return &buttoner{
+func defaultButtons(on onMask, l func(string)) *buttoner {
+	bb := &buttoner{
 		replace:  true,
 		listener: l,
 		newBB: []view.ButtonDef{
-			{Label: bttPkgs, Rune: 'p'},
-			{Label: bttSuits, Rune: 's'},
-			{Label: bttArgs, Rune: 'a'},
+			{Label: bttVetOff, Rune: 'v'},
+			{Label: bttRaceOff, Rune: 'r'},
+			{Label: bttStatsOff, Rune: 's'},
 			{Label: bttMore, Rune: 'm'},
 		},
 	}
+	if on&vetOn > 0 {
+		bb.newBB[0].Label = bttVetOn
+	}
+	if on&raceOn > 0 {
+		bb.newBB[1].Label = bttRaceOn
+	}
+	if on&statsOn > 0 {
+		bb.newBB[2].Label = bttStatsOn
+	}
+	return bb
 }
 
 func moreButtons(l func(string)) *buttoner {
@@ -118,38 +123,6 @@ func moreButtons(l func(string)) *buttoner {
 			{Label: "back", Rune: 'b'},
 		},
 	}
-}
-
-const (
-	bttRaceOff  = "race=off"
-	bttRaceOn   = "race=on"
-	bttVetOff   = "vet=off"
-	bttVetOn    = "vet=on"
-	bttStatsOff = "stats=off"
-	bttStatsOn  = "stats=on"
-)
-
-func argsButtons(on onMask, l func(string)) *buttoner {
-	bb := &buttoner{
-		replace:  true,
-		listener: l,
-		newBB: []view.ButtonDef{
-			{Label: bttRaceOff, Rune: 'r'},
-			{Label: bttVetOff, Rune: 'v'},
-			{Label: bttStatsOff, Rune: 's'},
-			{Label: "back", Rune: 'b'},
-		},
-	}
-	if on&raceOn > 0 {
-		bb.newBB[0].Label = bttRaceOn
-	}
-	if on&vetOn > 0 {
-		bb.newBB[1].Label = bttVetOn
-	}
-	if on&statsOn > 0 {
-		bb.newBB[2].Label = bttStatsOn
-	}
-	return bb
 }
 
 type buttoner struct {

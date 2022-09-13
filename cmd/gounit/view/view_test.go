@@ -337,7 +337,7 @@ func (s *AView) Clears_unused_main_lines(t *T) {
 	t.SpaceMatched(tt.Screen().String(), strings.Split(exp, "\n")...)
 
 	exp = "\n\n2nd\n3rd\n4th"
-	fx.updateReporting(&linerFX{content: exp, clearing: true})
+	fx.updateReporting(&linerFX{content: exp, flags: RpClearing})
 
 	scr := tt.Screen().String()
 	t.SpaceMatched(scr, strings.Split(exp, "\n")...)

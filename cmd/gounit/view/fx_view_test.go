@@ -32,9 +32,9 @@ type fxInit struct {
 
 	updButton func(Buttoner)
 
-	updateReporting ReportingUpd
+	updateReporting func(Reporter)
 
-	listenReporting ReportingLst
+	listenReporting func(int)
 
 	reportedLine int
 }
@@ -70,7 +70,7 @@ func (fx *fxInit) Status(upd func(StatusUpdate)) {
 	fx.updateStatus = upd
 }
 
-func (fx *fxInit) Reporting(ru ReportingUpd) (string, ReportingLst) {
+func (fx *fxInit) Reporting(ru func(Reporter)) Reporter {
 	fx.updateReporting = ru
 
 	if fx.listenReporting == nil {
@@ -79,7 +79,7 @@ func (fx *fxInit) Reporting(ru ReportingUpd) (string, ReportingLst) {
 		}
 	}
 
-	return fxReporting, fx.listenReporting
+	return &linerFX{content: fxReporting, listener: fx.listenReporting}
 }
 
 func (fx *fxInit) Buttons(upd func(Buttoner)) Buttoner {
@@ -163,14 +163,17 @@ func (fx *viewFX) twoPointFiveTimesReportedLines() (int, string) {
 type linerFX struct {
 	content  string
 	f        func(lines.Componenter, func(uint, string))
-	clearing bool
+	flags    RprtMask
+	listener func(int)
 }
 
-func (l *linerFX) Clearing() bool { return l.clearing }
+func (l *linerFX) Flags() RprtMask { return l.flags }
 
-func (l *linerFX) Mask(idx uint) LineMask {
+func (l *linerFX) LineMask(idx uint) LineMask {
 	return 0
 }
+
+func (l *linerFX) Listener() func(int) { return l.listener }
 
 func (l *linerFX) For(r lines.Componenter, cb func(uint, string)) {
 	if l.f != nil {

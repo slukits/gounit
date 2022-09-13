@@ -4,11 +4,18 @@
 
 package controller
 
-import "strings"
+import (
+	"strings"
 
-func viewAbout(updVW func(interface{})) {
+	"github.com/slukits/gounit/cmd/gounit/view"
+)
+
+func viewAbout(updVW func(...interface{})) {
 	a := strings.Split(strings.TrimSpace(about), "\n")
-	updVW(&liner{clearing: true, ll: a})
+	updVW(&reporter{
+		flags: view.RpClearing | view.RpPush | view.RpReplaceByPush,
+		ll:    a,
+	})
 }
 
 const about = `

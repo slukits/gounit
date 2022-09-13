@@ -28,7 +28,7 @@ gounit's terminal user interface (note: the actual ui has no frames)
 	|                                                                  |
 	| packages: n; tests: t/f; stat: c/t d                             |
 	+------------------------------------------------------------------+
-	|       [p]kgs       [s]uites=off        [a]rgs       [m]ore       |
+	|       [v]kgs       [s]uites=off        [a]rgs       [m]ore       |
 	+------------------------------------------------------------------+
 */
 package view
@@ -64,7 +64,7 @@ type Initer interface {
 	// function for the reporting component's lines and expects an initial
 	// content string as well as a listener which is notified if a user
 	// selects a line.
-	Reporting(ReportingUpd) (string, ReportingLst)
+	Reporting(update func(Reporter)) Reporter
 
 	// Buttons is by initializing view provided with an update function
 	// for buttons and expects a Buttoner implementation with the
@@ -90,30 +90,6 @@ const (
 	// line of a reporting component.
 	ZeroLineMod LineMask = 0
 )
-
-// LstUpdater function is provided  to an Initer implementation to
-// update the lines listener.  A lines listener (function) is informed
-// if a particular line was selected by the user, e.g. clicked.
-type LstUpdater func(func(idx int))
-
-// A Liner provides line-updates for the main area.
-type Liner interface {
-
-	// Clearing returns true iff all remaining lines which are not set
-	// by Liner.For of the main component should be cleared.
-	Clearing() bool
-
-	// For is provided with the reporting component instance and a
-	// callback function which must be called for each line which should
-	// be updated.  If Clearing all other lines of reporting component
-	// are reset to zero.  For each updated line Mask is called for
-	// optional formatting information.
-	For(_ lines.Componenter, line func(idx uint, content string))
-
-	// Mask may provide for an updated line additional formatting
-	// information like "Failed" or "Passed".
-	Mask(idx uint) LineMask
-}
 
 // View implements the lines Componenter interface hence an instance of
 // it can be used to initialize a lines terminal ui.  Note the View
@@ -148,8 +124,8 @@ func New(i Initer) *view {
 	new := &view{fatal: i.Fatal()}
 	new.CC = append(new.CC, &messageBar{
 		dflt: i.Message(new.updateMessageBar)})
-	dflt, lst := i.Reporting(new.updateLines)
-	new.CC = append(new.CC, &report{dflt: dflt, listener: lst})
+	r := i.Reporting(new.updateLines)
+	new.CC = append(new.CC, &report{rr: []Reporter{r}})
 	new.CC = append(new.CC, &statusBar{})
 	i.Status(new.updateStatusBar)
 	initButtons(i, new)
@@ -205,7 +181,7 @@ func (v *view) updateStatusBar(upd StatusUpdate) {
 	}
 }
 
-func (v *view) updateLines(l Liner) {
+func (v *view) updateLines(l Reporter) {
 	if err := v.ee.Update(v.CC[1], l, nil); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: update: lines: %v", err))
 	}

@@ -4,11 +4,19 @@
 
 package controller
 
-import "strings"
+import (
+	"strings"
 
-func viewHelp(updVW func(interface{})) {
+	"github.com/slukits/gounit/cmd/gounit/view"
+)
+
+func viewHelp(updVW func(...interface{})) {
 	h := strings.Split(strings.TrimSpace(help), "\n")
-	updVW(&liner{clearing: true, ll: h})
+	updVW(&reporter{
+		flags: view.RpClearing | view.RpPush |
+			view.RpReplaceByPush,
+		ll: h,
+	})
 }
 
 const help = `

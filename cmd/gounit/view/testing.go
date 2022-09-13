@@ -33,6 +33,9 @@ func NewTesting(
 	return &Testing{T: t, Testing: tt, view: vw}
 }
 
+// ClickButton clicks the button in the button-bar with given label.
+// ClickButton does not return before subsequent view-changes triggered
+// by requested button click are processed.
 func (t *Testing) ClickButton(label string) {
 	bb := t.getButtonBar()
 	if bb == nil {
@@ -48,6 +51,10 @@ func (t *Testing) ClickButton(label string) {
 	t.T.Fatalf("gounit: view: fixture: no button labeled %q", label)
 }
 
+// ClickReporting clicks on the line with given index of the view's
+// reporting component.  ClickReporting does not return before
+// subsequent view-changes triggered by requested reporting click are
+// processed.
 func (t *Testing) ClickReporting(idx int) {
 	rp := t.getReporting()
 	if rp == nil {
@@ -56,6 +63,7 @@ func (t *Testing) ClickReporting(idx int) {
 	t.FireComponentClick(rp, 0, idx)
 }
 
+// MessageBar returns the test-screen portion of the message bar.
 func (t *Testing) MessageBar() lines.TestScreen {
 	if len(t.CC) < 1 {
 		t.T.Fatal("gounit: view: fixture: no ui components")
@@ -70,6 +78,7 @@ func (t *Testing) MessageBar() lines.TestScreen {
 	return t.ScreenOf(mb)
 }
 
+// Reporting returns the test-screen portion of the reporting component.
 func (t *Testing) Reporting() lines.TestScreen {
 	rp := t.getReporting()
 	if rp == nil {
@@ -78,6 +87,7 @@ func (t *Testing) Reporting() lines.TestScreen {
 	return t.ScreenOf(rp)
 }
 
+// StatusBar returns the test-screen portion of the status bar.
 func (t *Testing) StatusBar() lines.TestScreen {
 	if len(t.CC) < 3 {
 		t.T.Fatal(notEnough)
@@ -92,6 +102,7 @@ func (t *Testing) StatusBar() lines.TestScreen {
 	return t.ScreenOf(sb)
 }
 
+// ButtonBar returns the test-screen portion of the button bar.
 func (t *Testing) ButtonBar() lines.TestScreen {
 	bb := t.getButtonBar()
 	if bb == nil {
@@ -100,6 +111,8 @@ func (t *Testing) ButtonBar() lines.TestScreen {
 	return t.ScreenOf(bb)
 }
 
+// Trim trims a given test-screen portion horizontally and vertically,
+// i.e. is a short cut for ts.TrimHorizontal().TrimVertical().
 func (t *Testing) Trim(ts lines.TestScreen) lines.TestScreen {
 	return ts.TrimHorizontal().TrimVertical()
 }

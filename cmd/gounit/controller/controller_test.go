@@ -54,15 +54,19 @@ func (s *Gounit) fx(t *T) (*lines.Events, *Testing) {
 	return fx(t, s)
 }
 
+func (s *Gounit) fxSource(t *T, dir string) (*lines.Events, *Testing) {
+	return fxSource(t, s, dir)
+}
+
 func (s *Gounit) Shows_initially_default_buttons(t *T) {
-	exp := []string{"[p]kgs", "[s]uites=off", "[a]rgs", "[m]ore"}
+	exp := []string{"[v]et=off", "[r]ace=off", "[s]tats=off", "[m]ore"}
 	_, tt := s.fx(t)
 
 	t.SpaceMatched(tt.ButtonBar().String(), exp...)
 }
 
 func (s *Gounit) Shows_initially_module_and_watched_pkg_name(t *T) {
-	exp := []string{mckModule, mckSourceDir}
+	exp := []string{goldenModule, emptyPkg}
 	_, tt := s.fx(t)
 
 	t.StarMatched(tt.MessageBar().String(), exp...)
@@ -75,29 +79,37 @@ func (s *Gounit) Shows_initially_initial_report(t *T) {
 
 func (s *Gounit) Shows_help_screen(t *T) {
 	_, tt := s.fx(t)
-	tt.ClickButtons("more", "help")
-	got := tt.SplitTrimmed(tt.Trim(tt.Reporting()).String())
+	tt.clickButtons("more", "help")
+	got := tt.splitTrimmed(tt.Trim(tt.Reporting()).String())
 	t.SpaceMatched(help, got...)
 }
 
 func (s *Gounit) Shows_last_report_going_back_from_help(t *T) {
 	_, tt := s.fx(t)
 	exp := tt.Trim(tt.Reporting()).String()
-	tt.ClickButtons("more", "help", "back")
+	tt.clickButtons("more", "help", "back")
+
 	t.Eq(exp, tt.Trim(tt.Reporting()).String())
 }
 
 func (s *Gounit) Shows_about_screen(t *T) {
 	_, tt := s.fx(t)
-	tt.ClickButtons("more", "about")
-	got := tt.SplitTrimmed(tt.Trim(tt.Reporting()).String())
+	tt.clickButtons("more", "about")
+	got := tt.splitTrimmed(tt.Trim(tt.Reporting()).String())
 	t.SpaceMatched(about, got...)
 }
 
 func (s *Gounit) Shows_last_report_going_back_from_about(t *T) {
 	_, tt := s.fx(t)
 	exp := tt.Trim(tt.Reporting()).String()
-	tt.ClickButtons("more", "about", "back")
+	tt.clickButtons("more", "about", "back")
+	t.Eq(exp, tt.Trim(tt.Reporting()).String())
+}
+
+func (s *Gounit) Shows_last_report_going_back_from_about_help(t *T) {
+	_, tt := s.fx(t)
+	exp := tt.Trim(tt.Reporting()).String()
+	tt.clickButtons("more", "about", "help", "back")
 	t.Eq(exp, tt.Trim(tt.Reporting()).String())
 }
 
