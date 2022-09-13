@@ -232,6 +232,7 @@ type S struct {
 	logger   func(...interface{})
 	canceler func()
 	prefix   string
+	fs       *tfs.FS
 }
 
 // GoT returns a pointer to wrapped testing.T instance of the
@@ -282,4 +283,20 @@ func (st *S) FatalOn(err error) {
 	if err != nil {
 		st.Fatal(err.Error())
 	}
+}
+
+// FS returns an FS-instance with handy features for file system
+// operations for testing.  I.e. copying a "golden" test file from a
+// packages "testdata" directory to a test specific temporary directory
+// looks like this:
+//
+//	t.FS().Data().CopyFl(golden, t.FS().Temp())
+//
+// It also removes error handling for file system operations by simply
+// failing the test in case of an error.
+func (st *S) FS() *tfs.FS {
+	if st.fs == nil {
+		st.fs = tfs.New(st)
+	}
+	return st.fs
 }
