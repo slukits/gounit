@@ -39,7 +39,7 @@ type Testing struct {
 	// this time-span can't be to short (> 0.2sec).
 	watchTimeout time.Duration
 
-	watcher Watcher
+	quitWatching interface{ QuitAll() }
 }
 
 // cleanUp stop all go-routines initiated by a controller test.
@@ -47,9 +47,9 @@ func (tt *Testing) cleanUp() {
 	if tt.ee != nil && tt.ee.IsListening() {
 		tt.ee.QuitListening()
 	}
-	// if w, ok := tt.watcher.(interface{ QuitAll() }); ok {
-	// 	w.QuitAll()
-	// }
+	if tt.quitWatching != nil {
+		tt.quitWatching.QuitAll()
+	}
 }
 
 // isOn returns true if given button-mask represents on/off-buttons
@@ -103,16 +103,16 @@ func (tt *Testing) fxWatchMock(
 	watchRelay := make(chan *model.PackagesDiff)
 	go watch(watchRelay, func(i ...interface{}) {
 		f(i...)
+		tt.Lock()
 		close(tt.afterWatch)
+		tt.afterWatch = make(chan struct{})
+		tt.Unlock()
 	})
 	for pd := range c {
 		if pd == nil {
 			close(watchRelay)
 			return
 		}
-		tt.Lock()
-		tt.afterWatch = make(chan struct{})
-		tt.Unlock()
 		watchRelay <- pd
 	}
 }
@@ -231,10 +231,11 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 		ee *lines.Events
 	)
 	ct.Mutex = &sync.Mutex{}
-	ct.watchTimeout = 1 * time.Second
+	ct.watchTimeout = 2 * time.Second
 	if i.dbgTimeouts {
 		ct.watchTimeout = 20 * time.Minute
 	}
+	ct.afterWatch = make(chan struct{})
 
 	if i.Fatal == nil {
 		i.Fatal = func(i ...interface{}) {
@@ -253,7 +254,7 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 		return vw
 	}
 	i.Events = func(c lines.Componenter) *lines.Events {
-		events, tt := lines.Test(t.GoT(), c, 0)
+		events, tt := lines.Test(t.GoT(), c)
 		if i.dbgTimeouts {
 			tt.Timeout = 20 * time.Minute
 		}
@@ -265,7 +266,9 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 
 	New(i)
 
-	ct.watcher = i.Watcher
+	if qw, ok := i.Watcher.(interface{ QuitAll() }); ok {
+		ct.quitWatching = qw
+	}
 	if fs != nil {
 		fs.Set(t, ct.cleanUp)
 	}

@@ -15,8 +15,8 @@ import (
 
 type runResult struct {
 	err error
-	rr  *model.Results
-	tm  time.Duration
+	*model.Results
+	tm time.Duration
 }
 
 type pkg struct {
@@ -47,15 +47,16 @@ func watch(
 			p := <-rslt
 			pp[p.tp.ID()] = p
 		}
+		if len(pp) == 0 || pp[latest] == nil {
+			return
+		}
 		report(pp, latest, vwUpd)
 	}
 }
 
 func run(p *pkg, rslt chan *pkg) {
-	start := time.Now()
 	rr, err := p.tp.Run()
-	p.runResult = &runResult{rr: rr, err: err}
-	p.tm = time.Since(start)
+	p.runResult = &runResult{Results: rr, err: err}
 	rslt <- p
 }
 
@@ -72,15 +73,15 @@ func reportGoTestsOnly(
 	var singles, withSubs []*model.Test
 	p, n, ll := pp[latest], 0, []string{}
 	p.tp.ForTest(func(t *model.Test) {
-		if p.rr.OfTest(t).Len() == 1 {
+		if p.OfTest(t).Len() == 1 {
 			singles = append(singles, t)
 			n++
 			return
 		}
-		n += pp[latest].rr.OfTest(t).Len()
+		n += pp[latest].OfTest(t).Len()
 		withSubs = append(withSubs, t)
 	})
-	ll = append(ll, fmt.Sprintf("%s: %d/0 %v", p.tp.ID(), n, p.tm), "")
+	ll = append(ll, fmt.Sprintf("%s: %d/0 %v", p.tp.ID(), n, p.Duration), "")
 	sort.Slice(singles, func(i, j int) bool {
 		return singles[i].Name() < singles[j].Name()
 	})
@@ -91,7 +92,7 @@ func reportGoTestsOnly(
 		return withSubs[i].Name() < withSubs[j].Name()
 	})
 	for _, t := range withSubs {
-		tr := p.rr.OfTest(t)
+		tr := p.OfTest(t)
 		ll = append(ll, "", t.Name())
 		ss := []*model.SubResult{}
 		tr.For(func(sr *model.SubResult) {

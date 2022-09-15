@@ -5,6 +5,8 @@
 package controller
 
 import (
+	"testing"
+
 	. "github.com/slukits/gounit"
 	"github.com/slukits/lines"
 )
@@ -30,11 +32,14 @@ func (s *Report) fxSource(t *T, dir string) (*lines.Events, *Testing) {
 
 func (s *Report) Passing_go_tests_only(t *T) {
 	_, tt := s.fxSource(t, "go/pass")
-	str := tt.AfterWatch(awReporting).String()
-	t.Log(str)
+
+	t.StarMatched(
+		tt.AfterWatch(awReporting).String(),
+		fxExp["go/pass"]...,
+	)
 }
 
-// func TestReport(t *testing.T) {
-// 	t.Parallel()
-// 	Run(&Report{}, t)
-// }
+func TestReport(t *testing.T) {
+	t.Parallel()
+	Run(&Report{}, t)
+}
