@@ -19,25 +19,25 @@ type ANewViewDisplaysInitiallyGiven struct{ Suite }
 func (s *ANewViewDisplaysInitiallyGiven) SetUp(t *T) { t.Parallel() }
 
 func (s *ANewViewDisplaysInitiallyGiven) Message(t *T) {
-	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
+	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}), 1)
 	ee.Listen()
 	t.Contains(tt.LastScreen.String(), fxMsg)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Status(t *T) {
-	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
+	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}), 1)
 	ee.Listen()
 	t.Contains(tt.LastScreen.String(), fxStatus)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Main_info(t *T) {
-	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
+	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}), 1)
 	ee.Listen()
 	t.Contains(tt.LastScreen.String(), fxReporting)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Buttons(t *T) {
-	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}))
+	ee, tt := lines.Test(t.GoT(), New(&fxInit{t: t}), 1)
 	ee.Listen()
 	t.Contains(tt.LastScreen.String(), fxBtt1)
 	t.Contains(tt.LastScreen.String(), fxBtt2)
@@ -69,7 +69,7 @@ func (s *AView) TearDown(t *T) {
 // for ever and is quit by TearDown.
 func (s *AView) fx(t *T) (*lines.Events, *lines.Testing, *viewFX) {
 	fx := newFX(t)
-	ee, tt := lines.Test(t.GoT(), fx, 0)
+	ee, tt := lines.Test(t.GoT(), fx)
 	ee.Listen()
 	s.Set(t, ee.QuitListening)
 	return ee, tt, fx
@@ -88,6 +88,19 @@ func (s *AView) Reporting_component_is_scrollable(t *T) {
 
 	ee.Update(fx.Report, nil, func(e *lines.Env) {
 		t.True(fx.Report.FF.Has(lines.Scrollable))
+	})
+}
+
+func (s *AView) Reporting_component_s_lines_are_selectable(t *T) {
+	ee, tt, fx := s.fx(t)
+
+	ee.Update(fx.Report, nil, func(e *lines.Env) {
+		t.True(fx.Report.FF.Has(lines.LinesSelectable))
+		fmt.Fprint(e, "first\nsecond")
+	})
+	tt.FireKey(tcell.KeyDown)
+	ee.Update(fx.Report, nil, func(e *lines.Env) {
+		t.Eq(0, fx.Report.Highlight.Current())
 	})
 }
 
@@ -193,7 +206,7 @@ func (s *AView) Fails_buttons_init_if_ambiguous_labels(t *T) {
 			t.ErrIs(err, ErrButtonLabelAmbiguity)
 		},
 	}
-	lines.Test(t.GoT(), New(fx))
+	lines.Test(t.GoT(), New(fx), 1)
 }
 
 type fxFailButtonInitRunes struct {
@@ -217,7 +230,7 @@ func (s *AView) Fails_buttons_init_if_ambiguous_event_runes(t *T) {
 			t.ErrIs(err, ErrButtonRuneAmbiguity)
 		},
 	}
-	lines.Test(t.GoT(), New(fx))
+	lines.Test(t.GoT(), New(fx), 1)
 }
 
 func (s *AView) Reports_button_clicks(t *T) {

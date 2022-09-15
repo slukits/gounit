@@ -38,7 +38,7 @@ func (s *_test) fx(t *T, str *string) (
 	*lines.Events, *viewFX, *Testing,
 ) {
 	fx := newFX(t)
-	ee, tt := lines.Test(t.GoT(), fx, 0)
+	ee, tt := lines.Test(t.GoT(), fx)
 	ee.Listen()
 	s.Set(t, ee.QuitListening)
 	if str != nil {

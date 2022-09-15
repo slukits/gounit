@@ -144,7 +144,7 @@ func initButtons(i Initer, v *view) {
 
 func (v *view) OnInit(e *lines.Env) {
 	v.ee = e.EE
-	if err := e.EE.MoveFocus(v.CC[1]); err != nil {
+	if err := e.EE.MoveFocus(v.reporting()); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: move focus: %v", err))
 	}
 	width, _ := e.ScreenSize()
@@ -152,6 +152,8 @@ func (v *view) OnInit(e *lines.Env) {
 		v.Dim().SetWidth(80)
 	}
 }
+
+func (v *view) reporting() lines.Componenter { return v.CC[1] }
 
 func (v *view) OnLayout(e *lines.Env) {
 	width, _ := e.ScreenSize()

@@ -13,8 +13,12 @@ github.com/mattn/go-runewidth v0.0.13/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.3.4 h1:3Z3Eu6FGHZWSfNKJTOUiPatWwfc7DzJRU04jFUqJODw=
 github.com/rivo/uniseg v0.3.4/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
+github.com/rivo/uniseg v0.4.2 h1:YwD0ulJSJytLpiaWua0sBDusfsCZohxjxzVTYjwxfV8=
+github.com/rivo/uniseg v0.4.2/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/slukits/ints v0.0.0-20220826183122-e053a3960a38 h1:I2dwzvVCpQzn6QEQjh0SrFCBzc2cfz4B3a7VRvYDHBQ=
 github.com/slukits/ints v0.0.0-20220826183122-e053a3960a38/go.mod h1:9WN1RmSgcZ7Y+fAPXXxCiKqg82coCP6maRjIYTylF74=
+github.com/slukits/ints v0.0.0-20220911044927-395726d1da04 h1:BbDSIudKyS1cnykk7GCIeT5FIVu5Mi9gfCTPuv0hYvA=
+github.com/slukits/ints v0.0.0-20220911044927-395726d1da04/go.mod h1:9WN1RmSgcZ7Y+fAPXXxCiKqg82coCP6maRjIYTylF74=
 github.com/slukits/lines v0.0.0-20220829053403-7677ef38326e h1:/tqucxk6/INtGYWADv8N1nfL17sGjhn8zZZfhaic1zk=
 github.com/slukits/lines v0.0.0-20220829053403-7677ef38326e/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
 github.com/slukits/lines v0.0.0-20220829074827-d446f92d0c1f h1:+2s/UV1O8hxzHCq4YVcAoHMrESVX+KPzmL9IMARk44E=
@@ -63,6 +67,8 @@ github.com/slukits/lines v0.0.0-20220909030843-bd06a113d85a h1:cmsCasm7SxIXZARBd
 github.com/slukits/lines v0.0.0-20220909030843-bd06a113d85a/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
 github.com/slukits/lines v0.0.0-20220909042849-87fb88c8eee7 h1:kCUfBnkelGaCWa9WtrA+XIefKTEr5+JfDl3AOaZ6KD4=
 github.com/slukits/lines v0.0.0-20220909042849-87fb88c8eee7/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
+github.com/slukits/lines v0.0.0-20220915055539-a055ecaf6b57 h1:HOOumi32pESaV78Mawx9xrzSeA1Wu/dEAbTSxEK+t08=
+github.com/slukits/lines v0.0.0-20220915055539-a055ecaf6b57/go.mod h1:Qt8MgDZwnPcjbBZ5NwHo97TF/S10WiwBXk4YzVO7jqs=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20220318055525-2edf467146b5/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64 h1:UiNENfZ8gDvpiWw7IpOMQ27spWmThO1RwwdQVbJahJM=
@@ -75,6 +81,8 @@ golang.org/x/sys v0.0.0-20220908150016-7ac13a9a928d h1:RoyzQTK76Rktm3p4xyZslc8T8
 golang.org/x/sys v0.0.0-20220908150016-7ac13a9a928d/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220908164124-27713097b956 h1:XeJjHH1KiLpKGb6lvMiksZ9l0fVUh+AmGcm0nOMEBOY=
 golang.org/x/sys v0.0.0-20220908164124-27713097b956/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.0.0-20220913175220-63ea55921009 h1:PuvuRMeLWqsf/ZdT1UUZz0syhioyv1mzuFZsXs4fvhw=
+golang.org/x/sys v0.0.0-20220913175220-63ea55921009/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201210144234-2321bbc49cbf/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20220722155259-a9ba230a4035 h1:Q5284mrmYTpACcm+eAKjKJH48BBwSyfJqmmGDTtT8Vc=
 golang.org/x/term v0.0.0-20220722155259-a9ba230a4035/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
