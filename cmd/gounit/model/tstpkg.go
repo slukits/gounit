@@ -27,7 +27,7 @@ import (
 type TestingPackage struct {
 	ModTime  time.Time
 	abs, id  string
-	timeout  time.Duration
+	Timeout  time.Duration
 	parsed   bool
 	parseErr error
 	files    []*testFile
@@ -95,7 +95,7 @@ const StdErr = "shell exit error: "
 // of the test run.
 func (tp *TestingPackage) Run() (*Results, error) {
 	ctx, cancel := context.WithTimeout(
-		context.Background(), tp.timeout)
+		context.Background(), tp.Timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", "test", "-json")
 	cmd.Dir = tp.abs
@@ -110,14 +110,14 @@ func (tp *TestingPackage) Run() (*Results, error) {
 	rr, jsonErr := unmarshal(stdout)
 	if jsonErr != nil {
 		if err != nil {
-			return &Results{duration: time.Since(start),
+			return &Results{Duration: time.Since(start),
 				err: fmt.Sprintf("%s%v: %s",
 					StdErr, err, string(stdout))}, nil
 		}
-		return &Results{duration: time.Since(start),
+		return &Results{Duration: time.Since(start),
 			err: fmt.Sprintf("json-unmarshal stdout: %v", err)}, nil
 	}
-	return &Results{rr: rr, duration: duration}, nil
+	return &Results{rr: rr, Duration: duration}, nil
 }
 
 type testAst struct {

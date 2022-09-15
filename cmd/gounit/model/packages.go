@@ -39,7 +39,7 @@ func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) error {
 		}
 		tp := &TestingPackage{
 			ModTime: ps.ModTime,
-			id:      ps.rel, abs: ps.abs, files: tt, timeout: d.timeout}
+			id:      ps.rel, abs: ps.abs, files: tt, Timeout: d.timeout}
 		if cb(tp) {
 			return nil
 		}
@@ -58,7 +58,7 @@ func (d *PackagesDiff) ForDel(cb func(*TestingPackage) (stop bool)) {
 			continue
 		}
 		tp := &TestingPackage{
-			id: ps.rel, abs: ps.abs, parsed: true, timeout: 0}
+			id: ps.rel, abs: ps.abs, parsed: true, Timeout: 0}
 		if cb(tp) {
 			return
 		}

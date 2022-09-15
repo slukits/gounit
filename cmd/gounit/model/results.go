@@ -41,8 +41,8 @@ type Results struct {
 	// rr holds the results of a testing package's test run
 	rr results
 
-	// duration of a test run.
-	duration time.Duration
+	// Duration of a test run.
+	Duration time.Duration
 
 	// err from the error console
 	err string
