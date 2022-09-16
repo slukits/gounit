@@ -245,19 +245,19 @@ func fxSourceDBG(t *gounit.T, fs fixtureSetter, relDir string) (
 }
 
 func fxSetupSource(t *gounit.T, relDir string) (golden *tfs.Dir) {
+	t.GoT().Helper()
 	tmp := t.FS().Tmp()
 	dt, _ := t.FS().Data()
 	golden = dt.Child(goldenDir)
+	if _, err := os.Stat(golden.Path()); err != nil {
+		t.Fatalf("fx: watch: testdata: golden-module: %v", err)
+	}
 	golden.Copy(tmp)
 	golden = tmp.Child(goldenDir)
-	var err error
-	for i := 0; i < 100; i++ {
-		_, err = os.Stat(fp.Join(golden.Path(), relDir))
-		if err == nil {
-			break
-		}
-		time.Sleep(1 * time.Millisecond)
+	if _, err := os.Stat(golden.Path()); err != nil {
+		t.Fatalf("fx: watch: tmp-copy: golden-module: %v", err)
 	}
+	_, err := os.Stat(fp.Join(golden.Path(), relDir))
 	if err != nil {
 		t.Fatalf("fx: watch: %s: %v", relDir, err)
 	}
