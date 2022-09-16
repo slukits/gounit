@@ -430,12 +430,25 @@ func TestADir(t *testing.T) {
 // WorkingDirectory tests this aspect of a Dir-instance.  Since it
 // changes the working directory, i.e. the global state of the test
 // package it should not run it in parallel.
-type WorkingDirectory struct{ Suite }
+type WorkingDirectory struct {
+	Suite
+	wd string
+}
 
 func getWD(t *T) string {
 	currentWD, err := os.Getwd()
 	t.FatalOn(err)
 	return currentWD
+}
+
+func (s *WorkingDirectory) Init(t *S) {
+	currentWD, err := os.Getwd()
+	t.FatalOn(err)
+	s.wd = currentWD
+}
+
+func (s *WorkingDirectory) TearDown(t *T) {
+	t.FatalOn(os.Chdir(s.wd))
 }
 
 func (s *WorkingDirectory) Can_be_changed_to_a_directory(t *T) {
