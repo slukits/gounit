@@ -334,6 +334,7 @@ func (d *Dir) Mk(dir string, path ...string) (_ *Dir, undo func()) {
 // and given content.  MkFile fatales if the file already exists or
 // os.WriteFile fails.  MkFile panics if reset fails.
 func (d *Dir) MkFile(name string, content []byte) (undo func()) {
+	d.t.GoT().Helper()
 
 	fl := fp.Join(d.path, name)
 	if _, err := d.fs().Stat(fl); err == nil {
@@ -356,6 +357,8 @@ func (d *Dir) MkFile(name string, content []byte) (undo func()) {
 // WriteFile fails.  Returned undo function removes the copy and panics
 // if its execution fails.
 func (d *Dir) FileCopy(file string, toDir Pather) (undo func()) {
+	d.t.GoT().Helper()
+
 	bb, err := d.fs().ReadFile(fp.Join(d.path, file))
 	if err != nil {
 		d.t.Fatalf("gounit: fs: dir: copy: read: %s: %v", file, err)
@@ -374,6 +377,8 @@ func (d *Dir) FileCopy(file string, toDir Pather) (undo func()) {
 // FileContent joins given directory with given file name and returns
 // its content.  FileContent fatales if it cant be read.
 func (d *Dir) FileContent(relName string) []byte {
+	d.t.GoT().Helper()
+
 	bb, err := d.fs().ReadFile(fp.Join(d.path, relName))
 	if err != nil {
 		d.t.Fatalf("gounit: fs: dir: file-copy: read: %s: %v", relName, err)
@@ -415,6 +420,7 @@ func (d *Dir) Touch(relName string) {
 // MkMod adds to given directory a go.mod file with given module name.
 // It fatales/panics iff subsequent [Dir.AddFile] call fatales/panics.
 func (d *Dir) MkMod(module string) (reset func()) {
+	d.t.GoT().Helper()
 	return d.MkFile("go.mod", []byte(fmt.Sprintf("module %s", module)))
 }
 
@@ -423,6 +429,7 @@ func (d *Dir) MkMod(module string) (reset func()) {
 // and go.sum are cached in the users caching path's gounit directory.
 // This cached files are considered stale every 24 hours.
 func (d *Dir) MkTidy() {
+	d.t.GoT().Helper()
 	mdlName := d.moduleName()
 	if mdlName == "" {
 		d.t.Fatal("gounit: fs: tmp-dir: mk-tidy: missing module name")

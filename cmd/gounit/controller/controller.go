@@ -29,6 +29,7 @@ documentation were found.
 package controller
 
 import (
+	"fmt"
 	"log"
 	"sync"
 
@@ -86,7 +87,8 @@ func New(i *InitFactories) {
 	ensureInitArgs(i)
 	diff, _, err := i.Watcher.Watch()
 	if err != nil {
-		i.Fatal(WatcherErr, i.Watcher.SourcesDir(), err)
+		i.Fatal(fmt.Sprintf(
+			WatcherErr, i.Watcher.SourcesDir(), err))
 		return
 	}
 	ee := i.Events(i.View(&viewIniter{controller: i.controller}))

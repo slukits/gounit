@@ -191,14 +191,25 @@ func fxDBG(t *gounit.T, fs fixtureSetter) (*lines.Events, *Testing) {
 	return fxSourceDBG(t, fs, "empty")
 }
 
-func initGolden(t tfs.Tester) {
-	dt, _ := t.FS().Data()
-	golden := dt.Child(goldenDir)
-	if _, err := os.Stat(fp.Join(golden.Path(), "go.mod")); err != nil {
+// initGolden guarantees that the golden module is only initialized
+// once.
+var initGolden = func(done bool) func(t tfs.Tester) {
+	mutex := &sync.Mutex{}
+	return func(t tfs.Tester) {
+		t.GoT().Helper()
+		mutex.Lock()
+		defer mutex.Unlock()
+		if done {
+			return
+		}
+		done = true
+		dt, _ := t.FS().Data()
+		golden := dt.Child(goldenDir)
+		os.Remove(fp.Join(golden.Path(), "go.mod"))
 		golden.MkMod("example.com/gounit/controller/golden")
+		golden.MkTidy()
 	}
-	golden.MkTidy()
-}
+}(false)
 
 func fxSource(t *gounit.T, fs fixtureSetter, relDir string) (
 	*lines.Events, *Testing,

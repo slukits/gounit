@@ -16,6 +16,10 @@ type Report struct {
 	Fixtures
 }
 
+func (s *Report) Init(t *S) {
+	initGolden(t)
+}
+
 func (s *Report) SetUp(t *T) { t.Parallel() }
 
 func (s *Report) TearDown(t *T) {
@@ -27,7 +31,7 @@ func (s *Report) TearDown(t *T) {
 }
 
 func (s *Report) fxSource(t *T, dir string) (*lines.Events, *Testing) {
-	return fxSourceDBG(t, s, dir)
+	return fxSource(t, s, dir)
 }
 
 func (s *Report) Passing_go_tests_only(t *T) {

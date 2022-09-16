@@ -20,6 +20,10 @@ type Gounit struct {
 	Fixtures
 }
 
+func (s *Gounit) Init(t *S) {
+	initGolden(t)
+}
+
 func (s *Gounit) SetUp(t *T) { t.Parallel() }
 
 func (s *Gounit) TearDown(t *T) {

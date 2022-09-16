@@ -26,21 +26,21 @@ type pkgs map[string]*pkg
 
 func lastReport(pp pkgs, latest string) []interface{} {
 	if pp[latest].tp.LenSuites() == 0 {
-		return reportGoTestsOnly(pp, latest)
+		return reportGoTestsOnly(pp[latest])
 	}
 	return nil
 }
 
-func reportGoTestsOnly(pp pkgs, latest string) []interface{} {
+func reportGoTestsOnly(p *pkg) []interface{} {
 	var singles, withSubs []*model.Test
-	p, n, ll := pp[latest], 0, []string{}
+	n, ll := 0, []string{}
 	p.tp.ForTest(func(t *model.Test) {
 		if p.OfTest(t).Len() == 1 {
 			singles = append(singles, t)
 			n++
 			return
 		}
-		n += pp[latest].OfTest(t).Len()
+		n += p.OfTest(t).Len()
 		withSubs = append(withSubs, t)
 	})
 	ll = append(ll, fmt.Sprintf("%s: %d/0 %v", p.tp.ID(), n, p.Duration), "")

@@ -37,7 +37,7 @@ func findModule(dir string) (path, name string, err error) {
 		dir = filepath.Dir(dir)
 	}
 	if path == "" {
-		return "", "", fmt.Errorf("%w"+"%s", ErrNoModule, dir)
+		return "", "", fmt.Errorf("%w%s", ErrNoModule, dir)
 	}
 	goMod, err := os.Open(filepath.Join(path, "go.mod"))
 	if err != nil {
