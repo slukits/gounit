@@ -65,5 +65,5 @@ import (
 )
 
 func main() {
-	controller.New(controller.InitFactories{})
+	controller.New(nil)
 }

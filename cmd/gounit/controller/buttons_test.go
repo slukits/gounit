@@ -5,8 +5,6 @@
 package controller
 
 import (
-	"testing"
-
 	. "github.com/slukits/gounit"
 	"github.com/slukits/lines"
 )
@@ -18,13 +16,7 @@ type Buttons struct {
 
 func (s *Buttons) SetUp(t *T) { t.Parallel() }
 
-func (s *Buttons) TearDown(t *T) {
-	fx := s.Get(t)
-	if fx == nil {
-		return
-	}
-	fx.(func())()
-}
+func (s *Buttons) TearDown(t *T) { s.Get(t).(func())() }
 
 func (s *Buttons) fx(t *T) (*lines.Events, *Testing) {
 	return fx(t, s)
@@ -100,9 +92,4 @@ func (s *Buttons) Switches_stats_arg(t *T) {
 	_, vw2 = tt.dfltButtonLabel("race")
 	t.FatalIfNot(t.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
-}
-
-func TestButtons(t *testing.T) {
-	t.Parallel()
-	Run(&Buttons{}, t)
 }

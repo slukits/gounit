@@ -26,7 +26,7 @@ type fxInit struct {
 
 	// updateStatus holds the updater for the status bar which were
 	// received through the Status implementation.
-	updateStatus func(StatusUpdate)
+	updateStatus func(Statuser)
 
 	bttOneReported, bttTwoReported, bttThreeReported bool
 
@@ -66,7 +66,7 @@ func (fx *fxInit) Message(upd func(string)) string {
 	return fxMsg
 }
 
-func (fx *fxInit) Status(upd func(StatusUpdate)) {
+func (fx *fxInit) Status(upd func(Statuser)) {
 	fx.updateStatus = upd
 }
 
@@ -115,6 +115,18 @@ func newFX(t *gounit.T) *viewFX {
 	fx.view = New(fx.fxInit)
 	fx.Report = fx.CC[1].(*report)
 	return &fx
+}
+
+type fixtureSetter interface{ Set(*gounit.T, interface{}) }
+
+func fx(t *gounit.T, fs fixtureSetter) (
+	*lines.Events, *lines.Testing, *viewFX,
+) {
+	fx := newFX(t)
+	ee, tt := lines.Test(t.GoT(), fx)
+	ee.Listen()
+	fs.Set(t, ee.QuitListening)
+	return ee, tt, fx
 }
 
 func (fx *viewFX) ClickButton(tt *lines.Testing, label string) {

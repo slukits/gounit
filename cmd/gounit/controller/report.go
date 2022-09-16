@@ -7,7 +7,6 @@ package controller
 import (
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
@@ -16,7 +15,6 @@ import (
 type runResult struct {
 	err error
 	*model.Results
-	tm time.Duration
 }
 
 type pkg struct {
@@ -26,50 +24,7 @@ type pkg struct {
 
 type pkgs map[string]*pkg
 
-func watch(
-	watched <-chan *model.PackagesDiff,
-	vwUpd func(...interface{}),
-) {
-	pp := pkgs{}
-	for diff := range watched {
-		if diff == nil {
-			return
-		}
-		rslt, n := make(chan *pkg), 0
-		var latest string
-		diff.For(func(tp *model.TestingPackage) (stop bool) {
-			n++
-			go run(&pkg{tp: tp}, rslt)
-			latest = tp.ID()
-			return
-		})
-		for i := 0; i < n; i++ {
-			p := <-rslt
-			pp[p.tp.ID()] = p
-		}
-		if len(pp) == 0 || pp[latest] == nil {
-			return
-		}
-		report(pp, latest, vwUpd)
-	}
-}
-
-func run(p *pkg, rslt chan *pkg) {
-	rr, err := p.tp.Run()
-	p.runResult = &runResult{Results: rr, err: err}
-	rslt <- p
-}
-
-func report(pp pkgs, latest string, vwUpd func(...interface{})) {
-	if pp[latest].tp.LenSuites() == 0 {
-		reportGoTestsOnly(pp, latest, vwUpd)
-		return
-	}
-}
-
-func reportGoTestsOnly(
-	pp pkgs, latest string, vwUpd func(...interface{}),
-) {
+func reportGoTestsOnly(pp pkgs, latest string) []interface{} {
 	var singles, withSubs []*model.Test
 	p, n, ll := pp[latest], 0, []string{}
 	p.tp.ForTest(func(t *model.Test) {
@@ -105,5 +60,5 @@ func reportGoTestsOnly(
 			ll = append(ll, "    "+s.Name)
 		}
 	}
-	vwUpd(&reporter{flags: view.RpClearing, ll: ll})
+	return []interface{}{&reporter{flags: view.RpClearing, ll: ll}}
 }

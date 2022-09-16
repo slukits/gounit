@@ -23,22 +23,6 @@ const (
 	// cleared.
 	RpClearing RprtMask = 1 << iota
 
-	// RpPush pushes a given Reporter implementation on a reporter stack
-	// of which the last Reporter implementation is displayed.  See
-	// RpPop.
-	RpPush
-
-	// RpPop removes the last Reporter implementation of a reporter
-	// stack iff the reporter stack has at least one Reporter
-	// implementation left.  The "previous" Reporter implementation
-	// becomes the displayed Reporter implementation.
-	RpPop
-
-	// RpReplaceByPush indicates for the last Reporter implementation r
-	// on the stack that an other pushed Reporter implementation rather
-	// replaces r than appending after it.
-	RpReplaceByPush
-
 	// RpNoFlags is the return value of an Reporter.Flags implementation
 	// where no flags are set.
 	RpNoFlags = 0
@@ -77,8 +61,7 @@ type report struct {
 }
 
 func (m *report) OnInit(e *lines.Env) {
-	m.FF.Add(lines.Scrollable)
-	m.FF.Add(lines.LinesSelectable)
+	m.FF.Add(lines.Scrollable | lines.LinesSelectable)
 	m.rr[0].For(m, func(idx uint, content string) {
 		fmt.Fprint(e.LL(int(idx)), content)
 	})
@@ -98,27 +81,11 @@ func (m *report) OnUpdate(e *lines.Env) {
 		return
 	}
 	clearing := r.Flags()&RpClearing == RpClearing
-	if r.Flags()&RpPop == RpPop {
-		if len(m.rr) <= 1 {
-			return
-		}
-		m.rr = m.rr[:len(m.rr)-1]
-		r = m.rr[len(m.rr)-1]
-	}
 	ii := &ints.Set{}
 	r.For(m, func(idx uint, content string) {
 		ii.Add(int(idx))
 		fmt.Fprint(m.wrt(r, idx, e), content)
 	})
-	if r.Flags()&RpPush == RpPush {
-		if m.rr[len(m.rr)-1].Flags()&RpReplaceByPush > 0 {
-			m.rr[len(m.rr)-1] = r
-		} else {
-			m.rr = append(m.rr, r)
-		}
-	} else {
-		m.rr[len(m.rr)-1] = r
-	}
 	if !clearing {
 		return
 	}

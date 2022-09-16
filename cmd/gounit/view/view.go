@@ -28,7 +28,7 @@ gounit's terminal user interface (note: the actual ui has no frames)
 	|                                                                  |
 	| packages: n; tests: t/f; stat: c/t d                             |
 	+------------------------------------------------------------------+
-	|       [v]kgs       [s]uites=off        [a]rgs       [m]ore       |
+	|      [v]et=off      [r]ace=off      [s]tats=off      [m]ore      |
 	+------------------------------------------------------------------+
 */
 package view
@@ -58,7 +58,7 @@ type Initer interface {
 	// for the status bar's content and expects an initial content.
 	// Calling update with the empty string resets the statusbar's
 	// content.
-	Status(update func(StatusUpdate))
+	Status(update func(Statuser))
 
 	// Reporting is by initializing view provided with an update
 	// function for the reporting component's lines and expects an initial
@@ -177,7 +177,7 @@ func (v *view) updateMessageBar(s string) {
 	}
 }
 
-func (v *view) updateStatusBar(upd StatusUpdate) {
+func (v *view) updateStatusBar(upd Statuser) {
 	if err := v.ee.Update(v.CC[2], upd, nil); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: update: statusbar: %v", err))
 	}

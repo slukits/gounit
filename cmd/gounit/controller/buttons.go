@@ -15,18 +15,19 @@ const (
 )
 
 type buttons struct {
-	viewUpd func(...interface{})
-	dflt    *buttoner
-	more    *buttoner
-	isOn    onMask
-	quitter func()
+	viewUpd  func(...interface{})
+	reporter func()
+	dflt     *buttoner
+	more     *buttoner
+	isOn     onMask
+	quitter  func()
 }
 
 func newButtons(upd func(...interface{})) *buttons {
 	return &buttons{viewUpd: upd}
 }
 
-func (bb *buttons) defaultButtons() *buttoner {
+func (bb *buttons) defaults() *buttoner {
 	if bb.dflt == nil {
 		bb.dflt = defaultButtons(bb.isOn, bb.defaultListener)
 	}
@@ -68,8 +69,7 @@ func (bb *buttons) moreButtons() *buttoner {
 func (bb *buttons) moreListener(label string) {
 	switch label {
 	case "back":
-		bb.viewUpd(bb.defaultButtons(),
-			&reporter{flags: view.RpPop | view.RpClearing})
+		bb.reporter()
 	case "help":
 		viewHelp(bb.viewUpd)
 	case "quit":

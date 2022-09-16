@@ -11,7 +11,7 @@ import (
 	"github.com/slukits/lines"
 )
 
-type StatusUpdate struct {
+type Statuser struct {
 	// Str is a status-bar string superseding all other status
 	// information.
 	Str string
@@ -73,7 +73,7 @@ func (sb *statusBar) OnInit(e *lines.Env) {
 
 func (sb *statusBar) OnUpdate(e *lines.Env) {
 	// type save because message bar update only allows string
-	s, _ := e.Evt.(*lines.UpdateEvent).Data.(StatusUpdate)
+	s, _ := e.Evt.(*lines.UpdateEvent).Data.(Statuser)
 	if s.Str != "" {
 		fmt.Fprint(e.BG(sb.bg()).Filled().FG(sb.fg()).LL(1), s.Str)
 		return

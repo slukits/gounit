@@ -114,7 +114,7 @@ func (s *Suite) init(self interface{}, t *testing.T) *Suite {
 	return s
 }
 
-const special = "SetUpTearDownInitFinalize"
+const special = "SetUpTearDownInitFinalizeDelGet"
 
 // SuiteEmbedder is automatically implemented by embedding a
 // Suite-instance.  I.e.:
@@ -127,12 +127,15 @@ type SuiteEmbedder interface {
 }
 
 // Run sets up embedded Suite-instance and runs all methods of given
-// test-suite embedder which are public, have exactly one argument
-// and are not special:
+// test-suite embedder which are public, have exactly one argument and
+// are not special:
 //   - Init(*gounit.S): run before any other method of a suite
 //   - SetUp(*gounit.T): run before every suite-test
 //   - TearDown(*gounit.T): run after every suite-test
 //   - Finalize(*gounit.S): run after any other method of a suite
+//   - Get, Set, Del as methods of [gounit.Fixtures] are also
+//     considered special for the use case that Fixtures is
+//     embedded in a Suite-embedder (i.e. test-suite)
 func Run(suite SuiteEmbedder, t *testing.T) {
 	s := suite.init(suite, t)
 	subTestFactory := newSubTestFactory(s)

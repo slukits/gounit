@@ -68,40 +68,7 @@ func (s *AView) TearDown(t *T) {
 // along with the view fixture.  A so obtained Events instance listens
 // for ever and is quit by TearDown.
 func (s *AView) fx(t *T) (*lines.Events, *lines.Testing, *viewFX) {
-	fx := newFX(t)
-	ee, tt := lines.Test(t.GoT(), fx)
-	ee.Listen()
-	s.Set(t, ee.QuitListening)
-	return ee, tt, fx
-}
-
-func (s *AView) Focuses_the_reporting_component(t *T) {
-	ee, _, fx := s.fx(t)
-
-	ee.Update(fx, nil, func(e *lines.Env) {
-		t.Eq(fx.Report, e.Focused())
-	})
-}
-
-func (s *AView) Reporting_component_is_scrollable(t *T) {
-	ee, _, fx := s.fx(t)
-
-	ee.Update(fx.Report, nil, func(e *lines.Env) {
-		t.True(fx.Report.FF.Has(lines.Scrollable))
-	})
-}
-
-func (s *AView) Reporting_component_s_lines_are_selectable(t *T) {
-	ee, tt, fx := s.fx(t)
-
-	ee.Update(fx.Report, nil, func(e *lines.Env) {
-		t.True(fx.Report.FF.Has(lines.LinesSelectable))
-		fmt.Fprint(e, "first\nsecond")
-	})
-	tt.FireKey(tcell.KeyDown)
-	ee.Update(fx.Report, nil, func(e *lines.Env) {
-		t.Eq(0, fx.Report.Highlight.Current())
-	})
+	return fx(t, s)
 }
 
 func (s *AView) Sets_its_width_to_80_if_screen_bigger(t *T) {
@@ -145,7 +112,7 @@ func (s *AView) Resets_message_bar_to_default_if_zero_update(t *T) {
 
 func (s *AView) Updates_statusbar_with_given_string(t *T) {
 	_, tt, fx := s.fx(t)
-	exp := StatusUpdate{Str: "updated status"}
+	exp := Statuser{Str: "updated status"}
 
 	fx.updateStatus(exp)
 	t.Contains(tt.Screen().String(), exp.Str)
@@ -153,7 +120,7 @@ func (s *AView) Updates_statusbar_with_given_string(t *T) {
 
 func (s *AView) Updates_statusbar_with_given_numbers(t *T) {
 	_, tt, fx := s.fx(t)
-	exp := StatusUpdate{Packages: 1, Suites: 2, Tests: 5, Failed: 2}
+	exp := Statuser{Packages: 1, Suites: 2, Tests: 5, Failed: 2}
 
 	fx.updateStatus(exp)
 
@@ -175,7 +142,7 @@ func (s *AView) Status_has_green_background_if_not_failing(t *T) {
 func (s *AView) Status_has_red_background_if_failing(t *T) {
 	_, tt, fx := s.fx(t)
 	fx.updateStatus(
-		StatusUpdate{Packages: 1, Suites: 2, Tests: 5, Failed: 2})
+		Statuser{Packages: 1, Suites: 2, Tests: 5, Failed: 2})
 	vw := Testing{t, tt, fx.view}
 	sb := vw.StatusBar().TrimVertical()
 	t.Eq(1, len(sb))

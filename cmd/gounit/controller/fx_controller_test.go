@@ -21,48 +21,57 @@ import (
 
 // A Testing instance provides conveniences for controller-testing.
 type Testing struct {
+
 	// testing instance of gounit's view.
 	*view.Testing
+
 	// mutex protecting the access and update of afterWatch.
 	*sync.Mutex
+
 	// testing lines events instance.
-	ee *lines.Events
-	// gounit view's buttons.
-	bb *buttons
+	_ee *lines.Events
+
+	// gounit _controller instance created during the initialization
+	// porcess, i.e. _controller.New.
+	_controller *controller
+
 	// this channel is recreated each time a source directory update is
 	// reported and closed after an subsequent update of the view.
-	afterWatch chan struct{}
-	// watchTimeout is the time span Testing's AfterWatch-method waits
+	_afterWatch chan struct{}
+
+	// _watchTimeout is the time span Testing's AfterWatch-method waits
 	// for an update of the view.  Practically that means the time span
 	// between a reported packages of a source watcher and the update in
 	// the view.  Since the execution of the tests happen in between
 	// this time-span can't be to short (> 0.2sec).
-	watchTimeout time.Duration
+	_watchTimeout time.Duration
 
-	quitWatching interface{ QuitAll() }
+	// _quitWatching terminates the model's go routine checking for
+	// updated packages in given source directory.
+	_quitWatching interface{ QuitAll() }
 }
 
 // cleanUp stop all go-routines initiated by a controller test.
 func (tt *Testing) cleanUp() {
-	if tt.ee != nil && tt.ee.IsListening() {
-		tt.ee.QuitListening()
+	if tt._ee != nil && tt._ee.IsListening() {
+		tt._ee.QuitListening()
 	}
-	if tt.quitWatching != nil {
-		tt.quitWatching.QuitAll()
+	if tt._quitWatching != nil {
+		tt._quitWatching.QuitAll()
 	}
 }
 
 // isOn returns true if given button-mask represents on/off-buttons
 // which are switched to on.
 func (tt *Testing) isOn(o onMask) bool {
-	return tt.bb.isOn&o == o
+	return tt._controller.bb.isOn&o == o
 }
 
 // dfltButtonLabel returns the currently set argument button label as it
 // appears in the view, derived from given short label like "vet",
 // "race" or "stats".
 func (tt *Testing) dfltButtonLabel(shortLabel string) (string, string) {
-	bb := defaultButtons(tt.bb.isOn, nil)
+	bb := defaultButtons(tt._controller.bb.isOn, nil)
 	lbl, vw := "", ""
 	bb.ForNew(func(bd view.ButtonDef) error {
 		if lbl != "" {
@@ -97,17 +106,27 @@ func (tt *Testing) clickButtons(ll ...string) {
 	}
 }
 
-func (tt *Testing) fxWatchMock(
-	c <-chan *model.PackagesDiff, f func(...interface{}),
+// _fxWatchMock is started as go-routine during the controller's
+// initialization process in controller.New and wraps the default watch
+// function.  The later reports model changes (i.e. watched packages
+// changes) to the view.  _fxWatchMock intercepts that report to close
+// and replace the current tt._afterWatch channel after the view update
+// was processed.  This enables a test to wait on afterWatch to ensure
+// the view and screen update process has completed.
+func (tt *Testing) _fxWatchMock(
+	c <-chan *model.PackagesDiff, m *modelState,
 ) {
 	watchRelay := make(chan *model.PackagesDiff)
-	go watch(watchRelay, func(i ...interface{}) {
-		f(i...)
-		tt.Lock()
-		close(tt.afterWatch)
-		tt.afterWatch = make(chan struct{})
-		tt.Unlock()
-	})
+	m.viewUpdater = func(vu func(...interface{})) func(i ...interface{}) {
+		return func(i ...interface{}) {
+			vu(i...)
+			tt.Lock()
+			close(tt._afterWatch)
+			tt._afterWatch = make(chan struct{})
+			tt.Unlock()
+		}
+	}(m.viewUpdater)
+	go watch(watchRelay, m)
 	for pd := range c {
 		if pd == nil {
 			close(watchRelay)
@@ -126,12 +145,13 @@ const (
 	awButtons
 )
 
-// AfterWatch returns the requested screen portion after the watcher of
-// a source directory has updated the screen.
-func (tt *Testing) AfterWatch(c uiCmp) lines.TestScreen {
+// afterWatch returns the requested screen portion after the watcher of
+// a source directory has reported a change to the view which in turn
+// has updated the screen.
+func (tt *Testing) afterWatch(c uiCmp) lines.TestScreen {
 	tt.T.GoT().Helper()
 	tt.Lock()
-	cn := tt.afterWatch
+	cn := tt._afterWatch
 	tt.Unlock()
 	select {
 	case <-cn:
@@ -145,7 +165,7 @@ func (tt *Testing) AfterWatch(c uiCmp) lines.TestScreen {
 		case awButtons:
 			return tt.ButtonBar()
 		}
-	case <-tt.T.Timeout(tt.watchTimeout):
+	case <-tt.T.Timeout(tt._watchTimeout):
 		tt.T.Fatal("controller: testing: after watch: " +
 			"timed out without a watch-update")
 	}
@@ -164,6 +184,10 @@ const (
 // setter. NOTE fx doesn't return before controller.New is listening.
 func fx(t *gounit.T, fs fixtureSetter) (*lines.Events, *Testing) {
 	return fxSource(t, fs, "empty")
+}
+
+func fxDBG(t *gounit.T, fs fixtureSetter) (*lines.Events, *Testing) {
+	return fxSourceDBG(t, fs, "empty")
 }
 
 func initGolden(t tfs.Tester) {
@@ -221,7 +245,7 @@ func fxSetupSource(t *gounit.T, relDir string) (golden *tfs.Dir) {
 	return golden
 }
 
-// fxInit is like fx but also takes an instance of init fac
+// fxInit is like fx but also takes an instance of init factories
 func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 	*lines.Events, *Testing,
 ) {
@@ -231,11 +255,11 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 		ee *lines.Events
 	)
 	ct.Mutex = &sync.Mutex{}
-	ct.watchTimeout = 2 * time.Second
+	ct._watchTimeout = 2 * time.Second
 	if i.dbgTimeouts {
-		ct.watchTimeout = 20 * time.Minute
+		ct._watchTimeout = 20 * time.Minute
 	}
-	ct.afterWatch = make(chan struct{})
+	ct._afterWatch = make(chan struct{})
 
 	if i.Fatal == nil {
 		i.Fatal = func(i ...interface{}) {
@@ -246,12 +270,7 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 		i.Watcher = &watcherMock{}
 	}
 	if i.watch == nil {
-		i.watch = ct.fxWatchMock
-	}
-	i.View = func(i view.Initer) lines.Componenter {
-		vw := view.New(i)
-		ct.bb = i.(*vwIniter).bb
-		return vw
+		i.watch = ct._fxWatchMock
 	}
 	i.Events = func(c lines.Componenter) *lines.Events {
 		events, tt := lines.Test(t.GoT(), c)
@@ -260,14 +279,15 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 		}
 		ct.Testing = view.NewTesting(t, tt, c)
 		ee = events
-		ct.ee = events
+		ct._ee = events
 		return ee
 	}
 
-	New(i)
+	New(&i)
 
+	ct._controller = i.controller
 	if qw, ok := i.Watcher.(interface{ QuitAll() }); ok {
-		ct.quitWatching = qw
+		ct._quitWatching = qw
 	}
 	if fs != nil {
 		fs.Set(t, ct.cleanUp)

@@ -13,7 +13,7 @@ import (
 )
 
 // A TMock instance is obtained by [T.Mock] and provides the
-// possibilities to mock logging, error handing and canceling a test
+// possibilities to mock logging, error handing and canceling of a test
 // which default to [testing.T.Log], [testing.T.Error] and
 // [testing.T.FailNow].
 type TMock struct{ t *T }
@@ -24,7 +24,7 @@ type TMock struct{ t *T }
 func (m *TMock) Logger(l func(...interface{})) { m.t.logger = l }
 
 // Errorer the last function call of an error reporting function which
-// by default reports beck to the go testing framework indicating the
+// by default reports back to the go testing framework indicating the
 // failing of the test ... if mocked the later is prevented.
 func (m *TMock) Errorer(e func(...interface{})) { m.t.errorer = e }
 
@@ -183,10 +183,10 @@ func (t *T) Timeout(d time.Duration) chan struct{} {
 
 // FS returns an FS-instance with handy features for file system
 // operations for testing.  I.e. copying a "golden" test file from a
-// packages "testdata" directory to a test specific temporary directory
+// package's "testdata" directory to a test specific temporary directory
 // looks like this:
 //
-//	t.FS().Data().CopyFl(golden, t.FS().Temp())
+//	t.FS().Data().FileCopy(golden, t.FS().Temp())
 //
 // It also removes error handling for file system operations by simply
 // failing the test in case of an error.

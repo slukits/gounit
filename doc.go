@@ -1,7 +1,8 @@
-// Package gounit comes with a command to continuously report test
-// results and with a few types augmenting go's testing framework for a
-// test driven development style.  gounit's features aiding its user on
-// matters of:
+// Package gounit is an opinionated augmentation of the go testing
+// framework for a test driven development style.  gounit comes with a
+// command continuously reporting test results and with a few types
+// allowing to systematically remove all noise from tests.  gounit's features
+// aiding its user on matters of:
 //   - naming
 //   - focus
 //   - documenting/specifying
@@ -24,17 +25,9 @@
 //	Once the test passes refactor the code until all sins are removed.
 //
 // The closer you are at this style the more gounit can do for you.
-//
-// gounit is a combination of a command cmd/gounit and a few types of
-// the gounit package.  Only together they unlock gounit's full
-// potential.  The command watches the module you are working on and
-// gives you permanent redundancy free feedback about your progress
-// through reporting test results, an outline of your project
-// documentation, and – following above coding style – an outline of
-// your thought processes in ways go test and go doc do not.  From the
-// gounit package you will mainly use the types [gounit.Suite] and
-// [gounit.T] ([gounit.S] for Init and Finalize) as well as the function
-// [gounit.Run]:
+// From the gounit package you will mainly use the types [gounit.Suite]
+// and [gounit.T] ([gounit.S] for Init and Finalize) as well as the
+// function [gounit.Run]:
 //
 //	import github.com/slukits/gounit
 //
@@ -61,17 +54,28 @@
 //	    t.Parallel()
 //	}
 //
-// A suit test is a method of a gounit.Suite-embedder which is public,
-// not special, and has exactly one argument (which then must be of type
-// *testing.T but this is not validated, i.e. gounit will produce a
-// panic if not).  Special methods are Init, SetUp, TearDown, Finalize.
-// These methods behave as you expect: Init and Finalize are executed
-// before respectively after any other method.  SetUp and TearDown are
-// executed before respectively after each test.  The special methods
-// along with compact assertions provided by gounit.T allow you in a
-// systematic way to remove noise from your test implementations with
-// the goal to make your suite-test implementation the specification of
-// your production API.  NOTE:
+// Note that gounit also reports normal go-tests and go-tests with
+// sub-tests.  While on the other hand suite tests are also executed
+// using the "go test" command.  A suit test is a method of a
+// gounit.Suite-embedder which is public, not special, and has exactly
+// one argument (which then must be of type *gounit.T but this is not
+// validated, i.e. gounit will produce a panic if not).  Special methods
+// are Init, SetUp, TearDown and Finalize as well as Get, Set and Del.
+// The first four methods behave as you expect: Init and Finalize are
+// executed before respectively after any other method.  SetUp and
+// TearDown are executed before respectively after each test.  The other
+// three methods are considered special because they are implemented by
+// the [gounit.Fixtures]-utility and it turned out to be a quite natural
+// use case to embedded the Fixtures-type next to the Suite type in a
+// test suite.  Special methods along with compact assertions provided
+// by gounit.T allow you in a systematic way to remove noise from your
+// test implementations with the goal to make your suite-test
+// implementation the specification of your production API.  While suite
+// tests are reported in the order they were written they - following
+// above coding style - will outline the behavior of your production
+// code and the thought process which led there.
+//
+// NOTE:
 //
 //	func (s *TestedSubject) Init(t *gounit.S) {
 //	    // initialize your fixture environment
@@ -89,50 +93,46 @@
 // The reason is that the argument of Init and Finalize has a different
 // semantic than the argument of suite tests.  S and and T wrap
 // testing.T instances of the go testing framework.  S wraps the suite
-// tests runner's testing.T instance, i.e. in above example it is
+// runner's testing.T instance, i.e. in above example it is
 // TestTestedSubject's testing.T instance.  While T wraps a testing.T
 // instance of a test runner's sub-test created to execute the suite
-// test.
+// test.  A typical test suite (in pseudo-code) might look like this:
 //
-// How does gounit now fullfil the above promises?  To a great deal
-// through the gounit command and how it reports test runs.  First of
-// all it does them automatically if a package's source code file has
-// changed.  It tries to always report back the test suite you are
-// working on.  It reports the suite tests in the order they are written
-// in the test file.  I.e. if I have a clumsy formulation or an
-// unfitting notion in my suite test names I have it every 20 minutes or
-// so in my face, i.e.  I will notice and I'll fix it.
+//	type testedSubject struct{
+//	    gounit.Suite
+//	    gounit.Fixtures
+//	    fixtureOriginal *myFixture
+//	}
 //
-// If I start with the most simple behavior I expect from an
-// instance/operation and move subsequently on to more and more
-// intricate behavior my test-names not only outline the documentation
-// of the instance/operation but they also outline a thought process.
-// Being confronted with it in short intervals keeps me focused and
-// makes me discover wrong turns rather early.
+//	func (s *testedSubject) Init(t *gounit.S) {
+//	    s.fixtureOriginal = myInMemoryFixtureGenerator()
+//	}
 //
-// Since our test names express behavior instead of just repeating a
-// method name the test names together with the suite and package name
-// provide a semantical documentation of the production code.  The
-// functional documentation is go doc's domain and given in the function
-// respectively method documentation.  In summary a test-name should
-// express what is expected, a method/function name/documentation should
-// express what is done in detail, while git commits should focus on why
-// is something done, i.e. keep it DRY.  Through special methods and
-// compact assertions attached to provided [gounit.T] instance all noise
-// can be systematically removed from a test implementation which lets
-// the test express specifics and usage of the production API.
+//	func (s *testedSubject) SetUp(t *gounit.T) {
+//	    t.Parallel()
+//	    s.Set(t, s.fixtureOriginal.ConcurrencySaveClone())
+//	}
 //
-// While IDE's are very feature rich when it comes to the details they
-// are less so when it comes to the bird's eye view.  gounit shows you
-// all your packages in the module overview, all suites of a package in
-// the package overview and all tests of a suite.  While the suite tests
-// are reported in the order they are written suites and packages are
-// reported descending by their modification time.  That is how gounit
-// helps to manage complexity.
+//	func (s *testedSubject) TearDown(t *gounit.T) {
+//	    s.Del(t).(*myFixture).CleanUp()
+//	}
 //
-// Finally when it comes to maintenance: having test names together with
-// their suite and package names telling a story about the behavior of
-// an certain aspect of a software system while clutter free tests
-// provide the specifics about the production API makes it quite easy to
-// get (back) into that certain aspect of a software system.
+//	func (s *testedSubject) fx(t *gounit.T) *myFixture {
+//	    return s.Get(t).(*myFixture)
+//	}
+//
+//	func (s *testedSubject) Has_tested_behavior(t *gounit.T) {
+//	    fx := s.fx(t)
+//	    // do something within the test specific fixated environment
+//	    // and evaluate the effect of this doing.
+//	}
+//
+//	func (s *testedSubject) Finalize(t *gounit.S) {
+//	    s.fixtureOriginal.CleanUp()
+//	}
+//
+//	func TestTestedSubject(t *testing.T) {
+//	    t.Parallel()
+//	    Run(&testedSubject{}, t)
+//	}
 package gounit

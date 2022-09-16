@@ -29,9 +29,7 @@ documentation were found.
 package controller
 
 import (
-	"fmt"
 	"log"
-	"strings"
 	"sync"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
@@ -40,7 +38,8 @@ import (
 )
 
 // InitFactories allows to overwrite the default constructors and
-// functionality needed to initialize the controller.
+// functionality needed to initialize the controller and to obtain the
+// created controller for testing purposes.
 type InitFactories struct {
 
 	// Fatal to report fatal errors; defaults to log.Fatal
@@ -53,11 +52,14 @@ type InitFactories struct {
 	// packages and updates accordingly the view; defaults to a
 	// controller internal function and is there for testing
 	// interceptions.
-	watch func(<-chan *model.PackagesDiff, func(...interface{}))
+	watch func(<-chan *model.PackagesDiff, *modelState)
 
 	// dbgTimeouts set to true increases lines.Events.sync-timeout to
 	// 20min as well as controller.Testing.watchTimeout.
 	dbgTimeouts bool
+
+	// controller instance setup during the initialization process.
+	controller *controller
 
 	// View returns a controller's view; defaults to view.New
 	View func(view.Initer) lines.Componenter
@@ -66,19 +68,31 @@ type InitFactories struct {
 	Events func(lines.Componenter) *lines.Events
 }
 
+type controller struct {
+	view    *viewUpdater
+	model   *modelState
+	watcher Watcher
+	bb      *buttons
+	ftl     func(...interface{})
+}
+
 // New starts the application and blocks until a quit event occurs.
-func New(i InitFactories) {
-	ensureInitArgs(&i)
+// Providing the zero-InitFactories uses the documented defaults (see
+// [controller.InitFactories]).
+func New(i *InitFactories) {
+	if i == nil {
+		i = &InitFactories{}
+	}
+	ensureInitArgs(i)
 	diff, _, err := i.Watcher.Watch()
 	if err != nil {
 		i.Fatal(WatcherErr, i.Watcher.SourcesDir(), err)
 		return
 	}
-	vwInit := &vwIniter{vw: &vwUpd{mutex: &sync.Mutex{}}}
-	vwInit.w, vwInit.ftl = i.Watcher, i.Fatal
-	ee := i.Events(i.View(vwInit))
-	vwInit.bb.quitter = ee.QuitListening
-	go i.watch(diff, vwInit.vw.Update)
+	ee := i.Events(i.View(&viewIniter{controller: i.controller}))
+	i.controller.bb.quitter = ee.QuitListening
+	i.controller.bb.reporter = i.controller.model.report
+	go i.watch(diff, i.controller.model)
 	ee.Listen()
 }
 
@@ -100,141 +114,18 @@ func ensureInitArgs(i *InitFactories) {
 	if i.watch == nil {
 		i.watch = watch
 	}
-}
 
-// vwUpd collects the functions to update aspects of a view which are
-// used by the viewUpdater to modify the view.
-type vwUpd struct {
-	// mutex avoids that the view is updated concurrently.
-	mutex *sync.Mutex
-
-	// msg updates the view's message bar
-	msg func(string)
-
-	// stt updates the view's status bar
-	stt func(view.StatusUpdate)
-
-	// rprUpd updates lines of a view's reporting component.
-	rprUpd func(view.Reporter)
-
-	// bttUpd updates the buttons of a view's button bar.
-	bttUpd func(view.Buttoner)
-}
-
-// Update updates the view and should be the only way the view is
-// updated to avoid data races.
-func (vw *vwUpd) Update(dd ...interface{}) {
-	vw.mutex.Lock()
-	defer vw.mutex.Unlock()
-
-	for _, d := range dd {
-		switch updData := d.(type) {
-		case view.Buttoner:
-			vw.bttUpd(updData)
-		case view.Reporter:
-			vw.rprUpd(updData)
-		}
+	i.controller = &controller{
+		view: &viewUpdater{Mutex: &sync.Mutex{}},
+		model: &modelState{
+			Mutex: &sync.Mutex{},
+			lastReport: []interface{}{&reporter{
+				ll: []string{initReport}, flags: view.RpClearing}},
+			pp: pkgs{},
+		},
+		watcher: i.Watcher,
+		ftl:     i.Fatal,
 	}
+	i.controller.model.viewUpdater = i.controller.view.Update
+	i.controller.bb = newButtons(i.controller.view.Update)
 }
-
-const initReport = "waiting for testing packages being reported..."
-
-// vwIniter instance provides the initial data to a new view,
-// collects the provided view modifiers and instantiates *buttons.
-type vwIniter struct {
-
-	// w a Watcher instance whose module and watched source-directory
-	// information are used to initialize a view's message bar.
-	w Watcher
-
-	// ftl to report fatal errors during the initialization process.
-	ftl func(...interface{})
-
-	// vw properties are set during the view's initialization process
-	// with received update functions.
-	vw *vwUpd
-
-	// bb is the created buttons-instance for the initial button-bar
-	// definition.  They are saved in this property so they can be used
-	// after the initialization process for further processing.
-	bb *buttons
-}
-
-func (i *vwIniter) Fatal() func(...interface{}) { return i.ftl }
-
-func (i *vwIniter) Message(msg func(string)) string {
-	i.vw.msg = msg
-	return fmt.Sprintf("%s: %s",
-		i.w.ModuleName(), strings.TrimPrefix(
-			i.w.SourcesDir(), i.w.ModuleDir()))
-}
-
-func (i *vwIniter) Reporting(
-	upd func(view.Reporter),
-) view.Reporter {
-
-	i.vw.rprUpd = upd
-	return &reporter{ll: []string{initReport}}
-}
-
-func (i *vwIniter) Status(upd func(view.StatusUpdate)) {
-	i.vw.stt = upd
-}
-
-func (i *vwIniter) Buttons(upd func(view.Buttoner)) view.Buttoner {
-	i.vw.bttUpd = upd
-	i.bb = newButtons(i.vw.Update)
-	return i.bb.defaultButtons()
-}
-
-const (
-	WatcherErr = "gounit: watcher: %s: %v"
-)
-
-// A Watcher implementation provides the needed information about a
-// watched source directory to the controller.
-type Watcher interface {
-
-	// ModuleName is the module name of the descendant watched source
-	// directory.
-	ModuleName() string
-
-	// ModuleDir returns the absolute path of the module directory of
-	// the descendant watched source directory.
-	ModuleDir() string
-
-	// SourcesDir returns the absolute path of the watched source
-	// directory.
-	SourcesDir() string
-
-	// Watch is a function whose returned channel watches a go modules
-	// packages sources whose tests runs are reported to a terminal ui.
-	Watch() (<-chan *model.PackagesDiff, uint64, error)
-}
-
-// reporter implements view.Reporter.
-type reporter struct {
-	flags view.RprtMask
-	ll    []string
-	mask  map[uint]view.LineMask
-	lst   func(int)
-}
-
-// Clearing indicates if all lines not set by this reporter's For
-// function should be cleared or not.
-func (l *reporter) Flags() view.RprtMask { return l.flags }
-
-// For expects the view's reporting component and a callback to which
-// the updated lines can be provided to.
-func (l *reporter) For(_ lines.Componenter, line func(uint, string)) {
-	for idx, content := range l.ll {
-		line(uint(idx), content)
-	}
-}
-
-// Mask returns for given index special formatting directives.
-func (l *reporter) LineMask(idx uint) view.LineMask { return l.mask[idx] }
-
-// Listener returns the callback which is informed about user selections
-// of lines by providing the index of the selected line.
-func (l *reporter) Listener() func(int) { return l.lst }

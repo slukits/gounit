@@ -34,7 +34,7 @@ func (s *Report) Passing_go_tests_only(t *T) {
 	_, tt := s.fxSource(t, "go/pass")
 
 	t.StarMatched(
-		tt.AfterWatch(awReporting).String(),
+		tt.afterWatch(awReporting).String(),
 		fxExp["go/pass"]...,
 	)
 }
