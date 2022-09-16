@@ -32,7 +32,7 @@ type Testing struct {
 	_ee *lines.Events
 
 	// gounit _controller instance created during the initialization
-	// porcess, i.e. _controller.New.
+	// process, i.e. _controller.New.
 	_controller *controller
 
 	// this channel is recreated each time a source directory update is
@@ -274,7 +274,7 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 		ee *lines.Events
 	)
 	ct.Mutex = &sync.Mutex{}
-	ct._watchTimeout = 2 * time.Second
+	ct._watchTimeout = 10 * time.Second
 	if i.dbgTimeouts {
 		ct._watchTimeout = 20 * time.Minute
 	}
