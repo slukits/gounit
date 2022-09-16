@@ -1,0 +1,2 @@
+this empty file is for git since a sole empty directory doesn't become
+part of the working tree
