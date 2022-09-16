@@ -24,6 +24,13 @@ type pkg struct {
 
 type pkgs map[string]*pkg
 
+func lastReport(pp pkgs, latest string) []interface{} {
+	if pp[latest].tp.LenSuites() == 0 {
+		return reportGoTestsOnly(pp, latest)
+	}
+	return nil
+}
+
 func reportGoTestsOnly(pp pkgs, latest string) []interface{} {
 	var singles, withSubs []*model.Test
 	p, n, ll := pp[latest], 0, []string{}

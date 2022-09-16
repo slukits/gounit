@@ -117,15 +117,16 @@ func (tt *Testing) _fxWatchMock(
 	c <-chan *model.PackagesDiff, m *modelState,
 ) {
 	watchRelay := make(chan *model.PackagesDiff)
-	m.viewUpdater = func(vu func(...interface{})) func(i ...interface{}) {
-		return func(i ...interface{}) {
-			vu(i...)
-			tt.Lock()
-			close(tt._afterWatch)
-			tt._afterWatch = make(chan struct{})
-			tt.Unlock()
-		}
-	}(m.viewUpdater)
+	m.replaceViewUpdater(
+		func(vu func(...interface{})) func(i ...interface{}) {
+			return func(i ...interface{}) {
+				vu(i...)
+				tt.Lock()
+				close(tt._afterWatch)
+				tt._afterWatch = make(chan struct{})
+				tt.Unlock()
+			}
+		}(m.viewUpdater))
 	go watch(watchRelay, m)
 	for pd := range c {
 		if pd == nil {

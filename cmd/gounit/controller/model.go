@@ -20,33 +20,35 @@ type modelState struct {
 	latest      string
 }
 
-func (s *modelState) clone() *modelState {
+func (s *modelState) replaceViewUpdater(f func(...interface{})) {
 	s.Lock()
 	defer s.Unlock()
-	ms := &modelState{
-		Mutex:       &sync.Mutex{},
-		viewUpdater: s.viewUpdater,
-		pp:          pkgs{},
-	}
-	for k, v := range s.pp {
-		ms.pp[k] = v
-	}
-	return ms
+	s.viewUpdater = f
 }
 
-func (s *modelState) update(ms *modelState) {
-	_ms := *s
-	_ms.Lock()
-	*s = *ms
-	_ms.Unlock()
+func (s *modelState) clone() pkgs {
+	s.Lock()
+	defer s.Unlock()
+	pp := pkgs{}
+	for k, v := range s.pp {
+		pp[k] = v
+	}
+	return pp
+}
+
+func (s *modelState) update(
+	pp pkgs, latest string, lastReport []interface{},
+) {
+	s.Lock()
+	defer s.Unlock()
+	s.pp = pp
+	s.latest = latest
+	s.lastReport = lastReport
 }
 
 func (s *modelState) report() {
-	if s.lastReport == nil {
-		if s.pp[s.latest].tp.LenSuites() == 0 {
-			s.lastReport = reportGoTestsOnly(s.pp, s.latest)
-		}
-	}
+	s.Lock()
+	defer s.Unlock()
 	s.viewUpdater(s.lastReport...)
 }
 
@@ -55,25 +57,26 @@ func watch(
 	mdl *modelState,
 ) {
 	for diff := range watched {
-		m := mdl.clone()
 		if diff == nil {
 			return
 		}
+		pp, latest := mdl.clone(), ""
 		rslt, n := make(chan *pkg), 0
 		diff.For(func(tp *model.TestingPackage) (stop bool) {
 			n++
 			go run(&pkg{tp: tp}, rslt)
-			m.latest = tp.ID()
+			latest = tp.ID()
 			return
 		})
 		for i := 0; i < n; i++ {
 			p := <-rslt
-			m.pp[p.tp.ID()] = p
+			pp[p.tp.ID()] = p
 		}
-		if len(m.pp) == 0 || m.pp[m.latest] == nil {
+		if len(pp) == 0 || pp[latest] == nil {
 			return
 		}
-		mdl.update(m)
+		lastReport := lastReport(pp, latest)
+		mdl.update(pp, latest, lastReport)
 		mdl.report()
 	}
 }
