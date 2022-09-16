@@ -250,7 +250,14 @@ func fxSetupSource(t *gounit.T, relDir string) (golden *tfs.Dir) {
 	golden = dt.Child(goldenDir)
 	golden.Copy(tmp)
 	golden = tmp.Child(goldenDir)
-	_, err := os.Stat(fp.Join(golden.Path(), relDir))
+	var err error
+	for i := 0; i < 100; i++ {
+		_, err = os.Stat(fp.Join(golden.Path(), relDir))
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Millisecond)
+	}
 	if err != nil {
 		t.Fatalf("fx: watch: %s: %v", relDir, err)
 	}
