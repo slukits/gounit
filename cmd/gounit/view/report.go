@@ -76,6 +76,7 @@ func (m *report) OnClick(_ *lines.Env, _, y int) {
 }
 
 func (m *report) OnUpdate(e *lines.Env) {
+	m.Focus.Reset(true)
 	r, ok := e.Evt.(*lines.UpdateEvent).Data.(Reporter)
 	if !ok {
 		return
@@ -93,8 +94,9 @@ func (m *report) OnUpdate(e *lines.Env) {
 		if ii.Has(i) {
 			continue
 		}
-		m.Reset(i)
+		m.Reset(i, lines.NotFocusable)
 	}
+	m.listener = r.Listener()
 }
 
 func (m *report) wrt(l Reporter, idx uint, e *lines.Env) io.Writer {
@@ -117,6 +119,8 @@ func (r *report) OnContext(e *lines.Env, x, y int) {
 	r.scroll()
 }
 
+// OnRune scrolls given reporting component down iff given rune is the
+// space rune.  If at bottom it is scrolled to the top.
 func (r *report) OnRune(e *lines.Env, rn rune) {
 	if rn != ' ' {
 		return
@@ -130,4 +134,8 @@ func (r *report) scroll() {
 		return
 	}
 	r.Scroll.Down()
+}
+
+func (r *report) OnLineSelection(e *lines.Env, idx int) {
+	r.listener(idx)
 }

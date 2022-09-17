@@ -70,7 +70,7 @@ func reportGoTestsOnly(p *pkg) []interface{} {
 		})
 		for _, s := range ss {
 			ll = append(ll, "    "+s.Name)
-			mask[uint(len(ll)-1)] = view.TestLine
+			mask[uint(len(ll)-1)] = view.SuiteTestLine
 		}
 	}
 	return []interface{}{&reporter{

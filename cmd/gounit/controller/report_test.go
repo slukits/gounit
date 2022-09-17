@@ -7,6 +7,7 @@ package controller
 import (
 	"testing"
 
+	"github.com/gdamore/tcell/v2"
 	. "github.com/slukits/gounit"
 	"github.com/slukits/lines"
 )
@@ -45,7 +46,61 @@ func (s *Report) Passing_go_tests_only(t *T) {
 		tt.StatusBar().String(), "1", "2", "11", "0")
 }
 
+func (s *Report) Folds_tests_if_selecting_suite_with_shown_tests(t *T) {
+	_, tt := s.fxSource(t, "go/pass")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["go/pass"]...,
+	)
+
+	tt.FireRune('j')           // focus second
+	tt.FireRune('j')           // focusable line (TestPass_4)
+	tt.FireKey(tcell.KeyEnter) // and select it
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["go/pass: folded"]...,
+	)
+
+	str := tt.Reporting().String()
+	t.Log(str)
+
+}
+
 func TestReport(t *testing.T) {
 	t.Parallel()
 	Run(&Report{}, t)
 }
+
+type dbg struct {
+	Suite
+	Fixtures
+}
+
+func (s *dbg) fxSource(t *T, dir string) (*lines.Events, *Testing) {
+	return fxSourceDBG(t, s, dir)
+}
+
+func (s *dbg) Dbg(t *T) {
+	_, tt := s.fxSource(t, "go/pass")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["go/pass"]...,
+	)
+
+	tt.FireRune('j')           // focus second
+	tt.FireRune('j')           // focusable line (TestPass_4)
+	tt.FireKey(tcell.KeyEnter) // and select it
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["go/pass: folded"]...,
+	)
+
+	str := tt.Reporting().String()
+	t.Log(str)
+}
+
+func TestDBG(t *testing.T) { Run(&dbg{}, t) }

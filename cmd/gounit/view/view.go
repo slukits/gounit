@@ -90,13 +90,17 @@ const (
 	// only package or suite lines are selectable.
 	PackageLine
 
+	// TestLine classifies a reported line as go-test-line.  Note a
+	// go-test-line is not selectable.
+	TestLine
+
 	// SuiteLine classifies a reported line as suite-line.  Note only
 	// package or suite lines are selectable.
 	SuiteLine
 
-	// TestLine classifies a reported line as test-line.  Note a test-line
-	// is not selectable.
-	TestLine
+	// SuiteTestLine classifies a reported line as suit-test-line.  Note
+	// a suit-test-line is not selectable.
+	SuiteTestLine
 
 	// ZeroLineMode indicates no other than default formattings for a
 	// line of a reporting component.

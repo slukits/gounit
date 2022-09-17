@@ -39,11 +39,41 @@ func (s *modelState) clone() pkgs {
 func (s *modelState) update(
 	pp pkgs, latest string, lastReport []interface{},
 ) {
+	lastReport[0].(*reporter).lst = s.lineListener
 	s.Lock()
 	defer s.Unlock()
 	s.pp = pp
 	s.latest = latest
 	s.lastReport = lastReport
+}
+
+func (s *modelState) lineListener(idx int) {
+	s.Lock()
+	defer s.Unlock()
+	rpr, ok := s.lastReport[0].(*reporter)
+	if !ok {
+		panic("first component of last report must be reporter")
+	}
+	lm := view.ZeroLineMod
+	switch rpr.typ {
+	case packageReport:
+		lm = rpr.LineMask(uint(idx))
+	case packageReportFolded:
+		lm = rpr.Folded().LineMask(uint(idx))
+	}
+	switch {
+	case lm&view.PackageLine > 0:
+	case lm&view.SuiteLine > 0:
+		if rpr.typ == packageReport {
+			rpr.typ = packageReportFolded
+			s.viewUpdater(append([]interface{}{
+				rpr.Folded()}, s.lastReport[1:]...)...)
+			return
+		}
+		rpr.typ = packageReport
+		s.viewUpdater(s.lastReport...)
+		return
+	}
 }
 
 func (s *modelState) report() {
@@ -88,12 +118,26 @@ func run(p *pkg, rslt chan *pkg) {
 	rslt <- p
 }
 
+type reportType int
+
+const (
+	// packageReport reports one specific package
+	packageReport reportType = iota
+	// packageReportFolded reports one specific package with folded
+	// tests
+	packageReportFolded
+	// packagesReport reports all packages of the watched directory
+	packagesReport
+)
+
 // reporter implements view.Reporter.
 type reporter struct {
-	flags view.RprtMask
-	ll    []string
-	mask  map[uint]view.LineMask
-	lst   func(int)
+	flags  view.RprtMask
+	ll     []string
+	mask   map[uint]view.LineMask
+	lst    func(int)
+	typ    reportType
+	folded *reporter
 }
 
 // Clearing indicates if all lines not set by this reporter's For
@@ -119,6 +163,31 @@ func (l *reporter) LineMask(idx uint) view.LineMask {
 // Listener returns the callback which is informed about user selections
 // of lines by providing the index of the selected line.
 func (l *reporter) Listener() func(int) { return l.lst }
+
+func (r *reporter) Folded() *reporter {
+	if r.folded == nil {
+		_r := &reporter{
+			typ: packageReportFolded, lst: r.lst,
+			flags: view.RpClearing,
+			mask:  map[uint]view.LineMask{},
+		}
+		for idx, content := range r.ll {
+			ux := uint(idx)
+			if idx > 0 && content == "" {
+				if r.LineMask(ux-1)&view.SuiteTestLine > 0 {
+					continue
+				}
+			}
+			if r.LineMask(ux)&view.SuiteTestLine > 0 {
+				continue
+			}
+			_r.ll = append(_r.ll, content)
+			_r.mask[uint(len(_r.ll)-1)] = r.mask[ux]
+		}
+		r.folded = _r
+	}
+	return r.folded
+}
 
 const (
 	WatcherErr = "gounit: watcher: %s: %v"
