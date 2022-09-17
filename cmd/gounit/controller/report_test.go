@@ -41,6 +41,8 @@ func (s *Report) Passing_go_tests_only(t *T) {
 		tt.afterWatch(awReporting).String(),
 		fxExp["go/pass"]...,
 	)
+	t.StarMatched( // number of pkgs, suites, passed, failed
+		tt.StatusBar().String(), "1", "2", "11", "0")
 }
 
 func TestReport(t *testing.T) {

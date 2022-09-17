@@ -75,7 +75,8 @@ func watch(
 		if len(pp) == 0 || pp[latest] == nil {
 			return
 		}
-		lastReport := lastReport(pp, latest)
+		lastReport := reportTestingPackage(pp[latest])
+		lastReport = append(lastReport, reportStatus(pp))
 		mdl.update(pp, latest, lastReport)
 		mdl.report()
 	}

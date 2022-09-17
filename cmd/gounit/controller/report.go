@@ -24,9 +24,9 @@ type pkg struct {
 
 type pkgs map[string]*pkg
 
-func lastReport(pp pkgs, latest string) []interface{} {
-	if pp[latest].tp.LenSuites() == 0 {
-		return reportGoTestsOnly(pp[latest])
+func reportTestingPackage(p *pkg) []interface{} {
+	if p.tp.LenSuites() == 0 {
+		return reportGoTestsOnly(p)
 	}
 	return nil
 }
@@ -68,4 +68,33 @@ func reportGoTestsOnly(p *pkg) []interface{} {
 		}
 	}
 	return []interface{}{&reporter{flags: view.RpClearing, ll: ll}}
+}
+
+func reportStatus(pp pkgs) *view.Statuser {
+	// count suites, tests and failed tests
+	ssLen, ttLen, ffLen := 0, 0, 0
+	for _, p := range pp {
+		ssLen += p.tp.LenSuites()
+		p.tp.ForTest(func(t *model.Test) {
+			n := p.Results.OfTest(t).Len()
+			if n == 1 {
+				ttLen++
+				return
+			}
+			ssLen++
+			ttLen += n
+			ffLen += p.Results.OfTest(t).LenFailed()
+		})
+		p.tp.ForSuite(func(ts *model.TestSuite) {
+			rr := p.Results.OfSuite(ts)
+			ttLen += rr.Len()
+			ffLen += rr.LenFailed()
+		})
+	}
+	return &view.Statuser{
+		Packages: len(pp),
+		Suites:   ssLen,
+		Tests:    ttLen,
+		Failed:   ffLen,
+	}
 }

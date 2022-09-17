@@ -52,7 +52,7 @@ func (i *viewIniter) Reporting(upd func(view.Reporter)) view.Reporter {
 }
 
 func (i *viewIniter) Status(upd func(view.Statuser)) {
-	i.controller.view.stt = upd
+	i.controller.view.sttUpd = upd
 }
 
 func (i *viewIniter) Buttons(upd func(view.Buttoner)) view.Buttoner {
@@ -70,8 +70,8 @@ type viewUpdater struct {
 	// msg updates the view's message bar
 	msg func(string)
 
-	// stt updates the view's status bar
-	stt func(view.Statuser)
+	// sttUpd updates the view's status bar
+	sttUpd func(view.Statuser)
 
 	// rprUpd updates lines of a view's reporting component.
 	rprUpd func(view.Reporter)
@@ -92,6 +92,8 @@ func (vw *viewUpdater) Update(dd ...interface{}) {
 			vw.bttUpd(updData)
 		case view.Reporter:
 			vw.rprUpd(updData)
+		case *view.Statuser:
+			vw.sttUpd(*updData)
 		}
 	}
 }

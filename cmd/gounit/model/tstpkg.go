@@ -97,7 +97,7 @@ func (tp *TestingPackage) Run() (*Results, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(), tp.Timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "go", "test", "-json")
+	cmd := exec.CommandContext(ctx, "go", "test", "-json", "-vet=off")
 	cmd.Dir = tp.abs
 	start := time.Now()
 	stdout, err := cmd.CombinedOutput()
