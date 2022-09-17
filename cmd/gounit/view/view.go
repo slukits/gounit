@@ -86,6 +86,18 @@ const (
 	// and a black foreground.
 	Passed
 
+	// PackageLine classifies a reported line as package-line.  Note
+	// only package or suite lines are selectable.
+	PackageLine
+
+	// SuiteLine classifies a reported line as suite-line.  Note only
+	// package or suite lines are selectable.
+	SuiteLine
+
+	// TestLine classifies a reported line as test-line.  Note a test-line
+	// is not selectable.
+	TestLine
+
 	// ZeroLineMode indicates no other than default formattings for a
 	// line of a reporting component.
 	ZeroLineMod LineMask = 0

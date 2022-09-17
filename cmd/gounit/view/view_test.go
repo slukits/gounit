@@ -304,8 +304,8 @@ func (s *AView) Updates_its_main_content(t *T) {
 	_, tt, fx := s.fx(t)
 	exp := "first\n\nthird\nforth"
 
-	fx.updateReporting(&linerFX{content: ""}) // no-op, coverage
-	fx.updateReporting(&linerFX{content: exp})
+	fx.updateReporting(&reporterFX{content: ""}) // no-op, coverage
+	fx.updateReporting(&reporterFX{content: exp})
 
 	t.SpaceMatched(tt.Screen().String(), "first", "third", "forth")
 }
@@ -313,11 +313,11 @@ func (s *AView) Updates_its_main_content(t *T) {
 func (s *AView) Clears_unused_main_lines(t *T) {
 	_, tt, fx := s.fx(t)
 	exp := "first line\nsecond\nthird\nforth\nfifth"
-	fx.updateReporting(&linerFX{content: exp})
+	fx.updateReporting(&reporterFX{content: exp})
 	t.SpaceMatched(tt.Screen().String(), strings.Split(exp, "\n")...)
 
 	exp = "\n\n2nd\n3rd\n4th"
-	fx.updateReporting(&linerFX{content: exp, flags: RpClearing})
+	fx.updateReporting(&reporterFX{content: exp, flags: RpClearing})
 
 	scr := tt.Screen().String()
 	t.SpaceMatched(scr, strings.Split(exp, "\n")...)
@@ -329,7 +329,7 @@ func (s *AView) Reports_click_in_reporting_component(t *T) {
 	_, tt, fx := s.fx(t)
 
 	cnt, exp := "first\n\nthird\nforth", 2
-	fx.updateReporting(&linerFX{content: cnt})
+	fx.updateReporting(&reporterFX{content: cnt})
 
 	tt.FireComponentClick(fx.Report, 0, exp)
 	t.Eq(exp, fx.reportedLine)

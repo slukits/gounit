@@ -11,6 +11,8 @@ import (
 	"github.com/slukits/lines"
 )
 
+// Statuser instance passed to the provided status bar updater at
+// initialization time
 type Statuser struct {
 	// Str is a status-bar string superseding all other status
 	// information.

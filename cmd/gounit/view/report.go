@@ -98,14 +98,17 @@ func (m *report) OnUpdate(e *lines.Env) {
 }
 
 func (m *report) wrt(l Reporter, idx uint, e *lines.Env) io.Writer {
-	switch l.LineMask(idx) {
-	case Failed:
+	lm := l.LineMask(idx)
+	var lf lines.LineFlags
+	if lm&(PackageLine|SuiteLine) == 0 {
+		lf = lines.NotFocusable
+	}
+	if lm&Failed > 0 {
 		return e.BG(tcell.ColorRed).
 			FG(tcell.ColorWhite).
-			LL(int(idx))
-	default:
-		return e.LL(int(idx))
+			LL(int(idx), lf)
 	}
+	return e.LL(int(idx), lf)
 }
 
 // OnContext scrolls given reporting component down.  If at bottom it is

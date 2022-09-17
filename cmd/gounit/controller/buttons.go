@@ -12,6 +12,7 @@ const (
 	vetOn onMask = 1 << iota
 	raceOn
 	statsOn
+	errOn
 )
 
 type buttons struct {
@@ -70,6 +71,7 @@ func (bb *buttons) moreListener(label string) {
 	switch label {
 	case "back":
 		bb.reporter()
+		bb.viewUpd(bb.defaults())
 	case "help":
 		viewHelp(bb.viewUpd)
 	case "quit":
@@ -87,6 +89,8 @@ const (
 	bttStatsOff = "stats=off"
 	bttStatsOn  = "stats=on"
 	bttMore     = "more"
+	bttErrOff   = "err=off"
+	bttErrOn    = "err=on"
 )
 
 func defaultButtons(on onMask, l func(string)) *buttoner {

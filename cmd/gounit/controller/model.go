@@ -109,7 +109,12 @@ func (l *reporter) For(_ lines.Componenter, line func(uint, string)) {
 }
 
 // Mask returns for given index special formatting directives.
-func (l *reporter) LineMask(idx uint) view.LineMask { return l.mask[idx] }
+func (l *reporter) LineMask(idx uint) view.LineMask {
+	if l.mask == nil {
+		return view.ZeroLineMod
+	}
+	return l.mask[idx]
+}
 
 // Listener returns the callback which is informed about user selections
 // of lines by providing the index of the selected line.

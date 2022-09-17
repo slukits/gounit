@@ -79,7 +79,7 @@ func (fx *fxInit) Reporting(ru func(Reporter)) Reporter {
 		}
 	}
 
-	return &linerFX{content: fxReporting, listener: fx.listenReporting}
+	return &reporterFX{content: fxReporting, listener: fx.listenReporting}
 }
 
 func (fx *fxInit) Buttons(upd func(Buttoner)) Buttoner {
@@ -150,7 +150,7 @@ func (fx *viewFX) ClickButton(tt *lines.Testing, label string) {
 
 func (fx *viewFX) twoPointFiveTimesReportedLines() (int, string) {
 	len, lastLine := 0, ""
-	fx.updateReporting(&linerFX{f: func(
+	fx.updateReporting(&reporterFX{f: func(
 		r lines.Componenter, f func(uint, string),
 	) {
 		n := 2*r.(*report).Dim().Height() + r.(*report).Dim().Height()/2
@@ -172,31 +172,38 @@ func (fx *viewFX) twoPointFiveTimesReportedLines() (int, string) {
 	return len, lastLine
 }
 
-type linerFX struct {
+type reporterFX struct {
 	content  string
+	ll       []string
+	mm       map[uint]LineMask
 	f        func(lines.Componenter, func(uint, string))
 	flags    RprtMask
 	listener func(int)
 }
 
-func (l *linerFX) Flags() RprtMask { return l.flags }
+func (l *reporterFX) Flags() RprtMask { return l.flags }
 
-func (l *linerFX) LineMask(idx uint) LineMask {
-	return 0
+func (l *reporterFX) LineMask(idx uint) LineMask {
+	if l.mm == nil {
+		return 0
+	}
+	return l.mm[idx]
 }
 
-func (l *linerFX) Listener() func(int) { return l.listener }
+func (l *reporterFX) Listener() func(int) { return l.listener }
 
-func (l *linerFX) For(r lines.Componenter, cb func(uint, string)) {
+func (l *reporterFX) For(r lines.Componenter, cb func(uint, string)) {
 	if l.f != nil {
 		l.f(r, cb)
 		return
 	}
-	if l.content == "" {
+	if len(l.ll) == 0 && l.content != "" {
+		l.ll = strings.Split(l.content, "\n")
+	}
+	if len(l.ll) == 0 {
 		return
 	}
-	ll := strings.Split(l.content, "\n")
-	for idx, l := range ll {
+	for idx, l := range l.ll {
 		if l == "" {
 			continue
 		}

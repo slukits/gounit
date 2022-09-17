@@ -7,6 +7,7 @@ package controller
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
@@ -33,7 +34,7 @@ func reportTestingPackage(p *pkg) []interface{} {
 
 func reportGoTestsOnly(p *pkg) []interface{} {
 	var singles, withSubs []*model.Test
-	n, ll := 0, []string{}
+	n, ll, mask := 0, []string{}, map[uint]view.LineMask{}
 	p.tp.ForTest(func(t *model.Test) {
 		if p.OfTest(t).Len() == 1 {
 			singles = append(singles, t)
@@ -43,12 +44,15 @@ func reportGoTestsOnly(p *pkg) []interface{} {
 		n += p.OfTest(t).Len()
 		withSubs = append(withSubs, t)
 	})
-	ll = append(ll, fmt.Sprintf("%s: %d/0 %v", p.tp.ID(), n, p.Duration), "")
+	ll = append(ll, fmt.Sprintf("%s: %d/0 %v", p.tp.ID(), n,
+		p.Duration.Round(1*time.Millisecond)), "")
+	mask[0] = view.PackageLine
 	sort.Slice(singles, func(i, j int) bool {
 		return singles[i].Name() < singles[j].Name()
 	})
 	for _, t := range singles {
 		ll = append(ll, t.Name())
+		mask[uint(len(ll)-1)] = view.TestLine
 	}
 	sort.Slice(withSubs, func(i, j int) bool {
 		return withSubs[i].Name() < withSubs[j].Name()
@@ -56,6 +60,7 @@ func reportGoTestsOnly(p *pkg) []interface{} {
 	for _, t := range withSubs {
 		tr := p.OfTest(t)
 		ll = append(ll, "", t.Name())
+		mask[uint(len(ll)-1)] = view.SuiteLine
 		ss := []*model.SubResult{}
 		tr.For(func(sr *model.SubResult) {
 			ss = append(ss, sr)
@@ -65,9 +70,11 @@ func reportGoTestsOnly(p *pkg) []interface{} {
 		})
 		for _, s := range ss {
 			ll = append(ll, "    "+s.Name)
+			mask[uint(len(ll)-1)] = view.TestLine
 		}
 	}
-	return []interface{}{&reporter{flags: view.RpClearing, ll: ll}}
+	return []interface{}{&reporter{
+		flags: view.RpClearing, ll: ll, mask: mask}}
 }
 
 func reportStatus(pp pkgs) *view.Statuser {
