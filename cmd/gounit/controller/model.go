@@ -5,7 +5,9 @@
 package controller
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
@@ -132,12 +134,13 @@ const (
 
 // reporter implements view.Reporter.
 type reporter struct {
-	flags  view.RprtMask
-	ll     []string
-	mask   map[uint]view.LineMask
-	lst    func(int)
-	typ    reportType
-	folded *reporter
+	flags      view.RprtMask
+	ll         []string
+	mask       map[uint]view.LineMask
+	suitesInfo map[uint]suiteInfo
+	lst        func(int)
+	typ        reportType
+	folded     *reporter
 }
 
 // Clearing indicates if all lines not set by this reporter's For
@@ -180,6 +183,12 @@ func (r *reporter) Folded() *reporter {
 			}
 			if r.LineMask(ux)&view.SuiteTestLine > 0 {
 				continue
+			}
+			if r.LineMask(ux)&view.SuiteLine > 0 {
+				info := r.suitesInfo[ux]
+				content = fmt.Sprintf("%s%s%d/%d %s",
+					content, lines.LineFiller, info.ttN, info.ffN,
+					info.dr.Round(1*time.Millisecond))
 			}
 			_r.ll = append(_r.ll, content)
 			_r.mask[uint(len(_r.ll)-1)] = r.mask[ux]

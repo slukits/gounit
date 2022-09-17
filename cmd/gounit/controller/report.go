@@ -32,6 +32,11 @@ func reportTestingPackage(p *pkg) []interface{} {
 	return nil
 }
 
+type suiteInfo struct {
+	ttN, ffN int
+	dr       time.Duration
+}
+
 func reportGoTestsOnly(p *pkg) []interface{} {
 	var singles, withSubs []*model.Test
 	n, ll, mask := 0, []string{}, map[uint]view.LineMask{}
@@ -57,10 +62,14 @@ func reportGoTestsOnly(p *pkg) []interface{} {
 	sort.Slice(withSubs, func(i, j int) bool {
 		return withSubs[i].Name() < withSubs[j].Name()
 	})
+	subInfo := map[uint]suiteInfo{}
 	for _, t := range withSubs {
 		tr := p.OfTest(t)
 		ll = append(ll, "", t.Name())
 		mask[uint(len(ll)-1)] = view.SuiteLine
+		subInfo[uint(len(ll)-1)] = suiteInfo{
+			ttN: tr.Len(), ffN: tr.LenFailed(),
+			dr: time.Duration(tr.End.Sub(tr.Start))}
 		ss := []*model.SubResult{}
 		tr.For(func(sr *model.SubResult) {
 			ss = append(ss, sr)
@@ -74,7 +83,11 @@ func reportGoTestsOnly(p *pkg) []interface{} {
 		}
 	}
 	return []interface{}{&reporter{
-		flags: view.RpClearing, ll: ll, mask: mask}}
+		flags:      view.RpClearing,
+		ll:         ll,
+		mask:       mask,
+		suitesInfo: subInfo,
+	}}
 }
 
 func reportStatus(pp pkgs) *view.Statuser {
@@ -93,7 +106,7 @@ func reportStatus(pp pkgs) *view.Statuser {
 			ffLen += p.Results.OfTest(t).LenFailed()
 		})
 		p.tp.ForSuite(func(ts *model.TestSuite) {
-			rr := p.Results.OfSuite(ts)
+			rr := p.OfSuite(ts)
 			ttLen += rr.Len()
 			ffLen += rr.LenFailed()
 		})

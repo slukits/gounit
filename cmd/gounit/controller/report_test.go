@@ -72,35 +72,3 @@ func TestReport(t *testing.T) {
 	t.Parallel()
 	Run(&Report{}, t)
 }
-
-type dbg struct {
-	Suite
-	Fixtures
-}
-
-func (s *dbg) fxSource(t *T, dir string) (*lines.Events, *Testing) {
-	return fxSourceDBG(t, s, dir)
-}
-
-func (s *dbg) Dbg(t *T) {
-	_, tt := s.fxSource(t, "go/pass")
-
-	t.StarMatched(
-		tt.afterWatch(awReporting).String(),
-		fxExp["go/pass"]...,
-	)
-
-	tt.FireRune('j')           // focus second
-	tt.FireRune('j')           // focusable line (TestPass_4)
-	tt.FireKey(tcell.KeyEnter) // and select it
-
-	t.StarMatched(
-		tt.Reporting().String(),
-		fxExp["go/pass: folded"]...,
-	)
-
-	str := tt.Reporting().String()
-	t.Log(str)
-}
-
-func TestDBG(t *testing.T) { Run(&dbg{}, t) }
