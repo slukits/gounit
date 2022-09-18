@@ -5,25 +5,49 @@
 package controller
 
 import (
-	"fmt"
-	"sort"
 	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
+	"github.com/slukits/lines"
 )
 
-type runResult struct {
-	err error
-	*model.Results
+// report is the simplest implementation of view.Reporter.
+type report struct {
+	flags view.RprtMask
+	ll    []string
+	mask  map[uint]view.LineMask
+	lst   func(int)
 }
 
-type pkg struct {
-	*runResult
-	tp *model.TestingPackage
+// Clearing indicates if all lines not set by this reporter's For
+// function should be cleared or not.
+func (r *report) Flags() view.RprtMask { return r.flags }
+
+// For expects the view's reporting component and a callback to which
+// the updated lines can be provided to.
+func (r *report) For(_ lines.Componenter, line func(uint, string)) {
+	for idx, content := range r.ll {
+		line(uint(idx), content)
+	}
 }
 
-type pkgs map[string]*pkg
+// Mask returns for given index special formatting directives.
+func (r *report) LineMask(idx uint) view.LineMask {
+	if r.mask == nil {
+		return view.ZeroLineMod
+	}
+	return r.mask[idx]
+}
+
+// Listener returns the callback which is informed about user selections
+// of lines by providing the index of the selected line.
+func (r *report) Listener() func(int) { return r.lst }
+
+// setListener is part of the reporter-implementation.
+func (r *report) setListener(l func(int)) {
+	r.lst = l
+}
 
 func reportTestingPackage(p *pkg) []interface{} {
 	if p.tp.LenSuites() == 0 {
@@ -35,59 +59,6 @@ func reportTestingPackage(p *pkg) []interface{} {
 type suiteInfo struct {
 	ttN, ffN int
 	dr       time.Duration
-}
-
-func reportGoTestsOnly(p *pkg) []interface{} {
-	var singles, withSubs []*model.Test
-	n, ll, mask := 0, []string{}, map[uint]view.LineMask{}
-	p.tp.ForTest(func(t *model.Test) {
-		if p.OfTest(t).Len() == 1 {
-			singles = append(singles, t)
-			n++
-			return
-		}
-		n += p.OfTest(t).Len()
-		withSubs = append(withSubs, t)
-	})
-	ll = append(ll, fmt.Sprintf("%s: %d/0 %v", p.tp.ID(), n,
-		p.Duration.Round(1*time.Millisecond)), "")
-	mask[0] = view.PackageLine
-	sort.Slice(singles, func(i, j int) bool {
-		return singles[i].Name() < singles[j].Name()
-	})
-	for _, t := range singles {
-		ll = append(ll, t.Name())
-		mask[uint(len(ll)-1)] = view.TestLine
-	}
-	sort.Slice(withSubs, func(i, j int) bool {
-		return withSubs[i].Name() < withSubs[j].Name()
-	})
-	subInfo := map[uint]suiteInfo{}
-	for _, t := range withSubs {
-		tr := p.OfTest(t)
-		ll = append(ll, "", t.Name())
-		mask[uint(len(ll)-1)] = view.SuiteLine
-		subInfo[uint(len(ll)-1)] = suiteInfo{
-			ttN: tr.Len(), ffN: tr.LenFailed(),
-			dr: time.Duration(tr.End.Sub(tr.Start))}
-		ss := []*model.SubResult{}
-		tr.For(func(sr *model.SubResult) {
-			ss = append(ss, sr)
-		})
-		sort.Slice(ss, func(i, j int) bool {
-			return ss[i].Name < ss[j].Name
-		})
-		for _, s := range ss {
-			ll = append(ll, "    "+s.Name)
-			mask[uint(len(ll)-1)] = view.SuiteTestLine
-		}
-	}
-	return []interface{}{&reporter{
-		flags:      view.RpClearing,
-		ll:         ll,
-		mask:       mask,
-		suitesInfo: subInfo,
-	}}
 }
 
 func reportStatus(pp pkgs) *view.Statuser {

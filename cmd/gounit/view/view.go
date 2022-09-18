@@ -94,8 +94,18 @@ const (
 	// go-test-line is not selectable.
 	TestLine
 
-	// SuiteLine classifies a reported line as suite-line.  Note only
-	// package or suite lines are selectable.
+	// GoTestsLine classifies a reported line as the go-tests headline
+	// in a package report having go tests and test-suites.  Note only
+	// package, go-tests, go-suite or suite lines are selectable.
+	GoTestsLine
+
+	// GoSuiteLine classifies a reported line as go test with sub-tests.
+	// Note only package, go-tests, go-suite or suite lines are
+	// selectable.
+	GoSuiteLine
+
+	// GoSuiteLine classifies a reported line as test-suite.  Note only
+	// package, go-tests, go-suite or suite lines are selectable.
 	SuiteLine
 
 	// SuiteTestLine classifies a reported line as suit-test-line.  Note

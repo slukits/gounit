@@ -121,7 +121,7 @@ func ensureInitArgs(i *InitFactories) {
 		view: &viewUpdater{Mutex: &sync.Mutex{}},
 		model: &modelState{
 			Mutex: &sync.Mutex{},
-			lastReport: []interface{}{&reporter{
+			lastReport: []interface{}{&report{
 				ll: []string{initReport}, flags: view.RpClearing}},
 			pp: pkgs{},
 		},

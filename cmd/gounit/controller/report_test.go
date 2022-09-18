@@ -62,15 +62,21 @@ func (s *Report) Folds_tests_if_selecting_suite_with_shown_tests(t *T) {
 		tt.Reporting().String(),
 		fxExp["go/pass: folded"]...,
 	)
-
-	str := tt.Reporting().String()
-	t.Log(str)
-
+	t.Not.StarMatched(
+		tt.Reporting().String(),
+		fxNotExp["go/pass: folded"]...,
+	)
 }
 
-func (s *Report) Go_tests_and_suites_are_initially_folded(t *T) {
-
-}
+// func (s *Report) Go_tests_and_suites_are_initially_folded(t *T) {
+// 	_, tt := s.fxSource(t, "mixed/pass")
+//
+// 	t.StarMatched(
+// 		tt.afterWatch(awReporting).String(),
+// 		fxExp["mixed/pass"]...,
+// 	)
+//
+// }
 
 func TestReport(t *testing.T) {
 	t.Parallel()

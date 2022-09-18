@@ -48,7 +48,7 @@ func (i *viewIniter) Message(msg func(string)) string {
 
 func (i *viewIniter) Reporting(upd func(view.Reporter)) view.Reporter {
 	i.controller.view.rprUpd = upd
-	return &reporter{ll: []string{initReport}}
+	return &report{ll: []string{initReport}}
 }
 
 func (i *viewIniter) Status(upd func(view.Statuser)) {

@@ -68,7 +68,7 @@ func (s *Reporting) Component_s_test_lines_are_not_selectable(t *T) {
 		mm: map[uint]LineMask{
 			0: PackageLine,
 			1: TestLine, 2: TestLine,
-			3: SuiteLine,
+			3: GoSuiteLine,
 		},
 	})
 

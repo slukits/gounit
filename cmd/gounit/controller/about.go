@@ -12,7 +12,7 @@ import (
 
 func viewAbout(updVW func(...interface{})) {
 	a := strings.Split(strings.TrimSpace(about), "\n")
-	updVW(&reporter{
+	updVW(&report{
 		flags: view.RpClearing,
 		ll:    a,
 	})

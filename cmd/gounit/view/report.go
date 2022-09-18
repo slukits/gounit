@@ -102,7 +102,7 @@ func (m *report) OnUpdate(e *lines.Env) {
 func (m *report) wrt(l Reporter, idx uint, e *lines.Env) io.Writer {
 	lm := l.LineMask(idx)
 	var lf lines.LineFlags
-	if lm&(PackageLine|SuiteLine) == 0 {
+	if lm&(PackageLine|GoSuiteLine|SuiteLine) == 0 {
 		lf = lines.NotFocusable
 	}
 	if lm&Failed > 0 {
