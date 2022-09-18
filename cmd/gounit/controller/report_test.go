@@ -68,6 +68,10 @@ func (s *Report) Folds_tests_if_selecting_suite_with_shown_tests(t *T) {
 
 }
 
+func (s *Report) Go_tests_and_suites_are_initially_folded(t *T) {
+
+}
+
 func TestReport(t *testing.T) {
 	t.Parallel()
 	Run(&Report{}, t)

@@ -104,7 +104,7 @@ func (s *AView) Resets_message_bar_to_default_if_zero_update(t *T) {
 	exp := "updated message"
 
 	fx.updateMessage(exp)
-	t.False(strings.Contains(tt.Screen().String(), fxMsg))
+	t.Not.Contains(tt.Screen().String(), fxMsg)
 
 	fx.updateMessage("")
 	t.Contains(tt.Screen().String(), fxMsg)
@@ -257,7 +257,7 @@ func (s *AView) Removes_button_rune_on_zero_rune_update(t *T) {
 		updBB: map[string]ButtonDef{fxBtt1: {Label: fxBtt1, Rune: 0}}})
 	tt.FireRune(fxRnBtt1)
 
-	t.False(fx.bttOneReported)
+	t.Not.True(fx.bttOneReported)
 }
 
 func (s *AView) Updates_button_rune(t *T) {
@@ -270,7 +270,7 @@ func (s *AView) Updates_button_rune(t *T) {
 	fx.updButton(&buttonerFX{
 		updBB: map[string]ButtonDef{fxBtt1: {Label: fxBtt1Upd, Rune: 'x'}}})
 
-	t.False(fx.bttOneReported)
+	t.Not.True(fx.bttOneReported)
 	tt.FireRune('x')
 	t.True(fx.bttOneReported)
 	t.Contains(tt.Screen().String(), fxBtt1Upd)
@@ -321,8 +321,8 @@ func (s *AView) Clears_unused_main_lines(t *T) {
 
 	scr := tt.Screen().String()
 	t.SpaceMatched(scr, strings.Split(exp, "\n")...)
-	t.False(strings.Contains(scr, "first line"))
-	t.False(strings.Contains(scr, "fifth"))
+	t.Not.True(strings.Contains(scr, "first line"))
+	t.Not.True(strings.Contains(scr, "fifth"))
 }
 
 func (s *AView) Reports_click_in_reporting_component(t *T) {

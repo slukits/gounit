@@ -57,16 +57,23 @@ type T struct {
 	errorer  func(...interface{})
 	canceler func()
 	fs       *tfs.FS
+
+	// Not fails if its assertion passes.
+	Not not
 }
+
+type not struct{ t *T }
 
 // NewT wraps given go testing.T instance into a gounit.T instance.
 func NewT(t *testing.T) *T {
-	return &T{
+	_t := &T{
 		t:        t,
 		logger:   t.Log,
 		errorer:  t.Error,
 		canceler: t.FailNow,
 	}
+	_t.Not = not{t: _t}
+	return _t
 }
 
 // Mock provides the options to mock test logging, error handling and

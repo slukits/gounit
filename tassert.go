@@ -29,15 +29,19 @@ func (t *T) True(value bool) bool {
 	return true
 }
 
-// falseErr default message for failed 'false'-assertion.
-const falseErr = "expected given value to be false"
+// notTrueErr default message for failed 'false'-assertion.
+const notTrueErr = "expected given value be not true"
 
-// False errors the test and returns false iff given value is not false;
-// otherwise true is returned.
-func (t *T) False(value bool) bool {
-	t.t.Helper()
-	if value {
-		t.Errorf(assertErr, "false", falseErr)
+// True passes if called true assertion with given argument fails;
+// otherwise it errors.
+func (n *not) True(value bool) bool {
+	n.t.t.Helper()
+	err := n.t.errorer
+	n.t.errorer = func(i ...interface{}) {}
+	passed := n.t.True(value)
+	n.t.errorer = err
+	if passed {
+		n.t.Errorf(assertErr, "not-true", notTrueErr)
 		return false
 	}
 	return true
@@ -100,43 +104,19 @@ func (t *T) diff(a, b interface{}) string {
 	return diff
 }
 
-// Neq errors and returns false if given values considered equal see [T.Eq];
-// otherwise true is returned.
-func (t *T) Neq(a, b interface{}, msg ...interface{}) bool {
-	t.t.Helper()
-	if fmt.Sprintf("%T", a) != fmt.Sprintf("%T", b) {
-		return true
+// Eq passes if called equals assertion with given arguments fails;
+// otherwise it errors.
+func (n *not) Eq(a, b interface{}) bool {
+	n.t.t.Helper()
+	err := n.t.errorer
+	n.t.errorer = func(i ...interface{}) {}
+	passed := n.t.Eq(a, b)
+	n.t.errorer = err
+	if passed {
+		n.t.Errorf(assertErr, "not-equal", fmt.Sprintf("%p == %p", a, b))
+		return false
 	}
-
-	if reflect.ValueOf(a).Kind() == reflect.Ptr {
-		if a == b {
-			t.Errorf(assertErr, "not-equal", fmt.Sprintf("%p == %p", a, b))
-			return false
-		}
-		return true
-	}
-
-	err := ""
-	switch a := a.(type) {
-	case string:
-		if a == b.(string) {
-			err = "given strings are equal"
-		}
-	case fmt.Stringer:
-		if a.String() == b.(fmt.Stringer).String() {
-			err = "given Stringer return equal strings"
-		}
-	default:
-		if fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b) {
-			err = "given instances have same fmt-string representations"
-		}
-	}
-
-	if err == "" {
-		return true
-	}
-	t.Errorf(assertErr, "not-equal", err)
-	return false
+	return true
 }
 
 // containsErr default message for failed 'Contains'-assertion.
@@ -159,6 +139,25 @@ func (t *T) Contains(str, sub string) bool {
 	return true
 }
 
+// notContainsErr default message for failed Not-'Contains'-assertion.
+const notContainsErr = "%s does contain %s"
+
+// Contains passes if called contains assertion with given arguments fails;
+// otherwise it errors.
+func (n *not) Contains(str, sub string) bool {
+	n.t.t.Helper()
+	err := n.t.errorer
+	n.t.errorer = func(i ...interface{}) {}
+	passed := n.t.Contains(str, sub)
+	n.t.errorer = err
+	if passed {
+		n.t.Errorf(assertErr, "doesn't contain",
+			fmt.Sprintf(notContainsErr, str, sub))
+		return false
+	}
+	return true
+}
+
 // matchedErr default message for failed *'Matched'-assertion.
 const matchedErr = "Regexp '%s'\ndoesn't match '%s'"
 
@@ -170,6 +169,25 @@ func (t *T) Matched(str, regex string) bool {
 	if !re.MatchString(str) {
 		t.Errorf(assertErr, "matched",
 			fmt.Sprintf(matchedErr, re.String(), str))
+		return false
+	}
+	return true
+}
+
+// notMatchedErr default message for failed *'Matched'-assertion.
+const notMatchedErr = "Regexp '%s'\n matches '%s'"
+
+// Matched passes if called match assertion with given arguments fails;
+// otherwise it errors.
+func (n *not) Matched(str string, regex string) bool {
+	n.t.t.Helper()
+	err := n.t.errorer
+	n.t.errorer = func(i ...interface{}) {}
+	passed := n.t.Matched(str, regex)
+	n.t.errorer = err
+	if passed {
+		n.t.Errorf(assertErr, "don't-match",
+			fmt.Sprintf(matchedErr, regex, str))
 		return false
 	}
 	return true
@@ -197,6 +215,23 @@ func (t *T) SpaceMatched(str string, ss ...string) bool {
 	return true
 }
 
+// SpaceMatch passes if called space match assertion with given
+// arguments fails; otherwise it errors.
+func (n *not) SpaceMatched(str string, ss ...string) bool {
+	n.t.t.Helper()
+	err := n.t.errorer
+	n.t.errorer = func(i ...interface{}) {}
+	passed := n.t.SpaceMatched(str, ss...)
+	n.t.errorer = err
+	if passed {
+		spaceRe := reGen(`\s*`, "", ss...)
+		n.t.Errorf(assertErr, "not: space-match",
+			fmt.Sprintf(notMatchedErr, spaceRe.String(), str))
+		return false
+	}
+	return true
+}
+
 // StarMatched escapes given variadic-strings before it joins them with
 // the `.*?`-separator and matches the result against given string str:
 //
@@ -213,6 +248,23 @@ func (t *T) StarMatched(str string, ss ...string) bool {
 	if !startRe.MatchString(str) {
 		t.Errorf(assertErr, "star-match", fmt.Sprintf(
 			matchedErr, startRe.String(), str))
+		return false
+	}
+	return true
+}
+
+// StarMatched passes if called star match assertion with given
+// arguments fails; otherwise it errors.
+func (n *not) StarMatched(str string, ss ...string) bool {
+	n.t.t.Helper()
+	err := n.t.errorer
+	n.t.errorer = func(i ...interface{}) {}
+	passed := n.t.StarMatched(str, ss...)
+	n.t.errorer = err
+	if passed {
+		startRe := reGen(`.*?`, `(?s)`, ss...)
+		n.t.Errorf(assertErr, "not: star-match", fmt.Sprintf(
+			notMatchedErr, startRe.String(), str))
 		return false
 	}
 	return true

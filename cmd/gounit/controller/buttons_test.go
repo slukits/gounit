@@ -51,7 +51,7 @@ func (s *Buttons) Switches_vet_button(t *T) {
 
 	tt.ClickButton(label)
 	label, vw2 := tt.dfltButtonLabel("vet")
-	t.FatalIfNot(t.Neq(vw, vw2))
+	t.FatalIfNot(t.Not.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
 
 	tt.ClickButton(label)
@@ -68,7 +68,7 @@ func (s *Buttons) Switches_race_arg(t *T) {
 
 	tt.ClickButton(label)
 	label, vw2 := tt.dfltButtonLabel("race")
-	t.FatalIfNot(t.Neq(vw, vw2))
+	t.FatalIfNot(t.Not.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
 
 	tt.ClickButton(label)
@@ -85,7 +85,7 @@ func (s *Buttons) Switches_stats_arg(t *T) {
 
 	tt.ClickButton(label)
 	label, vw2 := tt.dfltButtonLabel("race")
-	t.FatalIfNot(t.Neq(vw, vw2))
+	t.FatalIfNot(t.Not.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
 
 	tt.ClickButton(label)

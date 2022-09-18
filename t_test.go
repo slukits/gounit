@@ -55,7 +55,7 @@ func (s *T_Instance) Error() func(...interface{}) {
 }
 
 func (s *T_Instance) Uses_suite_s_errorer(t *T) {
-	t.False(s.suiteErrorerUsed)
+	t.Not.True(s.suiteErrorerUsed)
 	t.Errorf("err")
 	t.True(s.suiteErrorerUsed)
 }
@@ -98,20 +98,10 @@ func TestTrueAssertion(t *testing.T) {
 
 type AssertionTests struct{ Suite }
 
-func (s *AssertionTests) For_falsehood(t *T) {
-	suite := &fx.TestAssertion{
-		True:  func(t *T) bool { return t.False(false) },
-		False: func(t *T) bool { return t.False(true) },
-		Fails: func(t *T) string {
-			t.False(true)
-			return FalseErr
-		},
-	}
-	if !t.GoT().Run("AssertFalsehood", func(_t *testing.T) {
-		Run(suite, _t)
-	}) {
-		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
-	}
+func (s *AssertionTests) For_negated_true_assertion(t *T) {
+	t.True(t.Not.True(false))
+	t.Mock().Errorer(func(i ...interface{}) {})
+	t.Not.True(t.Not.True(true))
 }
 
 func (s *AssertionTests) For_equality(t *T) {
@@ -164,46 +154,20 @@ func (s *AssertionTests) For_equality_of_struct_fmt_strings(t *T) {
 	}
 }
 
-func (s *AssertionTests) For_nequality_of_pointers(t *T) {
-	suite := &fx.PointerNoneEqualityFX{}
-	Run(suite, t.GoT())
-	if suite.Logs != "" {
-		t.Error(suite.Logs)
-	}
-}
+func (s *AssertionTests) For_inequality(t *T) {
+	t.True(t.Not.Eq(&T{}, &T{}))
+	t.True(t.Not.Eq(42, 22))
+	t.True(t.Not.Eq(42, "42"))
+	t.True(t.Not.Eq(struct{ n int }{n: 42}, struct{ n int }{n: 22}))
+	t.True(t.Not.Eq(fx.TestStringer{Str: "22"}, fx.TestStringer{Str: "42"}))
 
-func (s *AssertionTests) For_nequality_of_strings(t *T) {
-	suite := &fx.StringsNoneEqualityFX{}
-	Run(suite, t.GoT())
-	if suite.Logs != "" {
-		t.Error(suite.Logs)
-	}
-}
-
-func (s *AssertionTests) For_nequality_of_stringers(t *T) {
-	suite := &fx.StringerNoneEqualityFX{}
-	Run(suite, t.GoT())
-	if suite.Logs != "" {
-		t.Error(suite.Logs)
-	}
-}
-
-func (s *AssertionTests) For_nequality_of_structs(t *T) {
-	suite := &fx.TestAssertion{
-		True: func(t *T) bool {
-			return t.Neq(42, 22) && t.Neq("a", 42)
-		},
-		False: func(t *T) bool { return t.Neq(42, 42) },
-		Fails: func(t *T) string {
-			t.Neq(struct{ A int }{42}, struct{ A int }{42})
-			return "given instances have same fmt-string representations"
-		},
-	}
-	if !t.GoT().Run("AssertInequality", func(_t *testing.T) {
-		Run(suite, _t)
-	}) {
-		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
-	}
+	t.Mock().Errorer(func(i ...interface{}) {})
+	t.Not.True(t.Not.Eq(t, t))
+	t.Not.True(t.Not.Eq(42, 42))
+	t.Not.True(t.Not.Eq("42", "42"))
+	t.Not.True(t.Not.Eq(struct{ n int }{n: 42}, struct{ n int }{n: 42}))
+	t.Not.True(t.Not.Eq(
+		fx.TestStringer{Str: "42"}, fx.TestStringer{Str: "42"}))
 }
 
 func (s *AssertionTests) For_containing(t *T) {
@@ -223,6 +187,12 @@ func (s *AssertionTests) For_containing(t *T) {
 	}
 }
 
+func (s *AssertionTests) For_not_containing(t *T) {
+	t.True(t.Not.Contains("22", "4"))
+	t.Mock().Errorer(func(i ...interface{}) {})
+	t.Not.True(t.Not.Contains("22", "2"))
+}
+
 func (s *AssertionTests) For_matched(t *T) {
 	expErr := fmt.Sprintf(MatchedErr, "b", "a")
 	suite := &fx.TestAssertion{
@@ -238,6 +208,12 @@ func (s *AssertionTests) For_matched(t *T) {
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
+}
+
+func (s *AssertionTests) For_not_matching(t *T) {
+	t.True(t.Not.Matched("22", "4"))
+	t.Mock().Errorer(func(i ...interface{}) {})
+	t.Not.True(t.Not.Matched("22", "2"))
 }
 
 func (s *AssertionTests) For_space_matched(t *T) {
@@ -261,6 +237,12 @@ func (s *AssertionTests) For_space_matched(t *T) {
 	}
 }
 
+func (s *AssertionTests) For_not_space_matched(t *T) {
+	t.True(t.Not.SpaceMatched("22", "4", "2"))
+	t.Mock().Errorer(func(i ...interface{}) {})
+	t.Not.True(t.Not.SpaceMatched("22", "2", "2"))
+}
+
 func (s *AssertionTests) For_star_matched(t *T) {
 	expErr := fmt.Sprintf(MatchedErr, "(?s)b", "a")
 	suite := &fx.TestAssertion{
@@ -280,6 +262,12 @@ func (s *AssertionTests) For_star_matched(t *T) {
 	}) {
 		t.GoT().Fatalf("assertion suite failed: %s", suite.Msg)
 	}
+}
+
+func (s *AssertionTests) For_negated_star_match(t *T) {
+	t.True(t.Not.StarMatched("22", "4", "2"))
+	t.Mock().Errorer(func(i ...interface{}) {})
+	t.Not.True(t.Not.StarMatched("42", "4", "2"))
 }
 
 func (s *AssertionTests) For_error(t *T) {

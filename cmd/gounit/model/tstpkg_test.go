@@ -193,7 +193,7 @@ func (s *PkgTestRun) Reports_failing_and_passing_of_tests(t *T) {
 	s.pkg.ForTest(func(tst *Test) {
 		switch tst.Name() {
 		case fxTestA:
-			t.False(s.rslt.OfTest(tst).Passed)
+			t.Not.True(s.rslt.OfTest(tst).Passed)
 		case fxTestB:
 			t.True(s.rslt.OfTest(tst).Passed)
 		}
@@ -207,7 +207,7 @@ func (s *PkgTestRun) Reports_failing_and_passing_of_suite_tests(
 		sr := s.rslt.OfSuite(ts)
 		ts.ForTest(func(tst *Test) {
 			if ts.Name() == fxSuiteB && tst.Name() == fxStBTest1 {
-				t.False(sr.OfTest(tst).Passed)
+				t.Not.True(sr.OfTest(tst).Passed)
 				return
 			}
 			t.True(sr.OfTest(tst).Passed)

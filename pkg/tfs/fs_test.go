@@ -453,7 +453,7 @@ func (s *WorkingDirectory) TearDown(t *T) {
 
 func (s *WorkingDirectory) Can_be_changed_to_a_directory(t *T) {
 	td := t.FS().Tmp()
-	t.Neq(getWD(t), td.Path())
+	t.Not.Eq(getWD(t), td.Path())
 
 	undo := td.CWD()
 	defer undo()
@@ -463,7 +463,7 @@ func (s *WorkingDirectory) Can_be_changed_to_a_directory(t *T) {
 
 func (s *WorkingDirectory) Change_can_be_undone(t *T) {
 	td, origin := t.FS().Tmp(), getWD(t)
-	t.Neq(origin, td.Path())
+	t.Not.Eq(origin, td.Path())
 
 	undo := td.CWD()
 	t.Eq(getWD(t), td.Path())
@@ -497,7 +497,7 @@ func (s *WorkingDirectory) Change_panics_if_undoing_dir_change_fails(
 ) {
 	fx := tfs.NewFX(t)
 	td, origin := fx.Tmp(), getWD(t)
-	t.Neq(origin, td.Path())
+	t.Not.Eq(origin, td.Path())
 	undo := td.CWD()
 	t.Eq(getWD(t), td.Path())
 	fx.Mock().Chdir(func(s string) error { return ErrMock })
@@ -511,9 +511,9 @@ type ADirDiff struct{ Suite }
 
 func (s *ADirDiff) Fails_if_given_directories_have_different_bases(t *T) {
 	d1, d2 := t.FS().Tmp(), t.FS().Tmp()
-	t.FatalIfNot(t.False(fp.Base(d1.Path()) == fp.Base(d2.Path())))
+	t.FatalIfNot(t.Not.True(fp.Base(d1.Path()) == fp.Base(d2.Path())))
 
-	t.False(d1.Eq(d2))
+	t.Not.True(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fails_if_dirs_have_not_the_same_amounts_of_files(
@@ -523,7 +523,7 @@ func (s *ADirDiff) Fails_if_dirs_have_not_the_same_amounts_of_files(
 	d2, _ := t.FS().Tmp().Mk("base")
 	d1.MkFile("not_in.txt", []byte("compassion"))
 
-	t.False(d1.Eq(d2))
+	t.Not.True(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fails_if_directories_have_not_the_same_files(t *T) {
@@ -532,7 +532,7 @@ func (s *ADirDiff) Fails_if_directories_have_not_the_same_files(t *T) {
 	d1.MkFile("not_in.txt1", []byte("compassion"))
 	d2.MkFile("not_in.txt2", []byte("compassion"))
 
-	t.False(d1.Eq(d2))
+	t.Not.True(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fails_having_common_files_with_different_mode(t *T) {
@@ -542,7 +542,7 @@ func (s *ADirDiff) Fails_having_common_files_with_different_mode(t *T) {
 	d2.MkFile("file.txt", []byte("compassion"))
 	t.FatalOn(os.Chmod(fp.Join(d1.Path(), "file.txt"), 0622))
 
-	t.False(d1.Eq(d2))
+	t.Not.True(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fails_having_common_files_with_different_size(t *T) {
@@ -551,7 +551,7 @@ func (s *ADirDiff) Fails_having_common_files_with_different_size(t *T) {
 	d1.MkFile("file.txt", []byte("compassion"))
 	d2.MkFile("file.txt", []byte("wisdom"))
 
-	t.False(d1.Eq(d2))
+	t.Not.True(d1.Eq(d2))
 }
 
 func (s *ADirDiff) Fatales_if_nested_dir_cant_be_red(t *T) {

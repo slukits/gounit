@@ -146,94 +146,25 @@ type TestStringerEquality struct {
 	FX
 }
 
-type testStringer struct{ vl func() string }
+type TestStringer struct{ Str string }
 
-func (ts testStringer) String() string { return ts.vl() }
+func (ts TestStringer) String() string { return ts.Str }
 
 func (s *TestStringerEquality) Test_stringer_equality(t *gounit.T) {
 	if s.Logs != "" {
 		return
 	}
-	vl := func() string { return "42" }
-	t.Eq(testStringer{vl: vl}, testStringer{vl: vl})
+	t.Eq(TestStringer{Str: "42"}, TestStringer{Str: "42"})
 }
 
 func (s *TestStringerEquality) Test_stringer_inequality(t *gounit.T) {
 	if s.Logs != "" {
 		return
 	}
-	vl1, vl2 := func() string { return "22" }, func() string { return "42" }
-	t.Eq(testStringer{vl: vl1}, testStringer{vl: vl2})
+	t.Eq(TestStringer{Str: "22"}, TestStringer{Str: "42"})
 	if ok := inequalityMatcher.MatchString(s.Logs); !ok {
 		s.Logs = "assert equal: stringer: inequality: " +
 			fmt.Sprintf("didn't get expected error: %s", s.Logs)
-		return
-	}
-	s.Logs = ""
-}
-
-type PointerNoneEqualityFX struct{ FX }
-
-func (s *PointerNoneEqualityFX) Test_not_equal_pointers(t *gounit.T) {
-	if s.Logs != "" {
-		return
-	}
-	t.Neq(&T{}, &T{})
-}
-
-func (s *PointerNoneEqualityFX) Test_not_not_equal_pointers(t *gounit.T) {
-	if s.Logs != "" {
-		return
-	}
-	p := &T{}
-	t.Neq(p, p)
-	if !strings.HasPrefix(s.Logs, "assert not-equal:") {
-		s.Logs = "not-equal pointer: equality: didn't get expected error"
-		return
-	}
-	s.Logs = ""
-}
-
-type StringsNoneEqualityFX struct{ FX }
-
-func (s *StringsNoneEqualityFX) Test_not_equal_strings(t *gounit.T) {
-	if s.Logs != "" {
-		return
-	}
-	t.Neq("22", "42")
-}
-
-func (s *StringsNoneEqualityFX) Test_not_not_equal_strings(t *gounit.T) {
-	if s.Logs != "" {
-		return
-	}
-	t.Neq("22", "22")
-	if !strings.HasPrefix(s.Logs, "assert not-equal:") {
-		s.Logs = "not-equal pointer: equality: didn't get expected error"
-		return
-	}
-	s.Logs = ""
-}
-
-type StringerNoneEqualityFX struct{ FX }
-
-func (s *StringerNoneEqualityFX) Test_not_equal_strings(t *gounit.T) {
-	if s.Logs != "" {
-		return
-	}
-	str1 := testStringer{func() string { return "22" }}
-	str2 := testStringer{func() string { return "42" }}
-	t.Neq(str1, str2)
-}
-
-func (s *StringerNoneEqualityFX) Test_not_not_equal_strings(t *gounit.T) {
-	if s.Logs != "" {
-		return
-	}
-	str := testStringer{func() string { return "22" }}
-	t.Neq(str, str)
-	if !strings.HasPrefix(s.Logs, "assert not-equal:") {
-		s.Logs = "not-equal pointer: equality: didn't get expected error"
 		return
 	}
 	s.Logs = ""

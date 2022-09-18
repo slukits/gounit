@@ -41,7 +41,7 @@ func (s *source) Fails_initial_watcher_registration_if_no_module(t *T) {
 
 func (s *source) Is_not_watched_if_no_initial_watcher(t *T) {
 	fx := NewFX(t)
-	t.False(fx.IsWatched())
+	t.Not.True(fx.IsWatched())
 }
 
 func (s *source) Is_watched_having_registered_initial_watcher(t *T) {
@@ -148,7 +148,7 @@ func (s *source) Reserves_zero_quitting_for_quit_all(t *T) {
 	t.True(fx.IsWatched())
 
 	fx.QuitAll()
-	t.False(fx.IsWatched())
+	t.Not.True(fx.IsWatched())
 }
 
 func (s *source) Reports_initially_all_testing_packages(t *T) {

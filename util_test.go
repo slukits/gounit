@@ -36,7 +36,7 @@ func (s *timeStepper) Sets_step(t *T) {
 
 func (s *timeStepper) Step_adding_returns_false_if_no_more_steps(t *T) {
 	ts := (&TimeStepper{}).SetDuration(1 * time.Millisecond)
-	t.False(ts.AddStep())
+	t.Not.True(ts.AddStep())
 }
 
 func TestTimeStepper(t *testing.T) {

@@ -26,7 +26,7 @@ const PanicsErr = panicsErr
 const WithinErr = withinErr
 
 // FalseErr default message for failed 'false'-assertion.
-const FalseErr = falseErr
+const FalseErr = notTrueErr
 
 // TrueErr default message for failed 'true'-assertion.
 const TrueErr = trueErr
