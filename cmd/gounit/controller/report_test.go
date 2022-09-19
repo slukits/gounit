@@ -68,6 +68,39 @@ func (s *Report) Folds_tests_if_selecting_suite_with_shown_tests(t *T) {
 	)
 }
 
+type dbg struct {
+	Suite
+	Fixtures
+}
+
+func (s *dbg) fxSource(t *T, dir string) (*lines.Events, *Testing) {
+	return fxSourceDBG(t, s, dir)
+}
+
+func (s *dbg) Dbg(t *T) {
+	_, tt := s.fxSource(t, "go/pass")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["go/pass"]...,
+	)
+
+	tt.FireRune('j')           // focus second
+	tt.FireRune('j')           // focusable line (TestPass_4)
+	tt.FireKey(tcell.KeyEnter) // and select it
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["go/pass: folded"]...,
+	)
+	t.Not.StarMatched(
+		tt.Reporting().String(),
+		fxNotExp["go/pass: folded"]...,
+	)
+}
+
+func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+
 // func (s *Report) Go_tests_and_suites_are_initially_folded(t *T) {
 // 	_, tt := s.fxSource(t, "mixed/pass")
 //

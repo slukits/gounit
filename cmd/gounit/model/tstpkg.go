@@ -52,7 +52,12 @@ func (tp TestingPackage) Rel() string { return filepath.Dir(tp.id) }
 func (tp TestingPackage) ID() string { return tp.id }
 
 // LenTests returns the number of go tests of a testing package.
-func (tp *TestingPackage) LenTests() int { return len(tp.tests) }
+func (tp *TestingPackage) LenTests() int {
+	if err := tp.ensureParsing(); err != nil {
+		return 0
+	}
+	return len(tp.tests)
+}
 
 // ForTest provides given testing package's tests.  ForTest fails in
 // case of an parse error.
@@ -67,7 +72,12 @@ func (tp *TestingPackage) ForTest(cb func(*Test)) error {
 }
 
 // LenSuites returns the number of suites of a testing package.
-func (tp *TestingPackage) LenSuites() int { return len(tp.suites) }
+func (tp *TestingPackage) LenSuites() int {
+	if err := tp.ensureParsing(); err != nil {
+		return 0
+	}
+	return len(tp.suites)
+}
 
 // ForSuite provides given testing package's suites.  ForSuite fails in
 // case of an parse error.

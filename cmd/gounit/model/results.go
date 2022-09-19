@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -64,6 +65,16 @@ func (r *Results) OfTest(t *Test) *TestResult { return r.rr[t.Name()] }
 // tests.
 func (r *Results) OfSuite(ts *TestSuite) *TestResult {
 	return r.rr[ts.Runner()]
+}
+
+func (r *Results) Passed() bool {
+	for _, _r := range r.rr {
+		if _r.Passed {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // Len reports the number of tests, i.e. the number of go Test* tests
@@ -123,6 +134,17 @@ func (r *Result) LenFailed() int {
 // occurred to me to nest tests deeper than that the support for this
 // use case is rather rudimentary see [result.Descend].
 func (r *Result) For(cb func(*SubResult)) {
+	for _, s := range r.subs {
+		cb(s)
+	}
+}
+
+// For calls back for each sub test result of a test result.  I.e. in
+// case of a suite runner for each suite test.
+func (r *Result) ForOrdered(cb func(*SubResult)) {
+	sort.Slice(r.subs, func(i, j int) bool {
+		return r.subs[i].Name < r.subs[j].Name
+	})
 	for _, s := range r.subs {
 		cb(s)
 	}

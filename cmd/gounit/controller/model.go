@@ -13,7 +13,7 @@ import (
 
 type modelState struct {
 	*sync.Mutex
-	lastReport  []interface{}
+	current     []interface{}
 	viewUpdater func(...interface{})
 	pp          pkgs
 	latest      string
@@ -43,50 +43,70 @@ type reporter interface {
 	Folded() reporter
 }
 
-func (s *modelState) update(
-	pp pkgs, latest string, lastReport []interface{},
-) {
-	lastReport[0].(reporter).setListener(s.lineListener)
+func (s *modelState) update(pp pkgs, latest string) {
 	s.Lock()
 	defer s.Unlock()
 	s.pp = pp
 	s.latest = latest
-	s.lastReport = lastReport
 }
 
 func (s *modelState) lineListener(idx int) {
-	s.Lock()
-	defer s.Unlock()
-	rpr, ok := s.lastReport[0].(reporter)
-	if !ok {
-		panic("first component of last report must be reporter")
-	}
-	lm := view.ZeroLineMod
-	switch rpr.Type() {
-	case rprGoOnly:
-		lm = rpr.LineMask(uint(idx))
-	case rprGoOnlyFolded:
-		lm = rpr.Folded().LineMask(uint(idx))
-	}
-	switch {
-	case lm&view.PackageLine > 0:
-	case lm&view.GoSuiteLine > 0:
-		if rpr.Type() == rprGoOnly {
-			rpr.setType(rprGoOnlyFolded)
-			s.viewUpdater(append([]interface{}{
-				rpr.Folded()}, s.lastReport[1:]...)...)
-			return
-		}
-		rpr.setType(rprGoOnly)
-		s.viewUpdater(s.lastReport...)
-		return
-	}
+	s.report(s.reportTransition(idx))
 }
 
-func (s *modelState) report() {
+// reportTransition calculates in dependency of the selected line and
+// the current report-type the report-type for the user-request
+// response.
+func (s *modelState) reportTransition(idx int) reportType {
 	s.Lock()
 	defer s.Unlock()
-	s.viewUpdater(s.lastReport...)
+	rpr := s.current[0].(*report)
+	switch {
+	case rpr.LineMask(uint(idx))&view.PackageLine > 0:
+	case rpr.LineMask(uint(idx))&view.GoSuiteLine > 0:
+		switch rpr.Type() {
+		case rprGoOnly:
+			return rprGoOnlyFolded
+		case rprGoOnlyFolded:
+			return rprGoOnly
+		}
+	}
+	return rprDefault
+}
+
+func (s *modelState) report(t reportType) {
+	s.Lock()
+	defer s.Unlock()
+	if t == rprCurrent {
+		s.viewUpdater(s.current...)
+		return
+	}
+	status := reportStatus(s.pp)
+	ll, llMask, p := rprLines{}, linesMask{}, s.pp[s.latest]
+	var rt reportType
+	switch t {
+	case rprDefault:
+		switch p.tp.LenSuites() {
+		case 0:
+			ll, llMask = reportGoTestsOnly(p, ll, llMask)
+			rt = rprGoOnly
+		default:
+		}
+	case rprGoOnly:
+		ll, llMask = reportGoTestsOnly(p, ll, llMask)
+		rt = rprGoOnly
+	case rprGoOnlyFolded:
+		ll, llMask = reportGoTestsOnlyFolded(p, ll, llMask)
+		rt = rprGoOnlyFolded
+	}
+	s.current = []interface{}{&report{
+		typ:     rt,
+		flags:   view.RpClearing,
+		ll:      ll,
+		llMasks: llMask,
+		lst:     s.lineListener,
+	}, status}
+	s.viewUpdater(s.current...)
 }
 
 func watch(
@@ -112,10 +132,8 @@ func watch(
 		if len(pp) == 0 || pp[latest] == nil {
 			return
 		}
-		lastReport := reportTestingPackage(pp[latest])
-		lastReport = append(lastReport, reportStatus(pp))
-		mdl.update(pp, latest, lastReport)
-		mdl.report()
+		mdl.update(pp, latest)
+		mdl.report(rprDefault)
 	}
 }
 
@@ -144,8 +162,13 @@ type pkgs map[string]*pkg
 type reportType int
 
 const (
+	// rprDefault reports the initial view of a model-state
+	rprDefault reportType = iota
+	// rprCurrent re-reports the currently reported report; e.g. the
+	// user "closes" the help screen.
+	rprCurrent
 	// rprGoOnly reports one specific package
-	rprGoOnly reportType = iota
+	rprGoOnly
 	// rprGoOnlyFolded reports one specific package with folded
 	// tests
 	rprGoOnlyFolded

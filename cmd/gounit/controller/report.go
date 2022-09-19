@@ -5,6 +5,7 @@
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
@@ -12,17 +13,28 @@ import (
 	"github.com/slukits/lines"
 )
 
+// linesMask defines optional line-flags.
+type linesMask map[uint]view.LineMask
+
+// lines defines a reports lines content.
+type rprLines []string
+
 // report is the simplest implementation of view.Reporter.
 type report struct {
-	flags view.RprtMask
-	ll    []string
-	mask  map[uint]view.LineMask
-	lst   func(int)
+	typ     reportType
+	flags   view.RprtMask
+	ll      rprLines
+	llMasks linesMask
+	lst     func(int)
 }
 
-// Clearing indicates if all lines not set by this reporter's For
-// function should be cleared or not.
+// Flags control the processing of the report in the view.  E.g. if
+// clearing is set all unused lines after an report update are cleared.
 func (r *report) Flags() view.RprtMask { return r.flags }
+
+// Type returns a report's type to determine a report transition after a
+// user input; e.g. folding/un-folding suite-tests.
+func (r *report) Type() reportType { return r.typ }
 
 // For expects the view's reporting component and a callback to which
 // the updated lines can be provided to.
@@ -34,10 +46,10 @@ func (r *report) For(_ lines.Componenter, line func(uint, string)) {
 
 // Mask returns for given index special formatting directives.
 func (r *report) LineMask(idx uint) view.LineMask {
-	if r.mask == nil {
+	if r.llMasks == nil {
 		return view.ZeroLineMod
 	}
-	return r.mask[idx]
+	return r.llMasks[idx]
 }
 
 // Listener returns the callback which is informed about user selections
@@ -50,10 +62,16 @@ func (r *report) setListener(l func(int)) {
 }
 
 func reportTestingPackage(p *pkg) []interface{} {
+	ll, llMask := rprLines{}, linesMask{}
 	if p.tp.LenSuites() == 0 {
-		return reportGoTestsOnly(p)
+		ll, llMask = reportGoTestsOnly(p, ll, llMask)
+		return []interface{}{&report{
+			flags:   view.RpClearing,
+			ll:      ll,
+			llMasks: llMask,
+		}}
 	}
-	return nil
+	return reportMixedTests(p)
 }
 
 type suiteInfo struct {
@@ -88,4 +106,10 @@ func reportStatus(pp pkgs) *view.Statuser {
 		Tests:    ttLen,
 		Failed:   ffLen,
 	}
+}
+
+func withFoldInfo(content string, tr *model.TestResult) string {
+	return fmt.Sprintf("%s%s%d/%d %s",
+		content, lines.LineFiller, tr.Len(), tr.LenFailed(),
+		time.Duration(tr.End.Sub(tr.Start)).Round(1*time.Millisecond))
 }

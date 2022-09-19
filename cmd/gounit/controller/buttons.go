@@ -17,7 +17,7 @@ const (
 
 type buttons struct {
 	viewUpd  func(...interface{})
-	reporter func()
+	reporter func(reportType)
 	dflt     *buttoner
 	more     *buttoner
 	isOn     onMask
@@ -70,7 +70,7 @@ func (bb *buttons) moreButtons() *buttoner {
 func (bb *buttons) moreListener(label string) {
 	switch label {
 	case "back":
-		bb.reporter()
+		bb.reporter(rprCurrent)
 		bb.viewUpd(bb.defaults())
 	case "help":
 		viewHelp(bb.viewUpd)
