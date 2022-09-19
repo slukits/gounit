@@ -5,7 +5,9 @@
 package controller
 
 import (
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
@@ -51,30 +53,42 @@ func (s *modelState) update(pp pkgs, latest string) {
 }
 
 func (s *modelState) lineListener(idx int) {
-	s.report(s.reportTransition(idx))
+	s._report(s.reportTransition(idx), idx)
 }
 
-// reportTransition calculates in dependency of the selected line and
-// the current report-type the report-type for the user-request
+// reportTransition calculates in dependency of the current report's
+// selected line and type the new report-type for the user-request
 // response.
 func (s *modelState) reportTransition(idx int) reportType {
 	s.Lock()
 	defer s.Unlock()
-	rpr := s.current[0].(*report)
+	lm := s.current[0].(*report).LineMask(uint(idx))
 	switch {
-	case rpr.LineMask(uint(idx))&view.PackageLine > 0:
-	case rpr.LineMask(uint(idx))&view.GoSuiteLine > 0:
-		switch rpr.Type() {
-		case rprGoOnly:
-			return rprGoOnlyFolded
-		case rprGoOnlyFolded:
-			return rprGoOnly
-		}
+	case lm&view.PackageLine > 0:
+	case lm&view.GoSuiteLine > 0:
+		return rprGoSuiteFolded
+	case lm&view.GoSuiteFoldedLine > 0:
+		return rprGoSuite
+	case lm&view.GoTestsFoldedLine > 0:
+		return rprGoTests
+	case lm&view.GoTestsLine > 0:
+		return rprDefault
+	case lm&view.SuiteFoldedLine > 0:
+		return rprSuite
+	case lm&view.SuiteLine > 0:
+		return rprDefault
 	}
 	return rprDefault
 }
 
+// report reports a report of given type.
 func (s *modelState) report(t reportType) {
+	s._report(t, -1) // panics if we have a bug
+}
+
+// _report creates report of given type.  The index is needed for the
+// use case that a folded suite was selected to determine which one.
+func (s *modelState) _report(t reportType, idx int) {
 	s.Lock()
 	defer s.Unlock()
 	if t == rprCurrent {
@@ -83,30 +97,43 @@ func (s *modelState) report(t reportType) {
 	}
 	status := reportStatus(s.pp)
 	ll, llMask, p := rprLines{}, linesMask{}, s.pp[s.latest]
-	var rt reportType
-	switch t {
-	case rprDefault:
-		switch p.tp.LenSuites() {
-		case 0:
-			ll, llMask = reportGoTestsOnly(p, ll, llMask)
-			rt = rprGoOnly
-		default:
-		}
-	case rprGoOnly:
-		ll, llMask = reportGoTestsOnly(p, ll, llMask)
-		rt = rprGoOnly
-	case rprGoOnlyFolded:
-		ll, llMask = reportGoTestsOnlyFolded(p, ll, llMask)
-		rt = rprGoOnlyFolded
+	switch p.LenSuites() {
+	case 0:
+		ll, llMask = reportGoOnlyPkg(t, p, ll, llMask)
+	default:
+		ll, llMask = s.reportMixedPkg(t, idx, p, ll, llMask)
 	}
 	s.current = []interface{}{&report{
-		typ:     rt,
 		flags:   view.RpClearing,
 		ll:      ll,
 		llMasks: llMask,
 		lst:     s.lineListener,
 	}, status}
 	s.viewUpdater(s.current...)
+}
+
+func (s *modelState) reportMixedPkg(
+	t reportType, idx int, p *pkg, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	switch t {
+	case rprGoTests:
+		return reportMixedGoTests(p, ll, llMask)
+	case rprSuite:
+		var suite *model.TestSuite
+		ln := s.current[0].(*report).ll[idx]
+		p.ForSuite(func(ts *model.TestSuite) {
+			if suite != nil {
+				return
+			}
+			if strings.HasPrefix(ln, ts.Name()) {
+				suite = ts
+			}
+		})
+		return reportMixedSuite(suite, p, ll, llMask)
+	case rprDefault:
+		return reportMixedFolded(p, ll, llMask)
+	}
+	return ll, llMask
 }
 
 func watch(
@@ -121,13 +148,13 @@ func watch(
 		rslt, n := make(chan *pkg), 0
 		diff.For(func(tp *model.TestingPackage) (stop bool) {
 			n++
-			go run(&pkg{tp: tp}, rslt)
+			go run(&pkg{TestingPackage: tp}, rslt)
 			latest = tp.ID()
 			return
 		})
 		for i := 0; i < n; i++ {
 			p := <-rslt
-			pp[p.tp.ID()] = p
+			pp[p.ID()] = p
 		}
 		if len(pp) == 0 || pp[latest] == nil {
 			return
@@ -138,7 +165,7 @@ func watch(
 }
 
 func run(p *pkg, rslt chan *pkg) {
-	rr, err := p.tp.Run()
+	rr, err := p.Run()
 	p.runResult = &runResult{Results: rr, err: err}
 	rslt <- p
 }
@@ -150,7 +177,23 @@ type runResult struct {
 
 type pkg struct {
 	*runResult
-	tp *model.TestingPackage
+	*model.TestingPackage
+}
+
+// info counts a package's tests, failed tests and the provides the
+// (actual) duration of the package's test run.
+func (p *pkg) info() (n, f int, d time.Duration) {
+	p.ForTest(func(t *model.Test) {
+		r := p.OfTest(t)
+		n += r.Len()
+		f += r.LenFailed()
+	})
+	p.ForSuite(func(st *model.TestSuite) {
+		r := p.OfSuite(st)
+		n += r.Len()
+		f += r.LenFailed()
+	})
+	return n, f, p.Duration
 }
 
 type pkgs map[string]*pkg
@@ -167,11 +210,20 @@ const (
 	// rprCurrent re-reports the currently reported report; e.g. the
 	// user "closes" the help screen.
 	rprCurrent
-	// rprGoOnly reports one specific package
-	rprGoOnly
-	// rprGoOnlyFolded reports one specific package with folded
-	// tests
-	rprGoOnlyFolded
+	// rprGoSuite reports a package having only go-tests reporting all
+	// tests and sub-tests.
+	rprGoSuite
+	// rprGoTests report go tests unfolded (with folded sub-tests) of a
+	// mixed package.
+	rprGoTests
+	// rprSuite report a particular suite of a package.
+	rprSuite
+	// rprGoSuiteFolded reports a package having only go-tests with folded
+	// sub-tests.
+	rprGoSuiteFolded
+	// rprMixedFolded reports a package consisting of test-suites and
+	// optionally go-tests with all suites and go-tests folded.
+	rprMixedFolded
 	// rprPackages reports all packages of the watched directory
 	rprPackages
 	// rprPackage reports a single package with all suites folded

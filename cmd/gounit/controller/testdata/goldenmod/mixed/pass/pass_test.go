@@ -41,11 +41,11 @@ func TestSuite_1(t *testing.T) { Run(&Suite_1{}, t) }
 
 type Suite_2 struct{ Suite }
 
-func (s *Suite_1) Suite_test_2_1(t *T) {}
-func (s *Suite_1) Suite_test_2_2(t *T) {}
-func (s *Suite_1) Suite_test_2_3(t *T) {}
-func (s *Suite_1) Suite_test_2_4(t *T) {}
-func (s *Suite_1) Suite_test_2_5(t *T) {}
+func (s *Suite_2) Suite_test_2_1(t *T) {}
+func (s *Suite_2) Suite_test_2_2(t *T) {}
+func (s *Suite_2) Suite_test_2_3(t *T) {}
+func (s *Suite_2) Suite_test_2_4(t *T) {}
+func (s *Suite_2) Suite_test_2_5(t *T) {}
 
 func TestSuite_2(t *testing.T) { Run(&Suite_2{}, t) }
 

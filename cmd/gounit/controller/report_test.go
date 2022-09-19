@@ -54,8 +54,8 @@ func (s *Report) Folds_tests_if_selecting_suite_with_shown_tests(t *T) {
 		fxExp["go/pass"]...,
 	)
 
-	tt.FireRune('j')           // focus second
-	tt.FireRune('j')           // focusable line (TestPass_4)
+	tt.FireRune('j')           // focus package
+	tt.FireRune('j')           // focus go-test with subs
 	tt.FireKey(tcell.KeyEnter) // and select it
 
 	t.StarMatched(
@@ -68,48 +68,120 @@ func (s *Report) Folds_tests_if_selecting_suite_with_shown_tests(t *T) {
 	)
 }
 
-type dbg struct {
-	Suite
-	Fixtures
-}
-
-func (s *dbg) fxSource(t *T, dir string) (*lines.Events, *Testing) {
-	return fxSourceDBG(t, s, dir)
-}
-
-func (s *dbg) Dbg(t *T) {
-	_, tt := s.fxSource(t, "go/pass")
+func (s *Report) Go_tests_and_suites_are_initially_folded(t *T) {
+	_, tt := s.fxSource(t, "mixed/pass")
 
 	t.StarMatched(
 		tt.afterWatch(awReporting).String(),
-		fxExp["go/pass"]...,
+		fxExp["mixed/pass"]...,
 	)
 
-	tt.FireRune('j')           // focus second
-	tt.FireRune('j')           // focusable line (TestPass_4)
+	for _, s := range fxNotExp["mixed/pass"] {
+		t.Not.Contains(tt.Reporting().String(), s)
+	}
+}
+
+func (s *Report) Unfolds_go_tests_on_folded_go_tests_selection(t *T) {
+	_, tt := s.fxSource(t, "mixed/pass")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["mixed/pass"]...,
+	)
+
+	tt.FireRune('j')           // focus package
+	tt.FireRune('j')           // focus go-tests
 	tt.FireKey(tcell.KeyEnter) // and select it
 
 	t.StarMatched(
 		tt.Reporting().String(),
-		fxExp["go/pass: folded"]...,
+		fxExp["mixed/pass go folded subs"]...,
 	)
-	t.Not.StarMatched(
-		tt.Reporting().String(),
-		fxNotExp["go/pass: folded"]...,
-	)
+	for _, s := range fxNotExp["mixed/pass go folded subs"] {
+		t.Not.Contains(tt.Reporting().String(), s)
+	}
 }
 
-func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+func (s *Report) Folds_go_tests_on_unfolded_go_tests_selection(t *T) {
+	_, tt := s.fxSource(t, "mixed/pass")
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["mixed/pass"]...,
+	)
 
-// func (s *Report) Go_tests_and_suites_are_initially_folded(t *T) {
-// 	_, tt := s.fxSource(t, "mixed/pass")
-//
-// 	t.StarMatched(
-// 		tt.afterWatch(awReporting).String(),
-// 		fxExp["mixed/pass"]...,
-// 	)
-//
-// }
+	tt.FireRune('j')           // focus package
+	tt.FireRune('j')           // focus go-tests
+	tt.FireKey(tcell.KeyEnter) // and select it
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["mixed/pass go folded subs"]...,
+	)
+	for _, s := range fxNotExp["mixed/pass go folded subs"] {
+		t.Not.Contains(tt.Reporting().String(), s)
+	}
+
+	tt.FireRune('j')           // focus package
+	tt.FireRune('j')           // focus go-tests
+	tt.FireKey(tcell.KeyEnter) // and select it
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["mixed/pass"]...,
+	)
+	for _, s := range fxNotExp["mixed/pass"] {
+		t.Not.Contains(tt.Reporting().String(), s)
+	}
+}
+
+func (s *Report) Unfolds_suite_tests_on_folded_suite_selection(t *T) {
+	_, tt := s.fxSource(t, "mixed/pass")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["mixed/pass"]...,
+	)
+
+	// select second suite (pkg[0], blank[1], go[2], suite1[3], suite2[4])
+	tt.ClickReporting(4)
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["mixed/pass second suite"]...,
+	)
+	for _, s := range fxNotExp["mixed/pass second suite"] {
+		t.Not.Contains(tt.Reporting().String(), s)
+	}
+}
+
+func (s *Report) Folds_suite_tests_on_unfolded_suite_selection(t *T) {
+	_, tt := s.fxSource(t, "mixed/pass")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["mixed/pass"]...,
+	)
+
+	tt.ClickReporting(3) // select first suite (pkg, blank, go, suite)
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["mixed/pass first suite"]...,
+	)
+	for _, s := range fxNotExp["mixed/pass first suite"] {
+		t.Not.Contains(tt.Reporting().String(), s)
+	}
+
+	tt.ClickReporting(2) // select suite (pkg, blank, suite)
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["mixed/pass"]...,
+	)
+	for _, s := range fxNotExp["mixed/pass"] {
+		t.Not.Contains(tt.Reporting().String(), s)
+	}
+}
 
 func TestReport(t *testing.T) {
 	t.Parallel()
