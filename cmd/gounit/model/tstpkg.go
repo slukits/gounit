@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/slukits/ints"
 )
@@ -107,7 +108,8 @@ func (tp *TestingPackage) Run() (*Results, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(), tp.Timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "go", "test", "-json", "-vet=off")
+	cmd := exec.CommandContext(ctx, "go", "test", "-json", "-vet=off",
+		fmt.Sprintf("-timeout=%s", tp.Timeout))
 	cmd.Dir = tp.abs
 	start := time.Now()
 	stdout, err := cmd.CombinedOutput()
@@ -391,6 +393,40 @@ type Test struct {
 
 // Name returns a tests name.
 func (t *Test) Name() string { return t.name }
+
+var camelRe = regexp.MustCompile(`[A-Z]`)
+
+func (t *Test) String() string {
+	// return t.Name()
+	if strings.Contains(t.name, "_") {
+		name := strings.ReplaceAll(t.name, "_", " ")
+		for i, c := range name {
+			name = string(unicode.ToLower(c)) + name[i+1:]
+			break
+		}
+		return apostrophe(camelCaseToHuman(name))
+	}
+	return apostrophe(camelCaseToHuman(t.name))
+}
+
+func apostrophe(name string) string {
+	name = strings.ReplaceAll(name, " s ", "'s ")
+	name = strings.ReplaceAll(name, "dont", "don't")
+	name = strings.ReplaceAll(name, "doesnt", "doesn't")
+	name = strings.ReplaceAll(name, "havnt", "havn't")
+	return name
+}
+
+func camelCaseToHuman(str string) string {
+	str = strings.TrimSpace(camelRe.ReplaceAllStringFunc(
+		str, func(s string) string {
+			return " " + strings.ToLower(s)
+		}))
+	strings.TrimPrefix(str, "test ")
+	str = strings.ReplaceAll(str, " d b", " DB ")
+	str = strings.ReplaceAll(str, " i d", " ID ")
+	return str
+}
 
 // Pos returns a tests absolute filename with line and column number.
 func (t *Test) Pos() string { return t.abs }

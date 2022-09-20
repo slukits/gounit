@@ -37,10 +37,10 @@ func reportGoTestsOnly(
 
 	for _, t := range withSubs {
 		tr := p.OfTest(t)
-		ll = append(ll, blankLine, t.Name())
+		ll = append(ll, blankLine, t.String())
 		llMask[uint(len(ll)-1)] = view.GoSuiteLine
 		tr.ForOrdered(func(sr *model.SubResult) {
-			ll = append(ll, "    "+sr.Name)
+			ll = append(ll, indent+indent+sr.String())
 			llMask[uint(len(ll)-1)] = view.SuiteTestLine
 		})
 	}
@@ -56,7 +56,7 @@ func reportGoTestsOnlyFolded(
 
 	ll = append(ll, blankLine)
 	for _, t := range withSubs {
-		ll = append(ll, withFoldInfo(t.Name(), p.OfTest(t)))
+		ll = append(ll, withFoldInfo(t.String(), p.OfTest(t)))
 		llMask[uint(len(ll)-1)] = view.GoSuiteFoldedLine
 	}
 	return ll, llMask
@@ -100,7 +100,7 @@ func goWithoutSubs(
 	llMask[uint(len(ll)-1)] = view.PackageLine
 	ll = append(ll, blankLine)
 	for _, t := range without {
-		ll = append(ll, t.Name())
+		ll = append(ll, t.String())
 		llMask[uint(len(ll)-1)] = view.TestLine
 	}
 	return ll, llMask

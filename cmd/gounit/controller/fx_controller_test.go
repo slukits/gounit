@@ -49,6 +49,8 @@ type Testing struct {
 	// _quitWatching terminates the model's go routine checking for
 	// updated packages in given source directory.
 	_quitWatching interface{ QuitAll() }
+
+	golden *tfs.Dir
 }
 
 // cleanUp stop all go-routines initiated by a controller test.
@@ -224,6 +226,26 @@ func fxSource(t *gounit.T, fs fixtureSetter, relDir string) (
 				Interval: 1 * time.Millisecond,
 			},
 		},
+		golden,
+	)
+}
+
+func fxSourceTouched(
+	t *gounit.T, fs fixtureSetter, relDir string, touch string,
+) (*lines.Events, *Testing) {
+	golden := fxSetupSource(t, relDir)
+	time.Sleep(1 * time.Millisecond)
+	golden.Touch(touch)
+	return fxInit(
+		t,
+		fs,
+		InitFactories{
+			Watcher: &model.Sources{
+				Dir:      fp.Join(golden.Path(), relDir),
+				Interval: 1 * time.Millisecond,
+			},
+		},
+		golden,
 	)
 }
 
@@ -241,6 +263,44 @@ func fxSourceDBG(t *gounit.T, fs fixtureSetter, relDir string) (
 				Interval: 1 * time.Millisecond,
 			},
 		},
+		golden,
+	)
+}
+
+func fxSourceAbsDBG(t *gounit.T, fs fixtureSetter, absDir string) (
+	*lines.Events, *Testing,
+) {
+	return fxInit(
+		t,
+		fs,
+		InitFactories{
+			dbgTimeouts: true,
+			Watcher: &model.Sources{
+				Dir:      absDir,
+				Interval: 1 * time.Millisecond,
+			},
+		},
+		nil,
+	)
+}
+
+func fxSourceTouchedDBG(
+	t *gounit.T, fs fixtureSetter, relDir, touch string,
+) (*lines.Events, *Testing) {
+	golden := fxSetupSource(t, relDir)
+	time.Sleep(1 * time.Millisecond)
+	golden.Touch(touch)
+	return fxInit(
+		t,
+		fs,
+		InitFactories{
+			dbgTimeouts: true,
+			Watcher: &model.Sources{
+				Dir:      fp.Join(golden.Path(), relDir),
+				Interval: 1 * time.Millisecond,
+			},
+		},
+		golden,
 	)
 }
 
@@ -265,9 +325,9 @@ func fxSetupSource(t *gounit.T, relDir string) (golden *tfs.Dir) {
 }
 
 // fxInit is like fx but also takes an instance of init factories
-func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
-	*lines.Events, *Testing,
-) {
+func fxInit(
+	t *gounit.T, fs fixtureSetter, i InitFactories, golden *tfs.Dir,
+) (*lines.Events, *Testing) {
 
 	var (
 		ct Testing
@@ -279,6 +339,7 @@ func fxInit(t *gounit.T, fs fixtureSetter, i InitFactories) (
 		ct._watchTimeout = 20 * time.Minute
 	}
 	ct._afterWatch = make(chan struct{})
+	ct.golden = golden
 
 	if i.Fatal == nil {
 		i.Fatal = func(i ...interface{}) {

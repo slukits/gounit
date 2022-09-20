@@ -402,7 +402,7 @@ func (d *Dir) FileMod(relName string) time.Time {
 //	mt := d.FileMod("my_file")
 //	time.Sleep(1*time.Millisecond)
 //	d.Touch("my_file")
-//	fmt.Println(mt.Before(d.FileMod("my_file")) // => prints "true"
+//	fmt.Println(mt.Before(d.FileMod("my_file")) // => "true"
 //
 // Touch fatales iff given file doesn't exist in given directory or if
 // its modification time can't be updated.

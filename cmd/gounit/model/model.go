@@ -79,7 +79,7 @@ var DefaultTimeout = 10 * time.Second
 //
 // It is set iff Module.Ignore is unset at the first call of
 // [Module.Watch].
-var DefaultIgnore = []string{".git", "node_modules"}
+var DefaultIgnore = []string{".git", "node_modules", "testdata"}
 
 // Sources represents a go module's directory which itself or its
 // descendants is a (testing) go package.  A Sources-instance can be
@@ -142,7 +142,9 @@ type Sources struct {
 func (m *Sources) ModuleName() string {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-
+	if err := m.ensureNameAndDir(); err != nil {
+		return ""
+	}
 	return m.name
 }
 
@@ -159,7 +161,9 @@ func (m *Sources) SourcesDir() string {
 func (m *Sources) ModuleDir() string {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-
+	if err := m.ensureNameAndDir(); err != nil {
+		return ""
+	}
 	return m.moduleDir
 }
 

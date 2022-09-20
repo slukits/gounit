@@ -11,6 +11,7 @@ import (
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
+	"github.com/slukits/lines"
 )
 
 type modelState struct {
@@ -65,6 +66,7 @@ func (s *modelState) reportTransition(idx int) reportType {
 	lm := s.current[0].(*report).LineMask(uint(idx))
 	switch {
 	case lm&view.PackageLine > 0:
+		return rprPackages
 	case lm&view.GoSuiteLine > 0:
 		return rprGoSuiteFolded
 	case lm&view.GoSuiteFoldedLine > 0:
@@ -77,6 +79,8 @@ func (s *modelState) reportTransition(idx int) reportType {
 		return rprSuite
 	case lm&view.SuiteLine > 0:
 		return rprDefault
+	case lm&view.PackageFoldedLine > 0:
+		return rprPackage
 	}
 	return rprDefault
 }
@@ -96,6 +100,23 @@ func (s *modelState) _report(t reportType, idx int) {
 		return
 	}
 	status := reportStatus(s.pp)
+	if t == rprPackages {
+		s.current = []interface{}{
+			reportPackages(s.pp, s.lineListener), status}
+		s.viewUpdater(s.current...)
+		return
+	}
+	if t == rprPackage {
+		pNm := strings.Split(s.current[0].(*report).ll[idx],
+			lines.LineFiller)[0]
+		for _, p := range s.pp {
+			if p.ID() != pNm {
+				continue
+			}
+			s.latest = p.ID()
+			break
+		}
+	}
 	ll, llMask, p := rprLines{}, linesMask{}, s.pp[s.latest]
 	switch p.LenSuites() {
 	case 0:
@@ -120,29 +141,31 @@ func (s *modelState) reportMixedPkg(
 		return reportMixedGoTests(p, ll, llMask)
 	case rprSuite:
 		var suite *model.TestSuite
-		ln := s.current[0].(*report).ll[idx]
+		ln := strings.Split(s.current[0].(*report).ll[idx],
+			lines.LineFiller)[0]
 		p.ForSuite(func(ts *model.TestSuite) {
 			if suite != nil {
 				return
 			}
-			if strings.HasPrefix(ln, ts.Name()) {
+			if ln == ts.String() {
 				suite = ts
 			}
 		})
 		return reportMixedSuite(suite, p, ll, llMask)
 	case rprGoSuite:
 		var goSuite *model.Test
-		ln := s.current[0].(*report).ll[idx]
+		ln := strings.Split(s.current[0].(*report).ll[idx],
+			lines.LineFiller)[0]
 		p.ForTest(func(t *model.Test) {
 			if goSuite != nil {
 				return
 			}
-			if strings.HasPrefix(ln, indent+t.Name()) {
+			if ln == indent+t.String() {
 				goSuite = t
 			}
 		})
 		return reportMixedGoSuite(goSuite, p, ll, llMask)
-	case rprDefault:
+	case rprDefault, rprPackage:
 		return reportMixedFolded(p, ll, llMask)
 	}
 	return ll, llMask
@@ -238,6 +261,8 @@ const (
 	rprMixedFolded
 	// rprPackages reports all packages of the watched directory
 	rprPackages
+	// rprPackage reports a specific package
+	rprPackage
 	// rprPackage reports a single package with all suites folded
 	rprPackageFolded
 	// rprPackageFocusedGo reports a single package's go tests

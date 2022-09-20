@@ -44,7 +44,7 @@ func (s *Gounit) Fails_if_watching_fails(t *T) {
 			return nil, 0, errors.New("mock-err")
 		}},
 		Fatal: func(_ ...interface{}) { fatale = true },
-	})
+	}, nil)
 
 	t.True(fatale)
 }

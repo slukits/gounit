@@ -6,6 +6,7 @@ package controller
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
@@ -112,7 +113,7 @@ func foldedSuiteLine(
 ) (rprLines, linesMask, int, int) {
 	n, f, d := r.Len(), r.LenFailed(), r.End.Sub(r.Start)
 	content := fmt.Sprintf("%s%s%d/%d %s",
-		ts.Name(), lines.LineFiller, n, f,
+		ts.String(), lines.LineFiller, n, f,
 		d.Round(1*time.Millisecond))
 	ll = append(ll, content)
 	idx := uint(len(ll) - 1)
@@ -121,4 +122,27 @@ func foldedSuiteLine(
 		llMask[idx] |= view.Failed
 	}
 	return ll, llMask, n, f
+}
+
+func reportPackages(pp pkgs, lst func(int)) *report {
+	ll, llMask := rprLines{}, linesMask{}
+	_pp := []*pkg{}
+	for _, p := range pp {
+		_pp = append(_pp, p)
+	}
+	sort.Slice(_pp, func(i, j int) bool {
+		return _pp[i].ID() < _pp[j].ID()
+	})
+	for _, p := range _pp {
+		n, f, d := p.info()
+		ll = append(ll, fmt.Sprintf("%s%s%d/%d %s",
+			p.ID(), lines.LineFiller, n, f, d.Round(1*time.Millisecond)))
+		llMask[uint(len(ll)-1)] = view.PackageFoldedLine
+	}
+	return &report{
+		flags:   view.RpClearing,
+		ll:      ll,
+		llMasks: llMask,
+		lst:     lst,
+	}
 }

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/slukits/gounit"
 )
@@ -110,6 +111,18 @@ func (r *Result) Len() int {
 		n += s.Len()
 	}
 	return n
+}
+
+func (r *Result) String() string {
+	if strings.Contains(r.Name, "_") {
+		name := strings.ReplaceAll(r.Name, "_", " ")
+		for i, c := range name {
+			name = string(unicode.ToLower(c)) + name[i+1:]
+			break
+		}
+		return apostrophe(name)
+	}
+	return apostrophe(camelCaseToHuman(r.Name))
 }
 
 // LenFailed returns the number of failed tests which is only

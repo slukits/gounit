@@ -57,12 +57,12 @@ func reportMixedGoSuite(
 	content := fmt.Sprintf("go-tests%s%d/%d %s",
 		lines.LineFiller, n, f, d.Round(1*time.Millisecond))
 	ll = append(ll, content)
-	ll = append(ll, indent+goSuite.Name())
+	ll = append(ll, indent+goSuite.String())
 	llMask[uint(len(ll)-1)] = view.GoSuiteLine
 	tr := p.OfTest(goSuite)
 	tr.ForOrdered(func(sr *model.SubResult) {
 		ll = append(ll, fmt.Sprintf("%s%s%s",
-			indent+indent+sr.Name,
+			indent+indent+sr.String(),
 			lines.LineFiller,
 			sr.End.Sub(sr.Start).Round(1*time.Millisecond)))
 		llMask[uint(len(ll)-1)] = view.TestLine
@@ -78,13 +78,13 @@ func reportMixedSuite(
 		d.Round(1*time.Millisecond)))
 	llMask[uint(len(ll)-1)] = view.PackageLine
 	ll = append(ll, blankLine)
-	ll = append(ll, suite.Name())
+	ll = append(ll, suite.String())
 	llMask[uint(len(ll)-1)] = view.SuiteLine
 	suiteResults := p.OfSuite(suite)
 	suite.ForTest(func(t *model.Test) {
 		r := suiteResults.OfTest(t)
 		ll = append(ll, fmt.Sprintf("%s%s%s",
-			indent+t.Name(),
+			indent+t.String(),
 			lines.LineFiller,
 			r.End.Sub(r.Start).Round(1*time.Millisecond)))
 		llMask[uint(len(ll)-1)] = view.SuiteTestLine
@@ -140,12 +140,12 @@ func reportGoTestsSubTestsFolded(
 		llMask[idx] |= view.Failed
 	}
 	for _, t := range without {
-		ll = append(ll, indent+t.Name())
+		ll = append(ll, indent+t.String())
 		llMask[uint(len(ll)-1)] = view.TestLine
 	}
 	ll = append(ll, blankLine)
 	for _, t := range withSubs {
-		ll = append(ll, withFoldInfo(indent+t.Name(), p.OfTest(t)))
+		ll = append(ll, withFoldInfo(indent+t.String(), p.OfTest(t)))
 		llMask[uint(len(ll)-1)] = view.GoSuiteFoldedLine
 	}
 	return ll, llMask

@@ -183,7 +183,7 @@ func (s *Report) Folds_suite_tests_on_unfolded_suite_selection(t *T) {
 	}
 }
 
-func (s *Report) Unfolds_go_sub_tests_on_go_test_selection_(t *T) {
+func (s *Report) Unfolds_go_sub_tests_on_go_test_selection(t *T) {
 	_, tt := s.fxSource(t, "mixed/pass")
 
 	t.StarMatched(
@@ -203,36 +203,40 @@ func (s *Report) Unfolds_go_sub_tests_on_go_test_selection_(t *T) {
 	}
 }
 
-type dbg struct {
-	Suite
-	Fixtures
+func (s *Report) fxSourceTouched(
+	t *T, dir, touch string,
+) (*lines.Events, *Testing) {
+	return fxSourceTouched(t, s, dir, touch)
 }
 
-func (s *dbg) fxSource(t *T, dir string) (*lines.Events, *Testing) {
-	return fxSourceDBG(t, s, dir)
-}
-
-func (s *dbg) Dbg(t *T) {
-	_, tt := s.fxSource(t, "mixed/pass")
+func (s *Report) Folded_packages_on_reported_package_selection(t *T) {
+	_, tt := s.fxSourceTouched(t, "mixed/pp", "mixed/pp/pkg0")
 
 	t.StarMatched(
 		tt.afterWatch(awReporting).String(),
-		fxExp["mixed/pass"]...,
+		fxExp["mixed/pp/pkg0"]...,
 	)
 
-	tt.ClickReporting(2) // select go tests
-	tt.ClickReporting(7) // select first go test with sub-tests
-
-	t.StarMatched(
-		tt.Reporting().String(),
-		fxExp["mixed/pass go unfold"]...,
-	)
-	for _, s := range fxNotExp["mixed/pass go unfold"] {
-		t.Not.Contains(tt.Reporting().String(), s)
-	}
+	tt.ClickReporting(0) // select package
+	t.StarMatched(tt.Reporting().String(), fxExp["mixed/pp"]...)
 }
 
-func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+func (s *Report) Selected_folded_package(t *T) {
+	_, tt := s.fxSourceTouched(t, "mixed/pp", "mixed/pp/pkg0")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["mixed/pp/pkg0"]...,
+	)
+	tt.ClickReporting(0) // select package
+	t.StarMatched(tt.Reporting().String(), fxExp["mixed/pp"]...)
+	tt.ClickReporting(3) // select package 3
+
+	t.SpaceMatched(
+		tt.Reporting().String(),
+		fxExp["mixed/pp/pkg3"]...,
+	)
+}
 
 func TestReport(t *testing.T) {
 	t.Parallel()
