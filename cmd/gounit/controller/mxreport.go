@@ -13,6 +13,9 @@ import (
 	"github.com/slukits/lines"
 )
 
+// indent of a reported test-name.
+const indent = "  "
+
 func reportMixedFolded(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
@@ -32,12 +35,38 @@ func reportMixedFolded(
 func reportMixedGoTests(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
+
 	n, f, d := p.info()
 	ll = append(ll, fmt.Sprintf("%s: %d/%d %v", p.ID(), n, f,
 		d.Round(1*time.Millisecond)))
 	llMask[uint(len(ll)-1)] = view.PackageLine
 	ll = append(ll, blankLine)
 	ll, llMask = reportGoTestsSubTestsFolded(p, ll, llMask)
+	return ll, llMask
+}
+
+func reportMixedGoSuite(
+	goSuite *model.Test, p *pkg, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	n, f, d := p.info()
+	ll = append(ll, fmt.Sprintf("%s: %d/%d %v", p.ID(), n, f,
+		d.Round(1*time.Millisecond)))
+	llMask[uint(len(ll)-1)] = view.PackageLine
+	ll = append(ll, blankLine)
+	n, f, d, _, _ = goSplitTests(p)
+	content := fmt.Sprintf("go-tests%s%d/%d %s",
+		lines.LineFiller, n, f, d.Round(1*time.Millisecond))
+	ll = append(ll, content)
+	ll = append(ll, indent+goSuite.Name())
+	llMask[uint(len(ll)-1)] = view.GoSuiteLine
+	tr := p.OfTest(goSuite)
+	tr.ForOrdered(func(sr *model.SubResult) {
+		ll = append(ll, fmt.Sprintf("%s%s%s",
+			indent+indent+sr.Name,
+			lines.LineFiller,
+			sr.End.Sub(sr.Start).Round(1*time.Millisecond)))
+		llMask[uint(len(ll)-1)] = view.TestLine
+	})
 	return ll, llMask
 }
 
@@ -55,7 +84,7 @@ func reportMixedSuite(
 	suite.ForTest(func(t *model.Test) {
 		r := suiteResults.OfTest(t)
 		ll = append(ll, fmt.Sprintf("%s%s%s",
-			"  "+t.Name(),
+			indent+t.Name(),
 			lines.LineFiller,
 			r.End.Sub(r.Start).Round(1*time.Millisecond)))
 		llMask[uint(len(ll)-1)] = view.SuiteTestLine
@@ -111,12 +140,12 @@ func reportGoTestsSubTestsFolded(
 		llMask[idx] |= view.Failed
 	}
 	for _, t := range without {
-		ll = append(ll, "  "+t.Name())
+		ll = append(ll, indent+t.Name())
 		llMask[uint(len(ll)-1)] = view.TestLine
 	}
 	ll = append(ll, blankLine)
 	for _, t := range withSubs {
-		ll = append(ll, withFoldInfo("  "+t.Name(), p.OfTest(t)))
+		ll = append(ll, withFoldInfo(indent+t.Name(), p.OfTest(t)))
 		llMask[uint(len(ll)-1)] = view.GoSuiteFoldedLine
 	}
 	return ll, llMask

@@ -116,7 +116,7 @@ func (s *modelState) reportMixedPkg(
 	t reportType, idx int, p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	switch t {
-	case rprGoTests:
+	case rprGoTests, rprGoSuiteFolded:
 		return reportMixedGoTests(p, ll, llMask)
 	case rprSuite:
 		var suite *model.TestSuite
@@ -130,6 +130,18 @@ func (s *modelState) reportMixedPkg(
 			}
 		})
 		return reportMixedSuite(suite, p, ll, llMask)
+	case rprGoSuite:
+		var goSuite *model.Test
+		ln := s.current[0].(*report).ll[idx]
+		p.ForTest(func(t *model.Test) {
+			if goSuite != nil {
+				return
+			}
+			if strings.HasPrefix(ln, indent+t.Name()) {
+				goSuite = t
+			}
+		})
+		return reportMixedGoSuite(goSuite, p, ll, llMask)
 	case rprDefault:
 		return reportMixedFolded(p, ll, llMask)
 	}

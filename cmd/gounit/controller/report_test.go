@@ -183,6 +183,57 @@ func (s *Report) Folds_suite_tests_on_unfolded_suite_selection(t *T) {
 	}
 }
 
+func (s *Report) Unfolds_go_sub_tests_on_go_test_selection_(t *T) {
+	_, tt := s.fxSource(t, "mixed/pass")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["mixed/pass"]...,
+	)
+
+	tt.ClickReporting(2) // select go tests
+	tt.ClickReporting(7) // select first go test with sub-tests
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["mixed/pass go unfold"]...,
+	)
+	for _, s := range fxNotExp["mixed/pass go unfold"] {
+		t.Not.Contains(tt.Reporting().String(), s)
+	}
+}
+
+type dbg struct {
+	Suite
+	Fixtures
+}
+
+func (s *dbg) fxSource(t *T, dir string) (*lines.Events, *Testing) {
+	return fxSourceDBG(t, s, dir)
+}
+
+func (s *dbg) Dbg(t *T) {
+	_, tt := s.fxSource(t, "mixed/pass")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["mixed/pass"]...,
+	)
+
+	tt.ClickReporting(2) // select go tests
+	tt.ClickReporting(7) // select first go test with sub-tests
+
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["mixed/pass go unfold"]...,
+	)
+	for _, s := range fxNotExp["mixed/pass go unfold"] {
+		t.Not.Contains(tt.Reporting().String(), s)
+	}
+}
+
+func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+
 func TestReport(t *testing.T) {
 	t.Parallel()
 	Run(&Report{}, t)

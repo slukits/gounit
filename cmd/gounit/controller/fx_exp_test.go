@@ -24,6 +24,8 @@ var fxExp = map[string][]string{
 	"mixed/pass second suite": {"mixed/pass", "Suite_2",
 		"Suite_test_2_1", "Suite_test_2_2", "Suite_test_2_3",
 		"Suite_test_2_4", "Suite_test_2_5"},
+	"mixed/pass go unfold": {"mixed/pass", "go-tests", "TestPass_4",
+		"p4_sub_1", "p4_sub_2", "p4_sub_3", "p4_sub_4"},
 }
 
 var fxNotExp = map[string][]string{
@@ -37,4 +39,6 @@ var fxNotExp = map[string][]string{
 		"Suite_5"},
 	"mixed/pass second suite": {"go-tests", "Suite_1", "Suite_3", "Suite_4",
 		"Suite_5"},
+	"mixed/pass go unfold": {"TestPass_1", "TestPass_2", "TestPass_3",
+		"TestPass_5"},
 }
