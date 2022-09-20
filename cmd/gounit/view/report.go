@@ -68,11 +68,13 @@ func (m *report) OnInit(e *lines.Env) {
 	m.listener = m.rr[0].Listener()
 }
 
-func (m *report) OnClick(_ *lines.Env, _, y int) {
-	if m.listener == nil {
+// OnClick reports clicked line to given report-listener iff the line is
+// focusable.
+func (r *report) OnClick(_ *lines.Env, _, y int) {
+	if r.listener == nil || y >= r.Len() || !r.LL(y).IsFocusable() {
 		return
 	}
-	m.listener(y)
+	r.listener(y)
 }
 
 func (m *report) OnUpdate(e *lines.Env) {

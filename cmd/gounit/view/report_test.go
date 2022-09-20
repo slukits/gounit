@@ -81,6 +81,14 @@ func (s *Reporting) Component_s_test_lines_are_not_selectable(t *T) {
 	ee.Update(fx.Report, nil, func(e *lines.Env) {
 		t.Eq(3, fx.Report.Focus.Current())
 	})
+
+	tt.FireComponentClick(fx.Report, 0, 3)
+	t.Eq(3, fx.reportedLine)
+	tt.FireComponentClick(fx.Report, 0, 2)
+	ee.Update(fx.Report, nil, func(e *lines.Env) {
+		t.Eq(3, fx.Report.Focus.Current())
+	})
+	t.Eq(3, fx.reportedLine)
 }
 
 func TestReporting(t *testing.T) {
