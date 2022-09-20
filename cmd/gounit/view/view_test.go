@@ -326,13 +326,13 @@ func (s *AView) Clears_unused_main_lines(t *T) {
 }
 
 func (s *AView) Reports_click_in_reporting_component(t *T) {
-	_, tt, fx := s.fx(t)
+	ee, tt, fx := s.fx(t)
+	ee.Update(fx.Report, nil, func(e *lines.Env) {
+		fmt.Fprint(e, "first\n\nsecond\nthird")
+	})
 
-	cnt, exp := "first\n\nthird\nforth", 2
-	fx.updateReporting(&reporterFX{content: cnt})
-
-	tt.FireComponentClick(fx.Report, 0, exp)
-	t.Eq(exp, fx.reportedLine)
+	tt.FireComponentClick(fx.Report, 0, 2)
+	t.Eq(2, fx.reportedLine)
 }
 
 func (s *AView) Reporting_component_scrolls_on_context(t *T) {

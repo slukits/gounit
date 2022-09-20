@@ -172,7 +172,10 @@ func (s *_test) Clicks_requested_button(t *T) {
 }
 
 func (s *_test) Clicks_requested_reporting_line(t *T) {
-	_, fx, tv := s.fx(t, nil)
+	ee, fx, tv := s.fx(t, nil)
+	ee.Update(fx.Report, nil, func(e *lines.Env) {
+		fmt.Fprint(e, "first\nsecond\nthird")
+	})
 
 	tv.ClickReporting(2)
 	t.Eq(2, fx.reportedLine)

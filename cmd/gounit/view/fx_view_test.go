@@ -32,6 +32,9 @@ type fxInit struct {
 
 	updButton func(Buttoner)
 
+	// updateReporting NOTE if a reported line is not flagged with a
+	// *focusable* LineMask the line is not selectable, i.e. is not
+	// focused through key-events and not reported if clicked on it.
 	updateReporting func(Reporter)
 
 	listenReporting func(int)

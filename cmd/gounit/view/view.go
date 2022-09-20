@@ -72,68 +72,6 @@ type Initer interface {
 	Buttons(update func(Buttoner)) Buttoner
 }
 
-// LineMask  values are used to describe to a reporting component how a
-// particular line should be displayed and if it is focusable or not.
-type LineMask uint64
-
-const (
-
-	// Failed sets error formattings for a reporting component's line
-	// like a red background and a white foreground.
-	Failed LineMask = 1 << iota
-
-	// Passed sets a lines as the "green bar", i.e. a green background
-	// and a black foreground.
-	Passed
-
-	// PackageLine classifies a reported line as package-line.  Note
-	// only package or suite lines are selectable.
-	PackageLine
-
-	// PackageFoldedLine reports a folded package.
-	PackageFoldedLine
-
-	// TestLine classifies a reported line as go-test-line.  Note a
-	// go-test-line is not selectable.
-	TestLine
-
-	// GoTestsLine classifies a reported line as the go-tests headline
-	// in a package report having go tests and test-suites.  Note only
-	// package, go-tests, go-suite or suite lines are selectable.
-	GoTestsLine
-
-	// GoTestsFoldedLine classifies the headline of the go tests from a
-	// reported testing package which has go-tests and test-suite.
-	GoTestsFoldedLine
-
-	// GoSuiteLine classifies a reported line as go test with sub-tests.
-	// Note only package, go-tests, go-suite or suite lines are
-	// selectable.
-	GoSuiteLine
-
-	// GoSuiteFolded classifies a go-test line with folded sub-tests.
-	GoSuiteFoldedLine
-
-	// SuiteLine classifies a reported line as test-suite.
-	SuiteLine
-
-	// SuiteFoldedLine classifies a reported line as a test-suite whose
-	// suite-tests are folded.
-	SuiteFoldedLine
-
-	// SuiteTestLine classifies a reported line as suit-test-line.  Note
-	// a suit-test-line is not selectable.
-	SuiteTestLine
-
-	// ZeroLineMode indicates no other than default formattings for a
-	// line of a reporting component.
-	ZeroLineMod LineMask = 0
-)
-
-const focusable LineMask = PackageLine | PackageFoldedLine |
-	GoTestsLine | GoTestsFoldedLine | GoSuiteLine | GoSuiteFoldedLine |
-	SuiteLine | SuiteFoldedLine
-
 // View implements the lines Componenter interface hence an instance of
 // it can be used to initialize a lines terminal ui.  Note the View
 // package is designed in a way that there shouldn't be done anything
