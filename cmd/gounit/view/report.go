@@ -49,13 +49,14 @@ const (
 	// PackageFoldedLine reports a folded package.
 	PackageFoldedLine
 
-	// TestLine classifies a reported line as go-test-line.  Note a
-	// go-test-line is not selectable.
+	// TestLine classifies a reported line as go-test-line.
 	TestLine
 
+	// OutputLine classifies a reported line as a test-output.
+	OutputLine
+
 	// GoTestsLine classifies a reported line as the go-tests headline
-	// in a package report having go tests and test-suites.  Note only
-	// package, go-tests, go-suite or suite lines are selectable.
+	// in a package report having go tests and test-suites.
 	GoTestsLine
 
 	// GoTestsFoldedLine classifies the headline of the go tests from a

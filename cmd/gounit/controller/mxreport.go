@@ -6,6 +6,7 @@ package controller
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
@@ -57,15 +58,12 @@ func reportMixedGoSuite(
 	content := fmt.Sprintf("go-tests%s%d/%d %s",
 		lines.LineFiller, n, f, d.Round(1*time.Millisecond))
 	ll = append(ll, content)
+	llMask[uint(len(ll)-1)] = view.GoTestsLine
 	ll = append(ll, indent+goSuite.String())
 	llMask[uint(len(ll)-1)] = view.GoSuiteLine
 	tr := p.OfTest(goSuite)
 	tr.ForOrdered(func(sr *model.SubResult) {
-		ll = append(ll, fmt.Sprintf("%s%s%s",
-			indent+indent+sr.String(),
-			lines.LineFiller,
-			sr.End.Sub(sr.Start).Round(1*time.Millisecond)))
-		llMask[uint(len(ll)-1)] = view.TestLine
+		ll, llMask = reportSubResult(sr, indent+indent, ll, llMask)
 	})
 	return ll, llMask
 }
@@ -81,14 +79,25 @@ func reportMixedSuite(
 	ll = append(ll, suite.String())
 	llMask[uint(len(ll)-1)] = view.SuiteLine
 	suiteResults := p.OfSuite(suite)
+	for i, out := range suiteResults.InitOut {
+		if i == 0 {
+			ll = append(ll, indent+"init-log:")
+		}
+		ll = append(ll, indent+indent+strings.TrimSpace(out))
+	}
+	if len(suiteResults.InitOut) > 0 {
+		ll = append(ll, blankLine)
+	}
 	suite.ForTest(func(t *model.Test) {
-		r := suiteResults.OfTest(t)
-		ll = append(ll, fmt.Sprintf("%s%s%s",
-			indent+t.String(),
-			lines.LineFiller,
-			r.End.Sub(r.Start).Round(1*time.Millisecond)))
-		llMask[uint(len(ll)-1)] = view.SuiteTestLine
+		ll, llMask = reportSubResult(
+			suiteResults.OfTest(t), indent, ll, llMask)
 	})
+	for i, out := range suiteResults.FinalizeOut {
+		if i == 0 {
+			ll = append(ll, blankLine, indent+"finalize-log:")
+		}
+		ll = append(ll, indent+indent+strings.TrimSpace(out))
+	}
 	return ll, llMask
 }
 
@@ -140,8 +149,7 @@ func reportGoTestsSubTestsFolded(
 		llMask[idx] |= view.Failed
 	}
 	for _, t := range without {
-		ll = append(ll, indent+t.String())
-		llMask[uint(len(ll)-1)] = view.TestLine
+		ll, llMask = reportResult(p.OfTest(t), indent, ll, llMask)
 	}
 	ll = append(ll, blankLine)
 	for _, t := range withSubs {

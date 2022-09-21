@@ -7,6 +7,7 @@ package controller
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
@@ -145,4 +146,34 @@ func reportPackages(pp pkgs, lst func(int)) *report {
 		llMasks: llMask,
 		lst:     lst,
 	}
+}
+
+func reportResult(
+	r *model.TestResult, i string, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	ll = append(ll, fmt.Sprintf("%s%s%s",
+		indent+r.String(),
+		lines.LineFiller,
+		r.End.Sub(r.Start).Round(1*time.Millisecond)))
+	llMask[uint(len(ll)-1)] = view.TestLine
+	for _, out := range r.Output {
+		ll = append(ll, i+indent+strings.TrimSpace(out))
+		llMask[uint(len(ll)-1)] = view.OutputLine
+	}
+	return ll, llMask
+}
+
+func reportSubResult(
+	r *model.SubResult, i string, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	ll = append(ll, fmt.Sprintf("%s%s%s",
+		i+r.String(),
+		lines.LineFiller,
+		r.End.Sub(r.Start).Round(1*time.Millisecond)))
+	llMask[uint(len(ll)-1)] = view.TestLine
+	for _, out := range r.Output {
+		ll = append(ll, i+indent+strings.TrimSpace(out))
+		llMask[uint(len(ll)-1)] = view.OutputLine
+	}
+	return ll, llMask
 }

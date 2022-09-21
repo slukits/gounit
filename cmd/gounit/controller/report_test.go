@@ -5,6 +5,7 @@
 package controller
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
@@ -48,7 +49,6 @@ func (s *Report) Passing_go_tests_only(t *T) {
 
 func (s *Report) Folds_tests_if_selecting_suite_with_shown_tests(t *T) {
 	_, tt := s.fxSource(t, "go/pass")
-
 	t.StarMatched(
 		tt.afterWatch(awReporting).String(),
 		fxExp["go/pass"]...,
@@ -236,6 +236,35 @@ func (s *Report) Selected_folded_package(t *T) {
 		tt.Reporting().String(),
 		fxExp["mixed/pp/pkg3"]...,
 	)
+}
+
+func (s *Report) Logged_text(t *T) {
+	_, tt := s.fxSource(t, "logging")
+
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["logging"]...,
+	)
+
+	tt.ClickReporting(2) // click on "go-tests"
+	t.StarMatched(
+		tt.Reporting().String(), fxExp["logging go-test"]...)
+
+	// select the go-test-suite
+	for i, l := range tt.Reporting() {
+		if !strings.Contains(l.String(), "test go suite log") {
+			continue
+		}
+		tt.ClickReporting(i)
+		break
+	}
+	t.StarMatched(
+		tt.Reporting().String(), fxExp["logging go-sub-test"]...)
+
+	tt.ClickReporting(2) // back to folded view
+	tt.ClickReporting(3) // select suite
+	t.StarMatched(
+		tt.Reporting().String(), fxExp["logging suite"]...)
 }
 
 func TestReport(t *testing.T) {

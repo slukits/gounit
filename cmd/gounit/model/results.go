@@ -113,16 +113,20 @@ func (r *Result) Len() int {
 	return n
 }
 
+// HasSubs allows to discriminate go-tests with one sub-test from a
+// single go-test.
+func (r *Result) HasSubs() bool { return len(r.subs) > 0 }
+
 func (r *Result) String() string {
+	name := r.Name
 	if strings.Contains(r.Name, "_") {
-		name := strings.ReplaceAll(r.Name, "_", " ")
+		name = strings.ReplaceAll(r.Name, "_", " ")
 		for i, c := range name {
 			name = string(unicode.ToLower(c)) + name[i+1:]
 			break
 		}
-		return apostrophe(name)
 	}
-	return apostrophe(camelCaseToHuman(r.Name))
+	return apostrophe(camelCaseToHuman(name))
 }
 
 // LenFailed returns the number of failed tests which is only

@@ -30,6 +30,14 @@ var fxExp = map[string][]string{
 	"mixed/pp": {"pkg0", "pkg1", "pkg2", "pkg3", "pkg4", "pkg5", "pkg6",
 		"pkg7", "pkg8", "pkg9"},
 	"mixed/pp/pkg3": {"mixed/pp/pkg3"},
+	"logging":       {"logging", "go-tests", "suite"},
+	"logging go-test": {"logging", "go-tests", "test go log",
+		"go-test log", "test go suite log"},
+	"logging go-sub-test": {"logging", "go-tests", "test go suite log",
+		"test go sub log", "go sub-test log"},
+	"logging suite": {"logging", "suite", "init-log:", "suite init log",
+		"suite test log", "suite-test log", "finalize-log",
+		"suite finalize log"},
 }
 
 var fxNotExp = map[string][]string{

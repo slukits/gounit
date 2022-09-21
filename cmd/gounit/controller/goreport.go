@@ -69,17 +69,17 @@ func goSplitTests(p *pkg) (
 	p.ForTest(func(t *model.Test) {
 		r := p.OfTest(t)
 		d += r.End.Sub(r.Start)
-		if r.Len() == 1 {
-			without = append(without, t)
-			n++
-			if !r.Passed {
-				f++
-			}
+		if r.HasSubs() {
+			n += p.OfTest(t).Len()
+			f += p.OfTest(t).LenFailed()
+			with = append(with, t)
 			return
 		}
-		n += p.OfTest(t).Len()
-		f += p.OfTest(t).LenFailed()
-		with = append(with, t)
+		without = append(without, t)
+		n++
+		if !r.Passed {
+			f++
+		}
 	})
 	sort.Slice(without, func(i, j int) bool {
 		return without[i].Name() < without[j].Name()
