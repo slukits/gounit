@@ -14,12 +14,18 @@ import (
 	"github.com/slukits/lines"
 )
 
+type state struct {
+	view        []interface{}
+	pp          pkgs
+	ee          []*pkg
+	latestPkg   string
+	latestSuite string
+}
+
 type modelState struct {
 	*sync.Mutex
-	current     []interface{}
+	*state
 	viewUpdater func(...interface{})
-	pp          pkgs
-	latest      string
 }
 
 func (s *modelState) replaceViewUpdater(f func(...interface{})) {
@@ -46,11 +52,11 @@ type reporter interface {
 	Folded() reporter
 }
 
-func (s *modelState) update(pp pkgs, latest string) {
+func (s *modelState) update(st *state) {
 	s.Lock()
-	defer s.Unlock()
-	s.pp = pp
-	s.latest = latest
+	s.state = st
+	s.Unlock()
+	s.report(rprDefault)
 }
 
 func (s *modelState) lineListener(idx int) {
@@ -63,7 +69,7 @@ func (s *modelState) lineListener(idx int) {
 func (s *modelState) reportTransition(idx int) reportType {
 	s.Lock()
 	defer s.Unlock()
-	lm := s.current[0].(*report).LineMask(uint(idx))
+	lm := s.view[0].(*report).LineMask(uint(idx))
 	switch {
 	case lm&view.PackageLine > 0:
 		return rprPackages
@@ -96,41 +102,47 @@ func (s *modelState) _report(t reportType, idx int) {
 	s.Lock()
 	defer s.Unlock()
 	if t == rprCurrent {
-		s.viewUpdater(s.current...)
+		s.viewUpdater(s.view...)
 		return
 	}
 	status := reportStatus(s.pp)
+	if len(s.ee) > 0 {
+		s.view = []interface{}{
+			reportFailed(s.state, s.lineListener), status}
+		s.viewUpdater(s.view...)
+		return
+	}
 	if t == rprPackages {
-		s.current = []interface{}{
+		s.view = []interface{}{
 			reportPackages(s.pp, s.lineListener), status}
-		s.viewUpdater(s.current...)
+		s.viewUpdater(s.view...)
 		return
 	}
 	if t == rprPackage {
-		pNm := strings.Split(s.current[0].(*report).ll[idx],
+		pNm := strings.Split(s.view[0].(*report).ll[idx],
 			lines.LineFiller)[0]
 		for _, p := range s.pp {
 			if p.ID() != pNm {
 				continue
 			}
-			s.latest = p.ID()
+			s.latestPkg = p.ID()
 			break
 		}
 	}
-	ll, llMask, p := rprLines{}, linesMask{}, s.pp[s.latest]
+	ll, llMask, p := rprLines{}, linesMask{}, s.pp[s.latestPkg]
 	switch p.LenSuites() {
 	case 0:
 		ll, llMask = reportGoOnlyPkg(t, p, ll, llMask)
 	default:
 		ll, llMask = s.reportMixedPkg(t, idx, p, ll, llMask)
 	}
-	s.current = []interface{}{&report{
+	s.view = []interface{}{&report{
 		flags:   view.RpClearing,
 		ll:      ll,
 		llMasks: llMask,
 		lst:     s.lineListener,
 	}, status}
-	s.viewUpdater(s.current...)
+	s.viewUpdater(s.view...)
 }
 
 func (s *modelState) reportMixedPkg(
@@ -141,7 +153,7 @@ func (s *modelState) reportMixedPkg(
 		return reportMixedGoTests(p, ll, llMask)
 	case rprSuite:
 		var suite *model.TestSuite
-		ln := strings.Split(s.current[0].(*report).ll[idx],
+		ln := strings.Split(s.view[0].(*report).ll[idx],
 			lines.LineFiller)[0]
 		p.ForSuite(func(ts *model.TestSuite) {
 			if suite != nil {
@@ -154,7 +166,7 @@ func (s *modelState) reportMixedPkg(
 		return reportMixedSuite(suite, p, ll, llMask)
 	case rprGoSuite:
 		var goSuite *model.Test
-		ln := strings.Split(s.current[0].(*report).ll[idx],
+		ln := strings.Split(s.view[0].(*report).ll[idx],
 			lines.LineFiller)[0]
 		p.ForTest(func(t *model.Test) {
 			if goSuite != nil {
@@ -187,15 +199,19 @@ func watch(
 			latest = tp.ID()
 			return
 		})
+		ee := []*pkg{}
 		for i := 0; i < n; i++ {
 			p := <-rslt
 			pp[p.ID()] = p
+			if !p.HasErr() && p.Passed() {
+				continue
+			}
+			ee = append(ee, p)
 		}
 		if len(pp) == 0 || pp[latest] == nil {
 			return
 		}
-		mdl.update(pp, latest)
-		mdl.report(rprDefault)
+		mdl.update(&state{pp: pp, ee: ee, latestPkg: latest})
 	}
 }
 

@@ -62,9 +62,21 @@ func reportGoTestsOnlyFolded(
 	return ll, llMask
 }
 
+type goTests []*model.Test
+
+func (tt goTests) haveFailed(p *pkg) bool {
+	for _, t := range tt {
+		if p.OfTest(t).Passed {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 // goSplitTests splits go test into tests without and with sub-tests.
 func goSplitTests(p *pkg) (
-	n, f int, d time.Duration, without, with []*model.Test,
+	n, f int, d time.Duration, without, with goTests,
 ) {
 	p.ForTest(func(t *model.Test) {
 		r := p.OfTest(t)
@@ -100,8 +112,7 @@ func goWithoutSubs(
 	llMask[uint(len(ll)-1)] = view.PackageLine
 	ll = append(ll, blankLine)
 	for _, t := range without {
-		ll = append(ll, t.String())
-		llMask[uint(len(ll)-1)] = view.TestLine
+		ll, llMask = reportTestLine(p.OfTest(t), "", ll, llMask)
 	}
 	return ll, llMask
 }

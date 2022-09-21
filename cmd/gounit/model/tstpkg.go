@@ -397,16 +397,15 @@ func (t *Test) Name() string { return t.name }
 var camelRe = regexp.MustCompile(`[A-Z]`)
 
 func (t *Test) String() string {
-	// return t.Name()
-	if strings.Contains(t.name, "_") {
-		name := strings.ReplaceAll(t.name, "_", " ")
+	name := t.name
+	if strings.Contains(name, "_") {
+		name = strings.ReplaceAll(name, "_", " ")
 		for i, c := range name {
 			name = string(unicode.ToLower(c)) + name[i+1:]
 			break
 		}
-		return apostrophe(camelCaseToHuman(name))
 	}
-	return apostrophe(camelCaseToHuman(t.name))
+	return apostrophe(camelCaseToHuman(name))
 }
 
 func apostrophe(name string) string {

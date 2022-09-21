@@ -6,7 +6,6 @@ package controller
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
@@ -20,16 +19,12 @@ const indent = "  "
 func reportMixedFolded(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
-	pkgLine, ll, llMask := packageLine(p, ll, llMask)
-	n, f := 0, 0
+	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
+	ll = append(ll, blankLine)
 	if p.LenTests() > 0 {
-		ll, llMask, n, f = reportGoTestsFolded(p, ll, llMask)
+		ll, llMask = reportGoTestsFolded(p, ll, llMask)
 	}
-	var _n, _f int
-	ll, llMask, _n, _f = reportSuitesFolded(p, ll, llMask)
-	n += _n
-	f += _f
-	ll, llMask = pkgLine(ll, llMask, n, f)
+	ll, llMask = reportSuitesFolded(p, ll, llMask)
 	return ll, llMask
 }
 
@@ -42,7 +37,7 @@ func reportMixedGoTests(
 		d.Round(1*time.Millisecond)))
 	llMask[uint(len(ll)-1)] = view.PackageLine
 	ll = append(ll, blankLine)
-	ll, llMask = reportGoTestsSubTestsFolded(p, ll, llMask)
+	ll, llMask = reportGoTestWithSubsFolded(p, ll, llMask)
 	return ll, llMask
 }
 
@@ -63,7 +58,7 @@ func reportMixedGoSuite(
 	llMask[uint(len(ll)-1)] = view.GoSuiteLine
 	tr := p.OfTest(goSuite)
 	tr.ForOrdered(func(sr *model.SubResult) {
-		ll, llMask = reportSubResult(sr, indent+indent, ll, llMask)
+		ll, llMask = reportSubTestLine(sr, indent+indent, ll, llMask)
 	})
 	return ll, llMask
 }
@@ -76,48 +71,23 @@ func reportMixedSuite(
 		d.Round(1*time.Millisecond)))
 	llMask[uint(len(ll)-1)] = view.PackageLine
 	ll = append(ll, blankLine)
-	ll = append(ll, suite.String())
-	llMask[uint(len(ll)-1)] = view.SuiteLine
-	suiteResults := p.OfSuite(suite)
-	for i, out := range suiteResults.InitOut {
-		if i == 0 {
-			ll = append(ll, indent+"init-log:")
-		}
-		ll = append(ll, indent+indent+strings.TrimSpace(out))
-	}
-	if len(suiteResults.InitOut) > 0 {
-		ll = append(ll, blankLine)
-	}
-	suite.ForTest(func(t *model.Test) {
-		ll, llMask = reportSubResult(
-			suiteResults.OfTest(t), indent, ll, llMask)
-	})
-	for i, out := range suiteResults.FinalizeOut {
-		if i == 0 {
-			ll = append(ll, blankLine, indent+"finalize-log:")
-		}
-		ll = append(ll, indent+indent+strings.TrimSpace(out))
-	}
+	ll, llMask = reportSuite(p, suite, ll, llMask)
 	return ll, llMask
 }
 
 func reportSuitesFolded(
 	p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask, int, int) {
-	var n, f int
+) (rprLines, linesMask) {
 	p.ForSuite(func(ts *model.TestSuite) {
-		var _n, _f int
-		ll, llMask, _n, _f = foldedSuiteLine(
-			ts, p.OfSuite(ts), ll, llMask)
-		n += _n
-		f += _f
+		ll, llMask = reportSuiteLine(
+			p, ts, view.SuiteFoldedLine, ll, llMask)
 	})
-	return ll, llMask, n, f
+	return ll, llMask
 }
 
 func reportGoTestsFolded(
 	p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask, int, int) {
+) (rprLines, linesMask) {
 	n, f, d := 0, 0, time.Duration(0)
 	p.ForTest(func(t *model.Test) {
 		r := p.OfTest(t)
@@ -125,31 +95,18 @@ func reportGoTestsFolded(
 		f += r.LenFailed()
 		d += r.End.Sub(r.Start)
 	})
-	content := fmt.Sprintf("go-tests%s%d/%d %s",
-		lines.LineFiller, n, f, d.Round(1*time.Millisecond))
-	ll = append(ll, content)
-	idx := uint(len(ll) - 1)
-	llMask[idx] = view.GoTestsFoldedLine
-	if f > 0 {
-		llMask[idx] |= view.Failed
-	}
-	return ll, llMask, n, f
+	ll, llMask = reportGoTestsLine(
+		n, f, d, view.GoTestsFoldedLine, ll, llMask)
+	return ll, llMask
 }
 
-func reportGoTestsSubTestsFolded(
+func reportGoTestWithSubsFolded(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	n, f, d, without, withSubs := goSplitTests(p)
-	content := fmt.Sprintf("go-tests%s%d/%d %s",
-		lines.LineFiller, n, f, d.Round(1*time.Millisecond))
-	ll = append(ll, content)
-	idx := uint(len(ll) - 1)
-	llMask[idx] = view.GoTestsLine
-	if f > 0 {
-		llMask[idx] |= view.Failed
-	}
+	ll, llMask = reportGoTestsLine(n, f, d, view.GoTestsLine, ll, llMask)
 	for _, t := range without {
-		ll, llMask = reportResult(p.OfTest(t), indent, ll, llMask)
+		ll, llMask = reportTestLine(p.OfTest(t), indent, ll, llMask)
 	}
 	ll = append(ll, blankLine)
 	for _, t := range withSubs {
