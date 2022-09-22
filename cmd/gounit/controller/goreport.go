@@ -5,7 +5,6 @@
 package controller
 
 import (
-	"fmt"
 	"sort"
 	"time"
 
@@ -16,38 +15,6 @@ import (
 const blankLine = ""
 
 func reportGoOnlyPkg(
-	t reportType, p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask) {
-
-	switch t {
-	case rprGoSuite, rprDefault:
-		return reportGoTestsOnly(p, ll, llMask)
-	case rprGoSuiteFolded:
-		return reportGoTestsOnlyFolded(p, ll, llMask)
-	}
-	return ll, llMask
-}
-
-func reportGoTestsOnly(
-	p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask) {
-
-	n, f, _, withoutSubs, withSubs := goSplitTests(p)
-	ll, llMask = goWithoutSubs(p, ll, llMask, n, f, withoutSubs)
-
-	for _, t := range withSubs {
-		tr := p.OfTest(t)
-		ll = append(ll, blankLine, t.String())
-		llMask[uint(len(ll)-1)] = view.GoSuiteLine
-		tr.ForOrdered(func(sr *model.SubResult) {
-			ll = append(ll, indent+indent+sr.String())
-			llMask[uint(len(ll)-1)] = view.SuiteTestLine
-		})
-	}
-	return ll, llMask
-}
-
-func reportGoTestsOnlyFolded(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 
@@ -56,9 +23,23 @@ func reportGoTestsOnlyFolded(
 
 	ll = append(ll, blankLine)
 	for _, t := range withSubs {
-		ll = append(ll, withFoldInfo(t.String(), p.OfTest(t)))
-		llMask[uint(len(ll)-1)] = view.GoSuiteFoldedLine
+		ll, llMask = reportGoSuiteLine(
+			p.OfTest(t), view.GoSuiteFoldedLine, "", ll, llMask)
 	}
+	return ll, llMask
+}
+
+func reportGoOnlySuite(
+	p *pkg, s *model.Test, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
+	ll = append(ll, blankLine)
+	tr := p.OfTest(s)
+	ll, llMask = reportGoSuiteLine(
+		tr, view.GoSuiteLine, "", ll, llMask)
+	tr.ForOrdered(func(sr *model.SubResult) {
+		ll, llMask = reportSubTestLine(sr, indent+indent, ll, llMask)
+	})
 	return ll, llMask
 }
 
@@ -107,9 +88,7 @@ func goSplitTests(p *pkg) (
 func goWithoutSubs(
 	p *pkg, ll rprLines, llMask linesMask, n, f int, without []*model.Test,
 ) (rprLines, linesMask) {
-	ll = append(ll, fmt.Sprintf("%s: %d/%d %v", p.ID(), n, f,
-		p.Duration.Round(1*time.Millisecond)))
-	llMask[uint(len(ll)-1)] = view.PackageLine
+	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
 	ll = append(ll, blankLine)
 	for _, t := range without {
 		ll, llMask = reportTestLine(p.OfTest(t), "", ll, llMask)

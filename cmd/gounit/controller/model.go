@@ -5,6 +5,7 @@
 package controller
 
 import (
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -55,7 +56,16 @@ type reporter interface {
 func (s *modelState) update(st *state) {
 	s.Lock()
 	s.state = st
+	if len(s.ee) > 0 {
+		status := reportStatus(s.pp)
+		s.view = []interface{}{
+			reportFailed(s.state, s.lineListener), status}
+		s.viewUpdater(s.view...)
+	}
 	s.Unlock()
+	if len(s.ee) > 0 {
+		return
+	}
 	s.report(rprDefault)
 }
 
@@ -106,12 +116,6 @@ func (s *modelState) _report(t reportType, idx int) {
 		return
 	}
 	status := reportStatus(s.pp)
-	if len(s.ee) > 0 {
-		s.view = []interface{}{
-			reportFailed(s.state, s.lineListener), status}
-		s.viewUpdater(s.view...)
-		return
-	}
 	if t == rprPackages {
 		s.view = []interface{}{
 			reportPackages(s.pp, s.lineListener), status}
@@ -130,9 +134,29 @@ func (s *modelState) _report(t reportType, idx int) {
 		}
 	}
 	ll, llMask, p := rprLines{}, linesMask{}, s.pp[s.latestPkg]
+	if len(s.ee) > 0 {
+		ll, llMask = s.reportFailedPkgsBut(p, ll, llMask)
+	}
+	if p.HasErr() {
+		ll, llMask = reportFailedPkg(p, ll, llMask)
+		s.view = []interface{}{&report{
+			flags:   view.RpClearing,
+			ll:      ll,
+			llMasks: llMask,
+			lst:     s.lineListener,
+		}, status}
+		s.viewUpdater(s.view...)
+		return
+	}
 	switch p.LenSuites() {
 	case 0:
-		ll, llMask = reportGoOnlyPkg(t, p, ll, llMask)
+		switch t {
+		case rprGoSuite:
+			ll, llMask = reportGoOnlySuite(
+				p, s.findGoSuite(p, idx), ll, llMask)
+		default:
+			ll, llMask = reportGoOnlyPkg(p, ll, llMask)
+		}
 	default:
 		ll, llMask = s.reportMixedPkg(t, idx, p, ll, llMask)
 	}
@@ -143,6 +167,22 @@ func (s *modelState) _report(t reportType, idx int) {
 		lst:     s.lineListener,
 	}, status}
 	s.viewUpdater(s.view...)
+}
+
+func (s *modelState) reportFailedPkgsBut(
+	p *pkg, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	sort.Slice(s.ee, func(i, j int) bool {
+		return s.ee[i].ID() < s.ee[j].ID()
+	})
+	for _, ep := range s.ee {
+		if ep.ID() == p.ID() {
+			continue
+		}
+		ll, llMask = reportPackageLine(
+			ep, view.PackageFoldedLine, ll, llMask)
+	}
+	return ll, llMask
 }
 
 func (s *modelState) reportMixedPkg(
@@ -165,22 +205,27 @@ func (s *modelState) reportMixedPkg(
 		})
 		return reportMixedSuite(suite, p, ll, llMask)
 	case rprGoSuite:
-		var goSuite *model.Test
-		ln := strings.Split(s.view[0].(*report).ll[idx],
-			lines.LineFiller)[0]
-		p.ForTest(func(t *model.Test) {
-			if goSuite != nil {
-				return
-			}
-			if ln == indent+t.String() {
-				goSuite = t
-			}
-		})
-		return reportMixedGoSuite(goSuite, p, ll, llMask)
+		return reportMixedGoSuite(
+			s.findGoSuite(p, idx), p, ll, llMask)
 	case rprDefault, rprPackage:
 		return reportMixedFolded(p, ll, llMask)
 	}
 	return ll, llMask
+}
+
+func (s *modelState) findGoSuite(p *pkg, idx int) *model.Test {
+	var goSuite *model.Test
+	ln := strings.TrimSpace(strings.Split(
+		s.view[0].(*report).ll[idx], lines.LineFiller)[0])
+	p.ForTest(func(t *model.Test) {
+		if goSuite != nil {
+			return
+		}
+		if ln == t.String() {
+			goSuite = t
+		}
+	})
+	return goSuite
 }
 
 func watch(

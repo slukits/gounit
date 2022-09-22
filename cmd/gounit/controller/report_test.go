@@ -60,11 +60,11 @@ func (s *Report) Folds_tests_if_selecting_suite_with_shown_tests(t *T) {
 
 	t.StarMatched(
 		tt.Reporting().String(),
-		fxExp["go/pass: folded"]...,
+		fxExp["go/pass suite"]...,
 	)
 	t.Not.StarMatched(
 		tt.Reporting().String(),
-		fxNotExp["go/pass: folded"]...,
+		fxNotExp["go/pass suite"]...,
 	)
 }
 
@@ -265,6 +265,42 @@ func (s *Report) Logged_text(t *T) {
 	tt.ClickReporting(3) // select suite
 	t.StarMatched(
 		tt.Reporting().String(), fxExp["logging suite"]...)
+}
+
+func (s *Report) lineIsFailing(l lines.TestLine) bool {
+	for i, r := range l.String() {
+		if r == ' ' {
+			continue
+		}
+		return l.Styles().Of(i).HasBG(tcell.ColorRed)
+	}
+	return false
+}
+
+func (s *Report) Failing_go_tests_ony_package(t *T) {
+	failingLines := []int{0, 2, 7}
+	_, tt := s.fxSource(t, "fail/gonly")
+	got := tt.afterWatch(awReporting)
+	t.FatalIfNot(t.True(len(got) > 7))
+	for _, l := range failingLines {
+		t.True(s.lineIsFailing(got[l]))
+	}
+
+	tt.ClickReporting(7)
+	failingLines = []int{0, 2, 4}
+	got = tt.Reporting()
+	t.FatalIfNot(t.True(len(got) > 4))
+	for _, l := range failingLines {
+		t.True(s.lineIsFailing(got[l]))
+	}
+}
+
+func (s *Report) Failing_package_due_to_compile_error(t *T) {
+	_, tt := s.fxSource(t, "fail/compile")
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["fail compile"]...,
+	)
 }
 
 func TestReport(t *testing.T) {

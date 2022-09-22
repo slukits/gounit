@@ -6,6 +6,8 @@ package controller
 
 import (
 	"fmt"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -78,6 +80,9 @@ func reportPackages(pp pkgs, lst func(int)) *report {
 
 func reportFailed(st *state, lst func(int)) *report {
 	ll, llMask := rprLines{}, linesMask{}
+	sort.Slice(st.ee[:len(st.ee)-1], func(i, j int) bool {
+		return st.ee[i].ID() < st.ee[j].ID()
+	})
 	for _, p := range st.ee[:len(st.ee)-1] {
 		ll, llMask = reportPackageLine(
 			p, view.PackageFoldedLine, ll, llMask)
@@ -91,25 +96,48 @@ func reportFailed(st *state, lst func(int)) *report {
 	}
 }
 
+var reFileLoc = regexp.MustCompile(`^./.*?.go:[0-9]*?:[0-9]*?:`)
+
 func reportFailedPkg(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 
-	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
 	if p.HasErr() {
-		for _, s := range strings.Split(p.Err(), "\n") {
-			ll = append(ll, s)
-			llMask[uint(len(ll)-1)] = view.OutputLine
-		}
-		return ll, llMask
+		ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
+		return reportPkgErr(p, ll, llMask)
+	}
+	if p.LenSuites() == 0 {
+		return reportGoOnlyPkg(p, ll, llMask)
 	}
 
+	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
 	ll, llMask, goTestsFailed := reportFailedPkgGoTests(p, ll, llMask)
 
 	if goTestsFailed {
-		return reportFailedPkgSuiteHeader(p, ll, llMask)
+		return reportFailedPkgSuitesHeader(p, ll, llMask)
 	}
 	return reportFailedPkgSuites(p, ll, llMask)
+}
+
+func reportPkgErr(
+	p *pkg, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	for _, s := range strings.Split(p.Err(), "\n") {
+		if strings.HasPrefix(s, "# ") {
+			continue
+		}
+		flLoc := reFileLoc.FindString(s)
+		if flLoc == "" {
+			ll = append(ll, indent+s)
+			llMask[uint(len(ll)-1)] = view.OutputLine
+			continue
+		}
+		ll = append(ll, indent+filepath.Join(p.ID(), flLoc[2:]))
+		llMask[uint(len(ll)-1)] = view.OutputLine
+		ll = append(ll, indent+indent+strings.TrimSpace(s[len(flLoc):]))
+		llMask[uint(len(ll)-1)] = view.OutputLine
+	}
+	return ll, llMask
 }
 
 // reportFailedPkgGoTests reports (potentially) failed go tests.  If
@@ -147,7 +175,7 @@ func reportFailedPkgGoTests(
 	}
 	for _, t := range tt[:len(tt)-1] {
 		ll, llMask = reportGoSuiteLine(
-			p.OfTest(t), view.GoSuiteFoldedLine, ll, llMask)
+			p.OfTest(t), view.GoSuiteFoldedLine, indent, ll, llMask)
 	}
 	reportGoSuite(p.OfTest(tt[len(tt)-1]), ll, llMask)
 	return ll, llMask, true
@@ -158,7 +186,7 @@ func reportGoSuitesFolded(
 ) (rprLines, linesMask) {
 	for _, t := range with {
 		ll, llMask = reportGoSuiteLine(
-			p.OfTest(t), view.GoSuiteFoldedLine, ll, llMask)
+			p.OfTest(t), view.GoSuiteFoldedLine, indent, ll, llMask)
 	}
 	return ll, llMask
 }
@@ -166,23 +194,34 @@ func reportGoSuitesFolded(
 func reportGoSuite(
 	r *model.TestResult, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
-	ll, llMask = reportGoSuiteLine(r, view.GoSuiteLine, ll, llMask)
+	ll, llMask = reportGoSuiteLine(r, view.GoSuiteLine, indent, ll, llMask)
 	r.ForOrdered(func(r *model.SubResult) {
 		ll, llMask = reportSubTestLine(r, indent+indent, ll, llMask)
 	})
 	return ll, llMask
 }
 
-func reportFailedPkgSuiteHeader(
+func reportFailedPkgSuitesHeader(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
+	ss := []*model.TestSuite{}
 	p.ForSuite(func(s *model.TestSuite) {
 		if p.OfSuite(s).Passed {
 			return
 		}
+		ss = append(ss, s)
+	})
+	if len(ss) == 0 {
+		return ll, llMask
+	}
+	sort.Slice(ss, func(i, j int) bool {
+		return ss[i].Name() < ss[j].Name()
+	})
+
+	for _, s := range ss {
 		ll, llMask = reportSuiteLine(
 			p, s, view.SuiteFoldedLine, ll, llMask)
-	})
+	}
 	return ll, llMask
 }
 
@@ -200,6 +239,9 @@ func reportFailedPkgSuites(
 	if len(ss) == 0 {
 		return ll, llMask
 	}
+	sort.Slice(ss[:len(ss)-1], func(i, j int) bool {
+		return ss[i].Name() < ss[j].Name()
+	})
 
 	for _, s := range ss[:len(ss)-1] {
 		ll, llMask = reportSuiteLine(
@@ -246,6 +288,12 @@ func reportPackageLine(
 	p *pkg, lm view.LineMask, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 
+	if p.HasErr() {
+		ll = append(ll, p.ID())
+		idx := uint(len(ll) - 1)
+		llMask[idx] = lm | view.Failed
+		return ll, llMask
+	}
 	n, f, d := p.info()
 	ll = append(ll, fmt.Sprintf("%s%s%d/%d %s",
 		p.ID(), lines.LineFiller, n, f, d.Round(1*time.Millisecond)))
@@ -262,8 +310,11 @@ func reportGoTestsLine(
 	ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 
-	content := fmt.Sprintf("go-tests%s%d/%d %s",
-		lines.LineFiller, n, f, d.Round(1*time.Millisecond))
+	content := "go-tests"
+	if lm == view.GoTestsFoldedLine {
+		content = fmt.Sprintf("%s%s%d/%d %s", content,
+			lines.LineFiller, n, f, d.Round(1*time.Millisecond))
+	}
 	ll = append(ll, content)
 	idx := uint(len(ll) - 1)
 	llMask[idx] = lm
@@ -274,9 +325,10 @@ func reportGoTestsLine(
 }
 
 func reportGoSuiteLine(
-	r *model.TestResult, lm view.LineMask, ll rprLines, llMask linesMask,
+	r *model.TestResult, lm view.LineMask, i string,
+	ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
-	content := indent + r.String()
+	content := i + r.String()
 	if lm == view.GoSuiteFoldedLine {
 		content = fmt.Sprintf("%s%s%d/%d %s",
 			content, lines.LineFiller, r.Len(), r.LenFailed(),
@@ -315,10 +367,14 @@ func reportTestLine(
 	r *model.TestResult, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	ll = append(ll, fmt.Sprintf("%s%s%s",
-		indent+r.String(),
+		i+r.String(),
 		lines.LineFiller,
 		r.End.Sub(r.Start).Round(1*time.Millisecond)))
-	llMask[uint(len(ll)-1)] = view.TestLine
+	idx := uint(len(ll) - 1)
+	llMask[idx] = view.TestLine
+	if !r.Passed {
+		llMask[idx] = view.Failed
+	}
 	for _, out := range r.Output {
 		ll = append(ll, i+indent+strings.TrimSpace(out))
 		llMask[uint(len(ll)-1)] = view.OutputLine
@@ -333,7 +389,11 @@ func reportSubTestLine(
 		i+r.String(),
 		lines.LineFiller,
 		r.End.Sub(r.Start).Round(1*time.Millisecond)))
-	llMask[uint(len(ll)-1)] = view.TestLine
+	idx := uint(len(ll) - 1)
+	llMask[idx] = view.TestLine
+	if !r.Passed {
+		llMask[idx] = view.Failed
+	}
 	for _, out := range r.Output {
 		ll = append(ll, i+indent+strings.TrimSpace(out))
 		llMask[uint(len(ll)-1)] = view.OutputLine
@@ -345,9 +405,12 @@ func reportStatus(pp pkgs) *view.Statuser {
 	// count suites, tests and failed tests
 	ssLen, ttLen, ffLen := 0, 0, 0
 	for _, p := range pp {
+		if p.HasErr() {
+			continue
+		}
 		ssLen += p.LenSuites()
 		p.ForTest(func(t *model.Test) {
-			n := p.Results.OfTest(t).Len()
+			n := p.OfTest(t).Len()
 			if n == 1 {
 				ttLen++
 				return

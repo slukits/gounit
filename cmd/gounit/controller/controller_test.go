@@ -117,6 +117,27 @@ func (s *Gounit) Shows_last_report_going_back_from_about_help(t *T) {
 	t.Eq(exp, tt.Trim(tt.Reporting()).String())
 }
 
+func (s *Gounit) Folds_unfolds_go_tests_only_package(t *T) {
+	_, tt := s.fxSource(t, "go/pass")
+	t.StarMatched(
+		tt.afterWatch(awReporting).String(),
+		fxExp["go/pass"]...,
+	)
+
+	tt.ClickReporting(0)
+	t.Not.StarMatched(
+		tt.Reporting().String(),
+		fxExp["go/pass"]...,
+	)
+	t.Contains(tt.Reporting().String(), "go/pass")
+
+	tt.ClickReporting(0)
+	t.StarMatched(
+		tt.Reporting().String(),
+		fxExp["go/pass"]...,
+	)
+}
+
 func TestGounit(t *testing.T) {
 	t.Parallel()
 	Run(&Gounit{}, t)

@@ -5,14 +5,11 @@
 package controller
 
 var fxExp = map[string][]string{
-	// go/pass package should display all test and sub-test names
-	"go/pass": {"test pass 1", "test pass 2", "test pass 3",
-		"test pass 4", "p4 sub 1", "p4 sub 2", "p4 sub 3", "p4 sub 4",
-		"test pass 5", "p5 sub 1", "p5 sub 2", "p5 sub 3", "p5 sub 4",
-	},
-	// go/pass folded should display test-names only (see fxNotExp)
-	"go/pass: folded": {"test pass 1", "test pass 2", "test pass 3",
+	// go/pass should display test-names only (see fxNotExp)
+	"go/pass": {"go/pass", "test pass 1", "test pass 2", "test pass 3",
 		"test pass 4", "test pass 5"},
+	"go/pass suite": {"go/pass", "test pass 4", "p4 sub 1", "p4 sub 2",
+		"p4 sub 3", "p4 sub 4"},
 	// mixed/pass should contain initially "go-tests" and the suites
 	"mixed/pass": {"mixed/pass", "go-tests", "suite 1", "suite 2",
 		"suite 3", "suite 4", "suite 5"},
@@ -38,11 +35,17 @@ var fxExp = map[string][]string{
 	"logging suite": {"logging", "suite", "init-log:", "suite init log",
 		"suite test log", "suite-test log", "finalize-log",
 		"suite finalize log"},
+	"fail compile": {"fail/compile", "shell exit error: exit status 2:",
+		"fail/compile/compile_test.go:7:33:", "undefined: Sum",
+		"FAIL example.com/gounit/controller/golden/fail/compile " +
+			"[build failed]"},
 }
 
 var fxNotExp = map[string][]string{
-	// folded shouldn't contain the sub-tests of the go/pass-package
-	"go/pass: folded": {"p4_sub_1", "p4_sub_2", "p4_sub_3", "p4_sub_4"},
+	// go-pass shouldn't contain the sub-tests of the go/pass-package
+	"go/pass": {"p4_sub_1", "p4_sub_2", "p4_sub_3", "p4_sub_4"},
+	"go/pass suite": {"test pass 1", "test pass 2", "test pass 3",
+		"test pass 4", "test pass 5"},
 	// mixed/pass shouldn't contain initially sub-tests or suite-test
 	"mixed/pass": {"Suite_test", "_sub_"},
 	// mixed/pass go folded subs shouldn't contain suites and subs

@@ -123,7 +123,7 @@ func (tp *TestingPackage) Run() (*Results, error) {
 	if jsonErr != nil {
 		if err != nil {
 			return &Results{Duration: time.Since(start),
-				err: fmt.Sprintf("%s%v: %s",
+				err: fmt.Sprintf("%s%v:\n%s",
 					StdErr, err, string(stdout))}, nil
 		}
 		return &Results{Duration: time.Since(start),
