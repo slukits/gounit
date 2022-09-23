@@ -148,10 +148,10 @@ const (
 	awButtons
 )
 
-// afterWatch returns the requested screen portion after the watcher of
+// afterWatchScr returns the requested screen portion after the watcher of
 // a source directory has reported a change to the view which in turn
 // has updated the screen.
-func (tt *Testing) afterWatch(c uiCmp) lines.TestScreen {
+func (tt *Testing) afterWatchScr(c uiCmp) lines.TestScreen {
 	tt.T.GoT().Helper()
 	tt.Lock()
 	cn := tt._afterWatch
@@ -173,6 +173,37 @@ func (tt *Testing) afterWatch(c uiCmp) lines.TestScreen {
 			"timed out without a watch-update")
 	}
 	return nil
+}
+
+func (tt *Testing) afterWatch(f func()) {
+	tt.T.GoT().Helper()
+	tt.Lock()
+	cn := tt._afterWatch
+	tt.Unlock()
+	select {
+	case <-cn:
+		f()
+	case <-tt.T.Timeout(tt._watchTimeout):
+		tt.T.Fatal("controller: testing: after watch: " +
+			"timed out without a watch-update")
+	}
+}
+
+// beforeWatch calls given function and waits for an update of watched
+// directory, i.e. given function must trigger an source-file update in
+// watched directory.
+func (tt *Testing) beforeWatch(f func()) {
+	tt.T.GoT().Helper()
+	tt.Lock()
+	cn := tt._afterWatch
+	tt.Unlock()
+	f()
+	select {
+	case <-cn:
+	case <-tt.T.Timeout(tt._watchTimeout):
+		tt.T.Fatal("controller: testing: after watch: " +
+			"timed out without a watch-update")
+	}
 }
 
 const (

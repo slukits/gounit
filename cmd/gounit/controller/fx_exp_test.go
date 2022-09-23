@@ -10,11 +10,18 @@ var fxExp = map[string][]string{
 		"test pass 4", "test pass 5"},
 	"go/pass suite": {"go/pass", "test pass 4", "p4 sub 1", "p4 sub 2",
 		"p4 sub 3", "p4 sub 4"},
-	// mixed/pass should contain initially "go-tests" and the suites
-	"mixed/pass": {"mixed/pass", "go-tests", "suite 1", "suite 2",
-		"suite 3", "suite 4", "suite 5"},
+	"mixed/pass init": {"mixed/pass", "suite 3", "suite test 3 1",
+		"suite test 3 2", "suite test 3 3", "suite test 3 4",
+		"suite test 3 5"},
+	"mixed/pass fold suite": {"mixed/pass", "go-tests", "suite 1",
+		"suite 2", "suite 3", "suite 4", "suite 5"},
+	"mixed/pass unfold suite": {"mixed/pass", "suite 2",
+		"suite test 2 1", "suite test 2 2", "suite test 2 3",
+		"suite test 2 4", "suite test 2 5"},
 	"mixed/pass go folded subs": {"mixed/pass", "go-tests", "test pass 1",
 		"test pass 2", "test pass 3", "test pass 4", "test pass 5"},
+	"mixed/pass go unfolded suite": {"mixed/pass", "go-tests", "test pass 4",
+		"p4 sub 1", "p4 sub 2", "p4 sub 3", "p4 sub 4"},
 	"mixed/pass first suite": {"mixed/pass", "suite 1",
 		"suite test 1 1", "suite test 1 2", "suite test 1 3",
 		"suite test 1 4", "suite test 1 5"},
@@ -44,6 +51,8 @@ var fxExp = map[string][]string{
 var fxNotExp = map[string][]string{
 	// go-pass shouldn't contain the sub-tests of the go/pass-package
 	"go/pass": {"p4_sub_1", "p4_sub_2", "p4_sub_3", "p4_sub_4"},
+	"go/pass init": {"go-tests", "suite 1", "suite 2", "suite 4",
+		"suite 5"},
 	"go/pass suite": {"test pass 1", "test pass 2", "test pass 3",
 		"test pass 4", "test pass 5"},
 	// mixed/pass shouldn't contain initially sub-tests or suite-test

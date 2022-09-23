@@ -81,13 +81,60 @@ func (tp *TestingPackage) LenSuites() int {
 }
 
 // ForSuite provides given testing package's suites.  ForSuite fails in
-// case of an parse error.
+// case of an parse error.  Note the last suite is of the package's most
+// recently modified test file.
 func (tp *TestingPackage) ForSuite(cb func(*TestSuite)) error {
 	if err := tp.ensureParsing(); err != nil {
 		return err
 	}
 	for _, s := range tp.suites {
 		cb(s)
+	}
+	return nil
+}
+
+// ForSortedSuite calls back for each suite of given package whereas the
+// suites are ordered by name instead of the modification date of the
+// test file they belong to.
+func (tp *TestingPackage) ForSortedSuite(cb func(*TestSuite)) error {
+	if err := tp.ensureParsing(); err != nil {
+		return err
+	}
+	if len(tp.suites) == 0 {
+		return nil
+	}
+	sorted := append(suites{}, tp.suites...)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].name < sorted[j].name
+	})
+	for _, s := range sorted {
+		cb(s)
+	}
+	return nil
+}
+
+func (tp *TestingPackage) LastSuite() *TestSuite {
+	if err := tp.ensureParsing(); err != nil {
+		return nil
+	}
+	if len(tp.suites) == 0 {
+		return nil
+	}
+	return tp.suites[len(tp.suites)-1]
+}
+
+func (tp *TestingPackage) Suite(name string) *TestSuite {
+	if err := tp.ensureParsing(); err != nil {
+		return nil
+	}
+	if len(tp.suites) == 0 {
+		return nil
+	}
+	for _, s := range tp.suites {
+		if s.name != name {
+			continue
+		}
+		return s
 	}
 	return nil
 }

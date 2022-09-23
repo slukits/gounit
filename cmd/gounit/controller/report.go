@@ -104,6 +104,7 @@ func reportFailedPkg(
 
 	if p.HasErr() {
 		ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
+		ll = append(ll, blankLine)
 		return reportPkgErr(p, ll, llMask)
 	}
 	if p.LenSuites() == 0 {
@@ -111,6 +112,7 @@ func reportFailedPkg(
 	}
 
 	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
+	ll = append(ll, blankLine)
 	ll, llMask, goTestsFailed := reportFailedPkgGoTests(p, ll, llMask)
 
 	if goTestsFailed {
@@ -214,6 +216,7 @@ func reportFailedPkgSuitesHeader(
 	if len(ss) == 0 {
 		return ll, llMask
 	}
+	ll = append(ll, blankLine)
 	sort.Slice(ss, func(i, j int) bool {
 		return ss[i].Name() < ss[j].Name()
 	})

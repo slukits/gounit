@@ -20,6 +20,7 @@ type state struct {
 	pp          pkgs
 	ee          []*pkg
 	latestPkg   string
+	lastSuite   string
 	latestSuite string
 }
 
@@ -55,6 +56,9 @@ type reporter interface {
 
 func (s *modelState) update(st *state) {
 	s.Lock()
+	if st.latestPkg == s.latestPkg {
+		st.lastSuite = s.lastSuite
+	}
 	s.state = st
 	if len(s.ee) > 0 {
 		status := reportStatus(s.pp)
@@ -90,11 +94,11 @@ func (s *modelState) reportTransition(idx int) reportType {
 	case lm&view.GoTestsFoldedLine > 0:
 		return rprGoTests
 	case lm&view.GoTestsLine > 0:
-		return rprDefault
+		return rprPackage
 	case lm&view.SuiteFoldedLine > 0:
 		return rprSuite
 	case lm&view.SuiteLine > 0:
-		return rprDefault
+		return rprPackage
 	case lm&view.PackageFoldedLine > 0:
 		return rprPackage
 	}
@@ -190,6 +194,7 @@ func (s *modelState) reportMixedPkg(
 ) (rprLines, linesMask) {
 	switch t {
 	case rprGoTests, rprGoSuiteFolded:
+		s.lastSuite = "go-tests"
 		return reportMixedGoTests(p, ll, llMask)
 	case rprSuite:
 		var suite *model.TestSuite
@@ -203,14 +208,58 @@ func (s *modelState) reportMixedPkg(
 				suite = ts
 			}
 		})
+		s.lastSuite = suite.Name()
 		return reportMixedSuite(suite, p, ll, llMask)
 	case rprGoSuite:
-		return reportMixedGoSuite(
-			s.findGoSuite(p, idx), p, ll, llMask)
-	case rprDefault, rprPackage:
+		gSuite := s.findGoSuite(p, idx)
+		s.lastSuite = "go-tests:" + gSuite.Name()
+		return reportMixedGoSuite(gSuite, p, ll, llMask)
+	case rprPackage:
+		return reportMixedFolded(p, ll, llMask)
+	case rprDefault:
+		var suite *model.TestSuite
+		if s.lastSuite != "" {
+			if strings.HasPrefix(s.lastSuite, "go-tests") {
+				return s.reportLockedGoSuite(p, ll, llMask)
+			}
+			suite = p.Suite(s.lastSuite)
+		}
+		if suite == nil {
+			s.lastSuite = ""
+			suite = p.LastSuite()
+		}
+		if suite != nil {
+			return reportMixedSuite(suite, p, ll, llMask)
+		}
 		return reportMixedFolded(p, ll, llMask)
 	}
 	return ll, llMask
+}
+
+func (s *modelState) reportLockedGoSuite(
+	p *pkg, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	if p.LenTests() == 0 {
+		return reportMixedFolded(p, ll, llMask)
+	}
+	if s.lastSuite == "go-tests" {
+		return reportMixedGoTests(p, ll, llMask)
+	}
+	goSuiteName := strings.Split(s.lastSuite, ":")[1]
+	var goSuite *model.Test
+	p.ForTest(func(t *model.Test) {
+		if goSuite != nil {
+			return
+		}
+		if t.Name() != goSuiteName {
+			return
+		}
+		goSuite = t
+	})
+	if goSuite != nil {
+		return reportMixedGoSuite(goSuite, p, ll, llMask)
+	}
+	return reportMixedFolded(p, ll, llMask)
 }
 
 func (s *modelState) findGoSuite(p *pkg, idx int) *model.Test {
