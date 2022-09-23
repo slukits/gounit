@@ -96,8 +96,6 @@ func reportFailed(st *state, lst func(int)) *report {
 	}
 }
 
-var reFileLoc = regexp.MustCompile(`^./.*?.go:[0-9]*?:[0-9]*?:`)
-
 func reportFailedPkg(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
@@ -121,6 +119,8 @@ func reportFailedPkg(
 	return reportFailedPkgSuites(p, ll, llMask)
 }
 
+var reFileLoc = regexp.MustCompile(`^.*?.go:[0-9]*?:[0-9]*?:`)
+
 func reportPkgErr(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
@@ -128,13 +128,14 @@ func reportPkgErr(
 		if strings.HasPrefix(s, "# ") {
 			continue
 		}
+		s = strings.TrimPrefix(s, "./")
 		flLoc := reFileLoc.FindString(s)
 		if flLoc == "" {
 			ll = append(ll, indent+s)
 			llMask[uint(len(ll)-1)] = view.OutputLine
 			continue
 		}
-		ll = append(ll, indent+filepath.Join(p.ID(), flLoc[2:]))
+		ll = append(ll, indent+filepath.Join(p.ID(), flLoc))
 		llMask[uint(len(ll)-1)] = view.OutputLine
 		ll = append(ll, indent+indent+strings.TrimSpace(s[len(flLoc):]))
 		llMask[uint(len(ll)-1)] = view.OutputLine
@@ -162,7 +163,7 @@ func reportFailedPkgGoTests(
 	if without.haveFailed(p) {
 		ll = append(ll, blankLine)
 		for _, t := range without {
-			ll, llMask = reportTestLine(p.OfTest(t), indent, ll, llMask)
+			ll, llMask = reportTestLine(p, p.OfTest(t), indent, ll, llMask)
 		}
 		ll = append(ll, blankLine)
 		ll, llMask = reportGoSuitesFolded(p, with, ll, llMask)
@@ -179,7 +180,7 @@ func reportFailedPkgGoTests(
 		ll, llMask = reportGoSuiteLine(
 			p.OfTest(t), view.GoSuiteFoldedLine, indent, ll, llMask)
 	}
-	reportGoSuite(p.OfTest(tt[len(tt)-1]), ll, llMask)
+	reportGoSuite(p, p.OfTest(tt[len(tt)-1]), ll, llMask)
 	return ll, llMask, true
 }
 
@@ -194,11 +195,11 @@ func reportGoSuitesFolded(
 }
 
 func reportGoSuite(
-	r *model.TestResult, ll rprLines, llMask linesMask,
+	p *pkg, r *model.TestResult, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	ll, llMask = reportGoSuiteLine(r, view.GoSuiteLine, indent, ll, llMask)
 	r.ForOrdered(func(r *model.SubResult) {
-		ll, llMask = reportSubTestLine(r, indent+indent, ll, llMask)
+		ll, llMask = reportSubTestLine(p, r, indent+indent, ll, llMask)
 	})
 	return ll, llMask
 }
@@ -260,23 +261,21 @@ func reportSuite(
 
 	ll, llMask = reportSuiteLine(p, s, view.SuiteLine, ll, llMask)
 	rr := p.OfSuite(s)
-	for i, out := range rr.InitOut {
-		if i == 0 {
-			ll = append(ll, indent+"init-log:")
-		}
-		ll = append(ll, indent+indent+strings.TrimSpace(out))
-	}
 	if len(rr.InitOut) > 0 {
+		ll = append(ll, indent+"init-log:")
+		llMask[uint(len(ll)-1)] = view.OutputLine
+		ll, llMask = reportOutput(
+			p, rr.InitOut, indent, ll, llMask)
 		ll = append(ll, blankLine)
 	}
 	s.ForTest(func(t *model.Test) {
-		ll, llMask = reportSubTestLine(rr.OfTest(t), indent, ll, llMask)
+		ll, llMask = reportSubTestLine(p, rr.OfTest(t), indent, ll, llMask)
 	})
-	for i, out := range rr.FinalizeOut {
-		if i == 0 {
-			ll = append(ll, blankLine, indent+"finalize-log:")
-		}
-		ll = append(ll, indent+indent+strings.TrimSpace(out))
+	if len(rr.FinalizeOut) > 0 {
+		ll = append(ll, indent+"finalize-log:")
+		llMask[uint(len(ll)-1)] = view.OutputLine
+		ll, llMask = reportOutput(
+			p, rr.FinalizeOut, indent, ll, llMask)
 	}
 	return ll, llMask
 }
@@ -367,7 +366,7 @@ func reportSuiteLine(
 }
 
 func reportTestLine(
-	r *model.TestResult, i string, ll rprLines, llMask linesMask,
+	p *pkg, r *model.TestResult, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	ll = append(ll, fmt.Sprintf("%s%s%s",
 		i+r.String(),
@@ -378,15 +377,11 @@ func reportTestLine(
 	if !r.Passed {
 		llMask[idx] = view.Failed
 	}
-	for _, out := range r.Output {
-		ll = append(ll, i+indent+strings.TrimSpace(out))
-		llMask[uint(len(ll)-1)] = view.OutputLine
-	}
-	return ll, llMask
+	return reportOutput(p, r.Output, i+indent, ll, llMask)
 }
 
 func reportSubTestLine(
-	r *model.SubResult, i string, ll rprLines, llMask linesMask,
+	p *pkg, r *model.SubResult, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	ll = append(ll, fmt.Sprintf("%s%s%s",
 		i+r.String(),
@@ -397,8 +392,32 @@ func reportSubTestLine(
 	if !r.Passed {
 		llMask[idx] = view.Failed
 	}
-	for _, out := range r.Output {
-		ll = append(ll, i+indent+strings.TrimSpace(out))
+	return reportOutput(p, r.Output, i+indent, ll, llMask)
+}
+
+var reOutFileLoc = regexp.MustCompile(`^.*?\.go:[0-9]+?:`)
+
+func reportOutput(
+	p *pkg, out []string, i string, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	if len(out) == 0 {
+		return ll, llMask
+	}
+	startIdx := 0
+	flLoc := reOutFileLoc.FindString(out[0])
+	if flLoc != "" {
+		ll = append(ll, i+filepath.Join(p.ID(), flLoc))
+		llMask[uint(len(ll)-1)] = view.OutputLine
+		i += indent
+		ll = append(ll, i+strings.TrimSpace(out[0][len(flLoc):]))
+		llMask[uint(len(ll)-1)] = view.OutputLine
+		startIdx = 1
+	}
+	if len(out) == startIdx {
+		return ll, llMask
+	}
+	for _, s := range out[startIdx:] {
+		ll = append(ll, i+indent+s)
 		llMask[uint(len(ll)-1)] = view.OutputLine
 	}
 	return ll, llMask

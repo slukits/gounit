@@ -55,9 +55,12 @@ func reportMixedGoSuite(
 	ll, llMask = reportGoSuiteLine(
 		tr, view.GoSuiteLine, indent, ll, llMask)
 	tr.ForOrdered(func(sr *model.SubResult) {
-		ll, llMask = reportSubTestLine(sr, indent+indent, ll, llMask)
+		ll, llMask = reportSubTestLine(p, sr, indent+indent, ll, llMask)
 	})
-	ll, llMask, _ = reportFailedSuitesBut(nil, p, ll, llMask)
+	if p.HasFailedSuite() {
+		ll = append(ll, blankLine)
+		ll, llMask, _ = reportFailedSuitesBut(nil, p, ll, llMask)
+	}
 	return ll, llMask
 }
 
@@ -69,7 +72,7 @@ func reportFailedGoTests(
 		if p.OfTest(t).Passed || p.OfTest(t).HasSubs() {
 			return
 		}
-		ll, llMask = reportTestLine(p.OfTest(t), indent, ll, llMask)
+		ll, llMask = reportTestLine(p, p.OfTest(t), indent, ll, llMask)
 	})
 
 	return ll, llMask
@@ -89,7 +92,6 @@ func reportFailedSuitesBut(
 	if len(ss) == 0 {
 		return ll, llMask, false
 	}
-	// ll = append(ll, blankLine)
 
 	sort.Slice(ss, func(i, j int) bool {
 		return ss[i].Name() < ss[j].Name()
@@ -169,12 +171,12 @@ func reportGoTestWithSubsFolded(
 		ll = append(ll, blankLine)
 	}
 	for _, t := range without {
-		ll, llMask = reportTestLine(p.OfTest(t), indent, ll, llMask)
+		ll, llMask = reportTestLine(p, p.OfTest(t), indent, ll, llMask)
 	}
 	ll = append(ll, blankLine)
 	for _, t := range withSubs {
-		ll = append(ll, withFoldInfo(indent+t.String(), p.OfTest(t)))
-		llMask[uint(len(ll)-1)] = view.GoSuiteFoldedLine
+		ll, llMask = reportGoSuiteLine(
+			p.OfTest(t), view.GoSuiteFoldedLine, indent, ll, llMask)
 	}
 	return ll, llMask, len(withSubs) > 0
 }

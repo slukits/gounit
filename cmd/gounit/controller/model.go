@@ -341,6 +341,20 @@ func (p *pkg) info() (n, f int, d time.Duration) {
 	return n, f, p.Duration
 }
 
+func (p *pkg) HasFailedSuite() bool {
+	failed := false
+	p.ForSuite(func(ts *model.TestSuite) {
+		if failed {
+			return
+		}
+		if p.OfSuite(ts).Passed {
+			return
+		}
+		failed = true
+	})
+	return failed
+}
+
 type pkgs map[string]*pkg
 
 // reportType values type model-state reports which is leveraged

@@ -53,6 +53,10 @@ type Testing struct {
 	golden *tfs.Dir
 }
 
+func (tt *Testing) collapseAll() {
+	tt._controller.model.report(rprPackages)
+}
+
 // cleanUp stop all go-routines initiated by a controller test.
 func (tt *Testing) cleanUp() {
 	if tt._ee != nil && tt._ee.IsListening() {
@@ -175,6 +179,8 @@ func (tt *Testing) afterWatchScr(c uiCmp) lines.TestScreen {
 	return nil
 }
 
+// afterWatch waits for an update of watched directory and executes
+// after it given function.
 func (tt *Testing) afterWatch(f func()) {
 	tt.T.GoT().Helper()
 	tt.Lock()

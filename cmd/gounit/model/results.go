@@ -299,7 +299,9 @@ func (r *results) addEvent(e *event) {
 				break
 			}
 			out := strings.Replace(e.Output, gounit.InitPrefix, "", 1)
-			tr.InitOut = append(tr.InitOut, out)
+			for _, s := range strings.Split(out, "\n") {
+				tr.InitOut = append(tr.InitOut, strings.TrimSpace(s))
+			}
 			break
 		}
 		if strings.Contains(e.Output, gounit.FinalPrefix) {
@@ -308,10 +310,14 @@ func (r *results) addEvent(e *event) {
 				break
 			}
 			out := strings.Replace(e.Output, gounit.FinalPrefix, "", 1)
-			tr.FinalizeOut = append(tr.FinalizeOut, out)
+			for _, s := range strings.Split(out, "\n") {
+				tr.FinalizeOut = append(tr.FinalizeOut, strings.TrimSpace(s))
+			}
 			break
 		}
-		rslt.Output = append(rslt.Output, e.Output)
+		for _, s := range strings.Split(e.Output, "\n") {
+			rslt.Output = append(rslt.Output, strings.TrimSpace(s))
+		}
 	}
 }
 

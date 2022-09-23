@@ -38,7 +38,7 @@ func reportGoOnlySuite(
 	ll, llMask = reportGoSuiteLine(
 		tr, view.GoSuiteLine, "", ll, llMask)
 	tr.ForOrdered(func(sr *model.SubResult) {
-		ll, llMask = reportSubTestLine(sr, indent+indent, ll, llMask)
+		ll, llMask = reportSubTestLine(p, sr, indent+indent, ll, llMask)
 	})
 	return ll, llMask
 }
@@ -91,7 +91,7 @@ func goWithoutSubs(
 	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
 	ll = append(ll, blankLine)
 	for _, t := range without {
-		ll, llMask = reportTestLine(p.OfTest(t), "", ll, llMask)
+		ll, llMask = reportTestLine(p, p.OfTest(t), "", ll, llMask)
 	}
 	return ll, llMask
 }
