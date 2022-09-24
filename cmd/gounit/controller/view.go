@@ -14,6 +14,7 @@ package controller
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -38,11 +39,15 @@ func (i *viewIniter) Fatal() func(...interface{}) { return i.ftl }
 
 func (i *viewIniter) Message(msg func(string)) string {
 	i.controller.view.msg = msg
+	srcDir := strings.TrimPrefix(
+		i.controller.watcher.SourcesDir(),
+		i.controller.watcher.ModuleDir(),
+	)
+	if srcDir == "" {
+		srcDir = filepath.Base(i.controller.watcher.ModuleDir())
+	}
 	return fmt.Sprintf("%s: %s",
-		i.controller.watcher.ModuleName(), strings.TrimPrefix(
-			i.controller.watcher.SourcesDir(),
-			i.controller.watcher.ModuleDir(),
-		),
+		i.controller.watcher.ModuleName(), srcDir,
 	)
 }
 

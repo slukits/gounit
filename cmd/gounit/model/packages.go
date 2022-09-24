@@ -37,9 +37,13 @@ func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) error {
 		if err != nil {
 			return err
 		}
+		id := ps.rel
+		if id == "" {
+			id = filepath.Base(ps.abs)
+		}
 		tp := &TestingPackage{
 			ModTime: ps.ModTime,
-			id:      ps.rel, abs: ps.abs, files: tt, Timeout: d.timeout}
+			id:      id, abs: ps.abs, files: tt, Timeout: d.timeout}
 		if cb(tp) {
 			return nil
 		}
@@ -57,8 +61,12 @@ func (d *PackagesDiff) ForDel(cb func(*TestingPackage) (stop bool)) {
 		if d.current.has(ps) {
 			continue
 		}
+		id := ps.rel
+		if id == "" {
+			id = filepath.Base(ps.abs)
+		}
 		tp := &TestingPackage{
-			id: ps.rel, abs: ps.abs, parsed: true, Timeout: 0}
+			id: id, abs: ps.abs, parsed: true, Timeout: 0}
 		if cb(tp) {
 			return
 		}
