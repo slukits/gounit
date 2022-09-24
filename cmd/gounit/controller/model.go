@@ -5,6 +5,7 @@
 package controller
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -137,12 +138,14 @@ func (s *modelState) _report(t reportType, idx int) {
 			break
 		}
 	}
-	ll, llMask, p := rprLines{}, linesMask{}, s.pp[s.latestPkg]
+	ll, llMask := rprLines{}, linesMask{}
 	if len(s.ee) > 0 {
-		ll, llMask = s.reportFailedPkgsBut(p, ll, llMask)
+		ll, llMask = s.reportFailedPkgsBut(ll, llMask)
 	}
+	p := s.pp[s.latestPkg]
 	if p.HasErr() {
-		ll, llMask = reportFailedPkg(p, ll, llMask)
+		ll, llMask, ls := reportFailedPkg(s.state, ll, llMask)
+		s.lastSuite = ls
 		s.view = []interface{}{&report{
 			flags:   view.RpClearing,
 			ll:      ll,
@@ -174,13 +177,13 @@ func (s *modelState) _report(t reportType, idx int) {
 }
 
 func (s *modelState) reportFailedPkgsBut(
-	p *pkg, ll rprLines, llMask linesMask,
+	ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	sort.Slice(s.ee, func(i, j int) bool {
 		return s.ee[i].ID() < s.ee[j].ID()
 	})
 	for _, ep := range s.ee {
-		if ep.ID() == p.ID() {
+		if ep.ID() == s.latestPkg {
 			continue
 		}
 		ll, llMask = reportPackageLine(
@@ -208,6 +211,10 @@ func (s *modelState) reportMixedPkg(
 				suite = ts
 			}
 		})
+		if suite == nil {
+			panic(fmt.Sprintf(
+				"pkg '%s' doesn't have suite '%s'", p.ID(), ln))
+		}
 		s.lastSuite = suite.Name()
 		return reportMixedSuite(suite, p, ll, llMask)
 	case rprGoSuite:
@@ -320,25 +327,41 @@ type runResult struct {
 	*model.Results
 }
 
+type info struct {
+	n, f, s int
+	d       time.Duration
+}
+
 type pkg struct {
 	*runResult
 	*model.TestingPackage
+	inf *info
 }
 
 // info counts a package's tests, failed tests and the provides the
 // (actual) duration of the package's test run.
-func (p *pkg) info() (n, f int, d time.Duration) {
-	p.ForTest(func(t *model.Test) {
-		r := p.OfTest(t)
-		n += r.Len()
-		f += r.LenFailed()
-	})
-	p.ForSuite(func(st *model.TestSuite) {
-		r := p.OfSuite(st)
-		n += r.Len()
-		f += r.LenFailed()
-	})
-	return n, f, p.Duration
+func (p *pkg) info() (n, f, s int, d time.Duration) {
+	if p.HasErr() {
+		return 0, 0, 0, 0
+	}
+	if p.inf == nil {
+		goSuites := 0
+		p.ForTest(func(t *model.Test) {
+			r := p.OfTest(t)
+			n += r.Len()
+			f += r.LenFailed()
+			if r.HasSubs() {
+				goSuites++
+			}
+		})
+		p.ForSuite(func(st *model.TestSuite) {
+			r := p.OfSuite(st)
+			n += r.Len()
+			f += r.LenFailed()
+		})
+		p.inf = &info{n: n, f: f, d: d, s: p.LenSuites() + goSuites}
+	}
+	return p.inf.n, p.inf.f, p.inf.s, p.inf.d
 }
 
 func (p *pkg) HasFailedSuite() bool {

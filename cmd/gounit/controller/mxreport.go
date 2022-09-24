@@ -32,7 +32,7 @@ func reportMixedGoTests(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 
-	n, f, d := p.info()
+	n, f, _, d := p.info()
 	ll = append(ll, fmt.Sprintf("%s: %d/%d %v", p.ID(), n, f,
 		d.Round(1*time.Millisecond)))
 	llMask[uint(len(ll)-1)] = view.PackageLine

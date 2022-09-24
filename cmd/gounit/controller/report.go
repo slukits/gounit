@@ -87,7 +87,9 @@ func reportFailed(st *state, lst func(int)) *report {
 		ll, llMask = reportPackageLine(
 			p, view.PackageFoldedLine, ll, llMask)
 	}
-	ll, llMask = reportFailedPkg(st.ee[len(st.ee)-1], ll, llMask)
+	st.latestPkg = st.ee[len(st.ee)-1].ID()
+	ll, llMask, ls := reportFailedPkg(st, ll, llMask)
+	st.lastSuite = ls
 	return &report{
 		flags:   view.RpClearing,
 		ll:      ll,
@@ -97,25 +99,30 @@ func reportFailed(st *state, lst func(int)) *report {
 }
 
 func reportFailedPkg(
-	p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask) {
+	st *state, ll rprLines, llMask linesMask,
+) (rprLines, linesMask, string) {
 
+	p := st.pp[st.latestPkg]
 	if p.HasErr() {
 		ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
 		ll = append(ll, blankLine)
-		return reportPkgErr(p, ll, llMask)
+		ll, llMask = reportPkgErr(p, ll, llMask)
+		return ll, llMask, ""
 	}
 	if p.LenSuites() == 0 {
-		return reportGoOnlyPkg(p, ll, llMask)
+		ll, llMask = reportGoOnlyPkg(p, ll, llMask)
+		return ll, llMask, "go-tests"
 	}
 
 	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
 	ll = append(ll, blankLine)
 	ll, llMask, goTestsFailed := reportFailedPkgGoTests(p, ll, llMask)
 
-	if goTestsFailed {
-		return reportFailedPkgSuitesHeader(p, ll, llMask)
+	if goTestsFailed != "" {
+		ll, llMask = reportFailedPkgSuitesHeader(p, ll, llMask)
+		return ll, llMask, goTestsFailed
 	}
+
 	return reportFailedPkgSuites(p, ll, llMask)
 }
 
@@ -149,15 +156,15 @@ func reportPkgErr(
 // two cases false is returned; true otherwise.
 func reportFailedPkgGoTests(
 	p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask, bool) {
+) (rprLines, linesMask, string) {
 	if p.LenTests() == 0 {
-		return ll, llMask, false
+		return ll, llMask, ""
 	}
 	n, f, d, without, with := goSplitTests(p)
 	if f == 0 {
 		ll, llMask = reportGoTestsLine(
 			n, f, d, view.GoTestsFoldedLine, ll, llMask)
-		return ll, llMask, false
+		return ll, llMask, ""
 	}
 	ll, llMask = reportGoTestsLine(n, f, d, view.GoTestsLine, ll, llMask)
 	if without.haveFailed(p) {
@@ -167,7 +174,7 @@ func reportFailedPkgGoTests(
 		}
 		ll = append(ll, blankLine)
 		ll, llMask = reportGoSuitesFolded(p, with, ll, llMask)
-		return ll, llMask, true
+		return ll, llMask, "go-tests"
 	}
 	var tt []*model.Test
 	for _, t := range with {
@@ -181,7 +188,8 @@ func reportFailedPkgGoTests(
 			p.OfTest(t), view.GoSuiteFoldedLine, indent, ll, llMask)
 	}
 	reportGoSuite(p, p.OfTest(tt[len(tt)-1]), ll, llMask)
-	return ll, llMask, true
+	return ll, llMask, fmt.Sprintf(
+		"go-tests:%s", tt[len(tt)-1].Name())
 }
 
 func reportGoSuitesFolded(
@@ -231,7 +239,7 @@ func reportFailedPkgSuitesHeader(
 
 func reportFailedPkgSuites(
 	p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask) {
+) (rprLines, linesMask, string) {
 
 	ss := []*model.TestSuite{}
 	p.ForSuite(func(s *model.TestSuite) {
@@ -241,7 +249,7 @@ func reportFailedPkgSuites(
 		ss = append(ss, s)
 	})
 	if len(ss) == 0 {
-		return ll, llMask
+		return ll, llMask, ""
 	}
 	sort.Slice(ss[:len(ss)-1], func(i, j int) bool {
 		return ss[i].Name() < ss[j].Name()
@@ -252,7 +260,7 @@ func reportFailedPkgSuites(
 			p, s, view.SuiteFoldedLine, ll, llMask)
 	}
 	ll, llMask = reportSuite(p, ss[len(ss)-1], ll, llMask)
-	return ll, llMask
+	return ll, llMask, ss[len(ss)-1].Name()
 }
 
 func reportSuite(
@@ -296,7 +304,7 @@ func reportPackageLine(
 		llMask[idx] = lm | view.Failed
 		return ll, llMask
 	}
-	n, f, d := p.info()
+	n, f, _, d := p.info()
 	ll = append(ll, fmt.Sprintf("%s%s%d/%d %s",
 		p.ID(), lines.LineFiller, n, f, d.Round(1*time.Millisecond)))
 	idx := uint(len(ll) - 1)
@@ -427,25 +435,10 @@ func reportStatus(pp pkgs) *view.Statuser {
 	// count suites, tests and failed tests
 	ssLen, ttLen, ffLen := 0, 0, 0
 	for _, p := range pp {
-		if p.HasErr() {
-			continue
-		}
-		ssLen += p.LenSuites()
-		p.ForTest(func(t *model.Test) {
-			n := p.OfTest(t).Len()
-			if n == 1 {
-				ttLen++
-				return
-			}
-			ssLen++
-			ttLen += n
-			ffLen += p.Results.OfTest(t).LenFailed()
-		})
-		p.ForSuite(func(ts *model.TestSuite) {
-			rr := p.OfSuite(ts)
-			ttLen += rr.Len()
-			ffLen += rr.LenFailed()
-		})
+		n, f, s, _ := p.info()
+		ssLen += s
+		ttLen += n
+		ffLen += f
 	}
 	return &view.Statuser{
 		Packages: len(pp),
