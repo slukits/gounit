@@ -340,9 +340,8 @@ func reportGoSuiteLine(
 ) (rprLines, linesMask) {
 	content := i + r.String()
 	if lm == view.GoSuiteFoldedLine {
-		content = fmt.Sprintf("%s%s%d/%d %s",
-			content, lines.LineFiller, r.Len(), r.LenFailed(),
-			r.End.Sub(r.Start).Round(1*time.Millisecond))
+		content = fmt.Sprintf("%s%s%d/%d",
+			content, lines.LineFiller, r.Len(), r.LenFailed())
 	}
 	ll = append(ll, content)
 	idx := uint(len(ll) - 1)
@@ -360,9 +359,8 @@ func reportSuiteLine(
 	content := s.String()
 	r := p.OfSuite(s)
 	if lm == view.SuiteFoldedLine {
-		content = fmt.Sprintf("%s%s%d/%d %s", content,
-			lines.LineFiller, r.Len(), r.LenFailed(),
-			r.End.Sub(r.Start).Round(1*time.Millisecond))
+		content = fmt.Sprintf("%s%s%d/%d", content,
+			lines.LineFiller, r.Len(), r.LenFailed())
 	}
 	ll = append(ll, content)
 	idx := uint(len(ll) - 1)
@@ -376,10 +374,9 @@ func reportSuiteLine(
 func reportTestLine(
 	p *pkg, r *model.TestResult, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
-	ll = append(ll, fmt.Sprintf("%s%s%s",
+	ll = append(ll, fmt.Sprintf("%s%s",
 		i+r.String(),
-		lines.LineFiller,
-		r.End.Sub(r.Start).Round(1*time.Millisecond)))
+		lines.LineFiller))
 	idx := uint(len(ll) - 1)
 	llMask[idx] = view.TestLine
 	if !r.Passed {
@@ -391,10 +388,9 @@ func reportTestLine(
 func reportSubTestLine(
 	p *pkg, r *model.SubResult, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
-	ll = append(ll, fmt.Sprintf("%s%s%s",
+	ll = append(ll, fmt.Sprintf("%s%s",
 		i+r.String(),
-		lines.LineFiller,
-		r.End.Sub(r.Start).Round(1*time.Millisecond)))
+		lines.LineFiller))
 	idx := uint(len(ll) - 1)
 	llMask[idx] = view.TestLine
 	if !r.Passed {

@@ -189,47 +189,6 @@ func (s *Report) Failing_suite_test_along_failing_suites_and_go_suite(
 	t.Eq(exp, got)
 }
 
-type dbg struct {
-	Suite
-	Fixtures
-}
-
-func (s *dbg) fxSource(t *T, dir string) (*lines.Events, *Testing) {
-	return fxSourceDBG(t, s, dir)
-}
-
-func (s *dbg) lineIsFailing(l lines.TestLine) bool {
-	for i, r := range l.String() {
-		if r == ' ' {
-			continue
-		}
-		return l.Styles().Of(i).HasBG(tcell.ColorRed)
-	}
-	return false
-}
-
-func (s *dbg) Dbg(t *T) {
-	_, tt := s.fxSource(t, "fail/mixed")
-	tt.afterWatch(func() {
-		tt.ClickReporting(15)
-		t.Contains(tt.Reporting().String(), "suite test 4 3")
-	})
-
-	exp, got := 0, 0
-	for _, f := range fxExp["fail mixed suite"] {
-		exp++
-		for _, l := range tt.Reporting() {
-			if strings.HasPrefix(strings.TrimSpace(l.String()), f) {
-				got++
-				s.lineIsFailing(l)
-			}
-		}
-	}
-	t.Eq(exp, got)
-}
-
-func TestDBG(t *testing.T) { Run(&dbg{}, t) }
-
 func (s *Report) Failing_packages_always(t *T) {
 	_, tt := s.fxSource(t, "fail/pp")
 	tt.afterWatch(func() {
