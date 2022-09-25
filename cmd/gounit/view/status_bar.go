@@ -70,14 +70,14 @@ type statusBar struct {
 
 func (sb *statusBar) OnInit(e *lines.Env) {
 	sb.Dim().SetHeight(2)
-	fmt.Fprint(e.BG(sb.bg()).Filled().FG(sb.fg()).LL(1), sb.str())
+	fmt.Fprint(e.BG(sb.bg()).FG(sb.fg()).LL(1), sb.str())
 }
 
 func (sb *statusBar) OnUpdate(e *lines.Env) {
 	// type save because message bar update only allows string
 	s, _ := e.Evt.(*lines.UpdateEvent).Data.(Statuser)
 	if s.Str != "" {
-		fmt.Fprint(e.BG(sb.bg()).Filled().FG(sb.fg()).LL(1), s.Str)
+		fmt.Fprint(e.BG(sb.bg()).FG(sb.fg()).LL(1), s.Str)
 		return
 	}
 	sb.np = s.Packages
@@ -89,7 +89,7 @@ func (sb *statusBar) OnUpdate(e *lines.Env) {
 	sb.nc = s.Lines
 	sb.nct = s.TestLines
 	sb.nd = s.DocLines
-	fmt.Fprint(e.BG(sb.bg()).Filled().FG(sb.fg()).LL(1), sb.str())
+	fmt.Fprint(e.BG(sb.bg()).FG(sb.fg()).LL(1), sb.str())
 }
 
 const dfltStatus = "pkgs/suites: %d/%d; tests: %d/%d"

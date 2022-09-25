@@ -6,7 +6,7 @@ package view
 
 import (
 	"fmt"
-	"io"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/slukits/ints"
@@ -140,42 +140,54 @@ func (r *report) OnClick(_ *lines.Env, _, y int) {
 	r.listener(y)
 }
 
-func (m *report) OnUpdate(e *lines.Env) {
-	m.Focus.Reset(true)
-	r, ok := e.Evt.(*lines.UpdateEvent).Data.(Reporter)
+func (r *report) OnUpdate(e *lines.Env) {
+	r.Focus.Reset(true)
+	upd, ok := e.Evt.(*lines.UpdateEvent).Data.(Reporter)
 	if !ok {
 		return
 	}
-	clearing := r.Flags()&RpClearing == RpClearing
+	clearing := upd.Flags()&RpClearing == RpClearing
 	ii := &ints.Set{}
-	r.For(m, func(idx uint, content string) {
+	upd.For(r, func(idx uint, content string) {
 		ii.Add(int(idx))
-		fmt.Fprint(m.wrt(r, idx, e), content)
+		lm := upd.LineMask(idx)
+		if lm&Failed > 0 {
+			r.reportFailed(upd, idx, e, content)
+			return
+		}
+		if lm&focusable == 0 {
+			fmt.Fprint(e.LL(int(idx), lines.NotFocusable), content)
+		}
+		fmt.Fprint(e.LL(int(idx)), content)
 	})
 	if !clearing {
 		return
 	}
-	for i := 0; i < m.Len(); i++ {
+	for i := 0; i < r.Len(); i++ {
 		if ii.Has(i) {
 			continue
 		}
-		m.Reset(i, lines.NotFocusable)
+		r.Reset(i, lines.NotFocusable)
 	}
-	m.listener = r.Listener()
+	r.listener = upd.Listener()
 }
 
-func (m *report) wrt(l Reporter, idx uint, e *lines.Env) io.Writer {
-	lm := l.LineMask(idx)
-	var lf lines.LineFlags
-	if lm&focusable == 0 {
-		lf = lines.NotFocusable
+func (r *report) reportFailed(
+	upd Reporter, idx uint, e *lines.Env, content string,
+) {
+	spl := strings.Split(content, lines.LineFiller)
+	if len(spl) == 1 {
+		fmt.Fprint(
+			e.BG(tcell.ColorRed).FG(tcell.ColorWhite).At(
+				int(idx), 0), content)
+		return
 	}
-	if lm&Failed > 0 {
-		return e.BG(tcell.ColorRed).
-			FG(tcell.ColorWhite).
-			LL(int(idx), lf)
-	}
-	return e.LL(int(idx), lf)
+	fmt.Fprint(
+		e.BG(tcell.ColorRed).FG(tcell.ColorWhite).At(int(idx), 0),
+		spl[0],
+	)
+	fmt.Fprint(
+		e.At(int(idx), len(spl[0])), lines.LineFiller+spl[1])
 }
 
 // OnContext scrolls given reporting component down.  If at bottom it is
