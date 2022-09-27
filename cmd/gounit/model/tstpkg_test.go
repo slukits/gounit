@@ -257,7 +257,7 @@ func (s *PkgTestRun) Reports_suite_test_logs(t *T) {
 			if tst.Name() != fxStATest1 {
 				return
 			}
-			t.Eq(4, len(sr.OfTest(tst).Output))
+			t.Eq(2, len(sr.OfTest(tst).Output))
 		})
 	})
 }
@@ -267,9 +267,9 @@ func (s *PkgTestRun) Reports_suit_init_finalize_logs(t *T) {
 		sr := s.rslt.OfSuite(st)
 		switch st.Name() {
 		case fxSuiteA:
-			t.Eq(2, len(sr.InitOut))
+			t.Eq(1, len(sr.InitOut))
 		case fxSuiteB:
-			t.Eq(2, len(sr.FinalizeOut))
+			t.Eq(1, len(sr.FinalizeOut))
 		}
 	})
 }

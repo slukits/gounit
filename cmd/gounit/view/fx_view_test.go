@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/slukits/gounit"
 	"github.com/slukits/lines"
@@ -127,6 +128,17 @@ func fx(t *gounit.T, fs fixtureSetter) (
 ) {
 	fx := newFX(t)
 	ee, tt := lines.Test(t.GoT(), fx)
+	ee.Listen()
+	fs.Set(t, ee.QuitListening)
+	return ee, tt, fx
+}
+
+func fxDBG(t *gounit.T, fs fixtureSetter) (
+	*lines.Events, *lines.Testing, *viewFX,
+) {
+	fx := newFX(t)
+	ee, tt := lines.Test(t.GoT(), fx)
+	tt.Timeout = 20 * time.Minute
 	ee.Listen()
 	fs.Set(t, ee.QuitListening)
 	return ee, tt, fx

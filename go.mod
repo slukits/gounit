@@ -6,7 +6,7 @@ go 1.19
 
 require (
 	github.com/google/go-cmp v0.5.9
-	github.com/slukits/lines v0.0.0-20220925144238-aa8f0645de23
+	github.com/slukits/lines v0.0.0-20220927063020-7205dae84247
 )
 
 require (
@@ -16,7 +16,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/slukits/ints v0.0.0-20220918112802-3e043810f5d7
-	golang.org/x/sys v0.0.0-20220919091848-fb04ddd9f9c8 // indirect
+	golang.org/x/sys v0.0.0-20220926163933-8cfa568d3c25 // indirect
 	golang.org/x/term v0.0.0-20220919170432-7a66f970e087 // indirect
 	golang.org/x/text v0.3.7 // indirect
 )

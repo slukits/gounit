@@ -300,6 +300,9 @@ func (r *results) addEvent(e *event) {
 			}
 			out := strings.Replace(e.Output, gounit.InitPrefix, "", 1)
 			for _, s := range strings.Split(out, "\n") {
+				if s == "" {
+					continue
+				}
 				tr.InitOut = append(tr.InitOut, strings.TrimSpace(s))
 			}
 			break
@@ -311,11 +314,17 @@ func (r *results) addEvent(e *event) {
 			}
 			out := strings.Replace(e.Output, gounit.FinalPrefix, "", 1)
 			for _, s := range strings.Split(out, "\n") {
+				if s == "" {
+					continue
+				}
 				tr.FinalizeOut = append(tr.FinalizeOut, strings.TrimSpace(s))
 			}
 			break
 		}
 		for _, s := range strings.Split(e.Output, "\n") {
+			if s == "" {
+				continue
+			}
 			rslt.Output = append(rslt.Output, strings.TrimSpace(s))
 		}
 	}

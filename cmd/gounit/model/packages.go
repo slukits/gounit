@@ -5,6 +5,7 @@
 package model
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -26,9 +27,7 @@ type PackagesDiff struct {
 // For returns all testing packages which were updated since the last
 // reported diff in descending order by their modification time.
 func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) error {
-	sort.Slice(d.current.pp, func(i, j int) bool {
-		return d.current.pp[i].ModTime.After(d.current.pp[j].ModTime)
-	})
+	pp := []*TestingPackage{}
 	for _, ps := range d.current.pp {
 		if !d.last.isUpdatedBy(ps) {
 			continue
@@ -41,14 +40,52 @@ func (d *PackagesDiff) For(cb func(*TestingPackage) (stop bool)) error {
 		if id == "" {
 			id = filepath.Base(ps.abs)
 		}
-		tp := &TestingPackage{
+		pp = append(pp, &TestingPackage{
 			ModTime: ps.ModTime,
-			id:      id, abs: ps.abs, files: tt, Timeout: d.timeout}
-		if cb(tp) {
+			id:      id, abs: ps.abs, files: tt, Timeout: d.timeout})
+	}
+	sort.Slice(pp, func(i, j int) bool {
+		return pp[i].ModTime.After(pp[j].ModTime)
+	})
+	for _, p := range pp {
+		if cb(p) {
 			return nil
 		}
 	}
 	return nil
+}
+
+func (d *PackagesDiff) String() string {
+	ss := []string{}
+	dd := []*TestingPackage{}
+	d.For(func(tp *TestingPackage) (stop bool) {
+		dd = append(dd, tp)
+		return
+	})
+	switch len(dd) {
+	case 0:
+		ss = append(ss, "pkg-diff: updated: none")
+	default:
+		ss = append(ss, "pkg-diff: updated:")
+		for _, d := range dd {
+			ss = append(ss, fmt.Sprintf("  %s", d.ID()))
+		}
+	}
+	dd = []*TestingPackage{}
+	d.ForDel(func(tp *TestingPackage) (stop bool) {
+		dd = append(dd, tp)
+		return
+	})
+	switch len(dd) {
+	case 0:
+		ss = append(ss, "pkg-diff: deleted: none")
+	default:
+		ss = append(ss, "pkg-diff: deleted:")
+		for _, d := range dd {
+			ss = append(ss, fmt.Sprintf("  %s", d.ID()))
+		}
+	}
+	return strings.Join(ss, "\n")
 }
 
 // ForDel returns a testing package which got deleted.  Note neither

@@ -61,35 +61,36 @@ func (s *Reporting) Component_s_lines_are_selectable(t *T) {
 	})
 }
 
-// func (s *Reporting) Component_s_test_lines_are_not_selectable(t *T) {
-// 	ee, tt, fx := s.fx(t)
-// 	fx.updateReporting(&reporterFX{
-// 		ll: []string{"pkg 1", "test 1", "test 2", "suite 1"},
-// 		mm: map[uint]LineMask{
-// 			0: PackageLine,
-// 			1: TestLine, 2: TestLine,
-// 			3: GoSuiteLine,
-// 		},
-// 	})
-//
-// 	tt.FireKey(tcell.KeyDown)
-// 	ee.Update(fx.Report, nil, func(e *lines.Env) {
-// 		t.Eq(0, fx.Report.Focus.Current())
-// 	})
-//
-// 	tt.FireKey(tcell.KeyDown)
-// 	ee.Update(fx.Report, nil, func(e *lines.Env) {
-// 		t.Eq(3, fx.Report.Focus.Current())
-// 	})
-//
-// 	tt.FireComponentClick(fx.Report, 0, 3)
-// 	t.Eq(3, fx.reportedLine)
-// 	tt.FireComponentClick(fx.Report, 0, 2)
-// 	ee.Update(fx.Report, nil, func(e *lines.Env) {
-// 		t.Eq(3, fx.Report.Focus.Current())
-// 	})
-// 	t.Eq(3, fx.reportedLine)
-// }
+func (s *Reporting) Component_s_test_lines_are_not_selectable(t *T) {
+	ee, tt, fx := s.fx(t)
+	fx.updateReporting(&reporterFX{
+		ll: []string{"pkg 1", "test 1", "test 2", "suite 1"},
+		mm: map[uint]LineMask{
+			0: PackageLine,
+			1: TestLine, 2: TestLine,
+			3: GoSuiteLine,
+		},
+		listener: fx.listenReporting,
+	})
+
+	tt.FireKey(tcell.KeyDown)
+	ee.Update(fx.Report, nil, func(e *lines.Env) {
+		t.Eq(0, fx.Report.Focus.Current())
+	})
+
+	tt.FireKey(tcell.KeyDown)
+	ee.Update(fx.Report, nil, func(e *lines.Env) {
+		t.Eq(3, fx.Report.Focus.Current())
+	})
+
+	tt.FireComponentClick(fx.Report, 0, 3)
+	t.Eq(3, fx.reportedLine)
+	tt.FireComponentClick(fx.Report, 0, 2)
+	ee.Update(fx.Report, nil, func(e *lines.Env) {
+		t.Eq(3, fx.Report.Focus.Current())
+	})
+	t.Eq(3, fx.reportedLine)
+}
 
 func TestReporting(t *testing.T) {
 	t.Parallel()

@@ -19,7 +19,7 @@ import (
 type state struct {
 	view        []interface{}
 	pp          pkgs
-	ee          []*pkg
+	ee          map[string]bool
 	latestPkg   string
 	lastSuite   string
 	latestSuite string
@@ -55,26 +55,77 @@ type reporter interface {
 	Folded() reporter
 }
 
-func (s *modelState) update(st *state) {
+func (s *modelState) update(st *state, deleted []string) {
 	s.Lock()
-	if st.latestPkg == s.latestPkg {
-		st.lastSuite = s.lastSuite
+	defer s.Unlock()
+	if st == nil {
+		s.remove(deleted)
+		if len(s.pp) == 0 {
+			s.viewUpdater(emptyReport, &view.Statuser{})
+			return
+		}
+		s._report(rprDefault, -1)
+		return
 	}
-	s.state = st
+	s.updateFailing(st)
+	for p := range st.pp {
+		s.pp[p] = st.pp[p]
+	}
+	if st.latestPkg != "" {
+		if st.latestPkg != s.latestPkg {
+			st.lastSuite = ""
+			s.latestPkg = st.latestPkg
+		}
+	}
+	if len(deleted) > 0 {
+		s.remove(deleted)
+	}
+	if len(s.pp) == 0 {
+		s.viewUpdater(emptyReport, &view.Statuser{})
+		return
+	}
 	if len(s.ee) > 0 {
 		status := reportStatus(s.pp)
 		s.view = []interface{}{
 			reportFailed(s.state, s.lineListener), status}
 		s.viewUpdater(s.view...)
-	}
-	s.Unlock()
-	if len(s.ee) > 0 {
 		return
 	}
-	s.report(rprDefault)
+	s._report(rprDefault, -1)
+}
+
+func (s *modelState) remove(deleted []string) {
+	for _, pID := range deleted {
+		delete(s.pp, pID)
+		delete(s.ee, pID)
+		if s.latestPkg != pID {
+			continue
+		}
+		s.latestPkg = ""
+	}
+	if s.latestPkg != "" {
+		return
+	}
+	s.lastSuite = ""
+	s.latestSuite = ""
+}
+
+func (s *modelState) updateFailing(upd *state) {
+	if s.ee == nil {
+		s.ee = map[string]bool{}
+	}
+	for pID := range upd.pp {
+		if upd.ee[pID] {
+			s.ee[pID] = true
+			continue
+		}
+		delete(s.ee, pID)
+	}
 }
 
 func (s *modelState) lineListener(idx int) {
+	s.Lock()
+	defer s.Unlock()
 	s._report(s.reportTransition(idx), idx)
 }
 
@@ -82,8 +133,6 @@ func (s *modelState) lineListener(idx int) {
 // selected line and type the new report-type for the user-request
 // response.
 func (s *modelState) reportTransition(idx int) reportType {
-	s.Lock()
-	defer s.Unlock()
 	lm := s.view[0].(*report).LineMask(uint(idx))
 	switch {
 	case lm&view.PackageLine > 0:
@@ -108,14 +157,14 @@ func (s *modelState) reportTransition(idx int) reportType {
 
 // report reports a report of given type.
 func (s *modelState) report(t reportType) {
+	s.Lock()
+	defer s.Unlock()
 	s._report(t, -1) // panics if we have a bug
 }
 
 // _report creates report of given type.  The index is needed for the
 // use case that a folded suite was selected to determine which one.
 func (s *modelState) _report(t reportType, idx int) {
-	s.Lock()
-	defer s.Unlock()
 	if t == rprCurrent {
 		s.viewUpdater(s.view...)
 		return
@@ -143,6 +192,9 @@ func (s *modelState) _report(t reportType, idx int) {
 		ll, llMask = s.reportFailedPkgsBut(ll, llMask)
 	}
 	p := s.pp[s.latestPkg]
+	if p == nil {
+		panic(fmt.Sprintf("package '%s' doesn't exits", s.latestPkg))
+	}
 	if p.HasErr() {
 		ll, llMask, ls := reportFailedPkg(s.state, ll, llMask)
 		s.lastSuite = ls
@@ -179,15 +231,19 @@ func (s *modelState) _report(t reportType, idx int) {
 func (s *modelState) reportFailedPkgsBut(
 	ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
-	sort.Slice(s.ee, func(i, j int) bool {
-		return s.ee[i].ID() < s.ee[j].ID()
+	ee := []string{}
+	for k := range s.ee {
+		ee = append(ee, k)
+	}
+	sort.Slice(ee, func(i, j int) bool {
+		return ee[i] < ee[j]
 	})
-	for _, ep := range s.ee {
-		if ep.ID() == s.latestPkg {
+	for _, pID := range ee {
+		if pID == s.latestPkg {
 			continue
 		}
 		ll, llMask = reportPackageLine(
-			ep, view.PackageFoldedLine, ll, llMask)
+			s.pp[pID], view.PackageFoldedLine, ll, llMask)
 	}
 	return ll, llMask
 }
@@ -300,19 +356,27 @@ func watch(
 			latest = tp.ID()
 			return
 		})
-		ee := []*pkg{}
+		ee := map[string]bool{}
 		for i := 0; i < n; i++ {
 			p := <-rslt
 			pp[p.ID()] = p
 			if !p.HasErr() && p.Passed() {
 				continue
 			}
-			ee = append(ee, p)
+			ee[p.ID()] = true
 		}
-		if len(pp) == 0 || pp[latest] == nil {
+		deleted := []string{}
+		diff.ForDel(func(tp *model.TestingPackage) (stop bool) {
+			deleted = append(deleted, tp.ID())
+			return
+		})
+		if (len(pp) == 0 || pp[latest] == nil) && len(deleted) == 0 {
 			return
 		}
-		mdl.update(&state{pp: pp, ee: ee, latestPkg: latest})
+		if len(pp) == 0 || pp[latest] == nil {
+			mdl.update(nil, deleted)
+		}
+		mdl.update(&state{pp: pp, ee: ee, latestPkg: latest}, deleted)
 	}
 }
 
@@ -359,7 +423,8 @@ func (p *pkg) info() (n, f, s int, d time.Duration) {
 			n += r.Len()
 			f += r.LenFailed()
 		})
-		p.inf = &info{n: n, f: f, d: d, s: p.LenSuites() + goSuites}
+		p.inf = &info{n: n, f: f, d: p.Duration,
+			s: p.LenSuites() + goSuites}
 	}
 	return p.inf.n, p.inf.f, p.inf.s, p.inf.d
 }

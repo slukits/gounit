@@ -59,11 +59,11 @@ func (tt *Testing) collapseAll() {
 
 // cleanUp stop all go-routines initiated by a controller test.
 func (tt *Testing) cleanUp() {
-	if tt._ee != nil && tt._ee.IsListening() {
-		tt._ee.QuitListening()
-	}
 	if tt._quitWatching != nil {
 		tt._quitWatching.QuitAll()
+	}
+	if tt._ee != nil && tt._ee.IsListening() {
+		tt._ee.QuitListening()
 	}
 }
 
@@ -136,6 +136,10 @@ func (tt *Testing) _fxWatchMock(
 	go watch(watchRelay, m)
 	for pd := range c {
 		if pd == nil {
+			close(watchRelay)
+			return
+		}
+		if !tt._ee.IsListening() {
 			close(watchRelay)
 			return
 		}

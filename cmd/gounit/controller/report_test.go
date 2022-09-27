@@ -83,9 +83,27 @@ func (s *Report) Logged_text(t *T) {
 	t.StarMatched(
 		tt.Reporting().String(), fxExp["logging go-tests"]...)
 
-	tt.ClickReporting(9) // go to go-suite
+	tt.ClickReporting(8) // go to go-suite
 	t.StarMatched(
 		tt.Reporting().String(), fxExp["logging go-suite"]...)
+}
+
+const expTxt = "Lorem ipsum dolor sit amet, consectetur adipiscing " +
+	"elit. Morbi id mi rutrum, pretium ipsum et, gravida dui. " +
+	"Vestibulum et sapien et diam interdum gravida sit amet quis " +
+	"leo. Suspendisse ac nisi sit amet erat eleifend bibendum. Sed " +
+	"eu tincidunt arcu, sit amet pretium arcu. Nam urna eros, " +
+	"aliquet sed mi vitae, consectetur consequat purus. Donec " +
+	"tincidunt dictum velit, at dictum quam tincidunt ut. " +
+	"Pellentesque vel dolor lacinia, dictum justo sit amet, " +
+	"bibendum ex. Maecenas sit amet pellentesque leo."
+
+func (s *Report) Overlong_log_text_wrapped(t *T) {
+	_, tt := s.fxSource(t, "wrapped")
+	got := strings.ReplaceAll(tt.afterWatchScr(awReporting).String(), "\n", "")
+	got = strings.ReplaceAll(got, " ", "")
+	exp := strings.ReplaceAll(expTxt, " ", "")
+	t.Contains(got, exp)
 }
 
 func (s *Report) lineIsFailing(l lines.TestLine) bool {
@@ -99,15 +117,15 @@ func (s *Report) lineIsFailing(l lines.TestLine) bool {
 }
 
 func (s *Report) Failing_go_tests_only_package(t *T) {
-	failingLines := []int{0, 2, 9}
+	failingLines := []int{0, 2, 8}
 	_, tt := s.fxSource(t, "fail/gonly")
 	got := tt.afterWatchScr(awReporting)
-	t.FatalIfNot(t.True(len(got) > 9))
+	t.FatalIfNot(t.True(len(got) > 8))
 	for _, l := range failingLines {
 		t.True(s.lineIsFailing(got[l]))
 	}
 
-	tt.ClickReporting(9)
+	tt.ClickReporting(8)
 	failingLines = []int{0, 2, 4}
 	got = tt.Reporting()
 	t.FatalIfNot(t.True(len(got) > 4))
@@ -125,18 +143,18 @@ func (s *Report) Failing_package_due_to_compile_error(t *T) {
 }
 
 func (s *Report) Failing_package_s_failing_go_tests_initially(t *T) {
-	failingLines := []int{0, 2, 5, 11}
+	failingLines := []int{0, 2, 5, 10}
 	_, tt := s.fxSource(t, "fail/mixed")
 
 	got := tt.afterWatchScr(awReporting)
-	t.FatalIfNot(t.True(len(got) > 11))
+	t.FatalIfNot(t.True(len(got) > 10))
 	for _, l := range failingLines {
 		t.True(s.lineIsFailing(got[l]))
 	}
 }
 
 func (s *Report) Always_failing_package_s_failing_suites(t *T) {
-	failingLines := []int{14, 15}
+	failingLines := []int{13, 14}
 	_, tt := s.fxSource(t, "fail/mixed")
 
 	got := tt.afterWatchScr(awReporting)
@@ -149,7 +167,7 @@ func (s *Report) Always_failing_package_s_failing_suites(t *T) {
 func (s *Report) Failing_go_suite_test(t *T) {
 	_, tt := s.fxSource(t, "fail/mixed")
 	tt.afterWatch(func() {
-		tt.ClickReporting(11)
+		tt.ClickReporting(10)
 		t.StarMatched(tt.Reporting().String(), "go-tests", "p4 sub 2")
 	})
 
@@ -172,7 +190,7 @@ func (s *Report) Failing_suite_test_along_failing_suites_and_go_suite(
 
 	_, tt := s.fxSource(t, "fail/mixed")
 	tt.afterWatch(func() {
-		tt.ClickReporting(15)
+		tt.ClickReporting(14)
 		t.Contains(tt.Reporting().String(), "suite test 4 3")
 	})
 
@@ -192,7 +210,8 @@ func (s *Report) Failing_suite_test_along_failing_suites_and_go_suite(
 func (s *Report) Failing_packages_always(t *T) {
 	_, tt := s.fxSource(t, "fail/pp")
 	tt.afterWatch(func() {
-		t.StarMatched(tt.Reporting().String(), fxExp["fail pp"]...)
+		t.Contains(tt.Reporting().String(), "fail/pp/fail1")
+		t.Contains(tt.Reporting().String(), "fail/pp/fail2")
 		tt.collapseAll()
 		t.StarMatched(
 			tt.Reporting().String(), fxExp["fail pp collapsed"]...)

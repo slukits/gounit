@@ -31,6 +31,11 @@ type report struct {
 	lst     func(int)
 }
 
+var emptyReport = &report{
+	ll:    []string{initReport},
+	flags: view.RpClearing,
+}
+
 // Flags control the processing of the report in the view.  E.g. if
 // clearing is set all unused lines after an report update are cleared.
 func (r *report) Flags() view.RprtMask { return r.flags }
@@ -80,14 +85,23 @@ func reportPackages(pp pkgs, lst func(int)) *report {
 
 func reportFailed(st *state, lst func(int)) *report {
 	ll, llMask := rprLines{}, linesMask{}
-	sort.Slice(st.ee[:len(st.ee)-1], func(i, j int) bool {
-		return st.ee[i].ID() < st.ee[j].ID()
-	})
-	for _, p := range st.ee[:len(st.ee)-1] {
-		ll, llMask = reportPackageLine(
-			p, view.PackageFoldedLine, ll, llMask)
+	ee := []string{}
+	for pID := range st.ee {
+		ee = append(ee, pID)
 	}
-	st.latestPkg = st.ee[len(st.ee)-1].ID()
+	sort.Slice(ee, func(i, j int) bool {
+		return ee[i] < ee[j]
+	})
+	if !st.ee[st.latestPkg] {
+		st.latestPkg = ee[len(ee)-1]
+	}
+	for _, pID := range ee {
+		if pID == st.latestPkg {
+			continue
+		}
+		ll, llMask = reportPackageLine(
+			st.pp[pID], view.PackageFoldedLine, ll, llMask)
+	}
 	ll, llMask, ls := reportFailedPkg(st, ll, llMask)
 	st.lastSuite = ls
 	return &report{
@@ -401,29 +415,55 @@ func reportSubTestLine(
 
 var reOutFileLoc = regexp.MustCompile(`^.*?\.go:[0-9]+?:`)
 
+const outputWidth = 68
+
 func reportOutput(
 	p *pkg, out []string, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	if len(out) == 0 {
 		return ll, llMask
 	}
-	startIdx := 0
-	flLoc := reOutFileLoc.FindString(out[0])
-	if flLoc != "" {
-		ll = append(ll, i+filepath.Join(p.ID(), flLoc))
-		llMask[uint(len(ll)-1)] = view.OutputLine
-		i += indent
-		ll = append(ll, i+strings.TrimSpace(out[0][len(flLoc):]))
-		llMask[uint(len(ll)-1)] = view.OutputLine
-		startIdx = 1
+	for _, s := range out {
+		flLoc := reOutFileLoc.FindString(s)
+		if flLoc != "" {
+			ll, llMask = reportOutputLine(
+				outputWidth, filepath.Join(p.ID(), flLoc), i, ll, llMask)
+			ll, llMask = reportOutputLine(
+				outputWidth, strings.TrimSpace(s[len(flLoc):]),
+				i+indent, ll, llMask)
+			continue
+		}
+		ll, llMask = reportOutputLine(
+			outputWidth, s, i+indent, ll, llMask)
 	}
-	if len(out) == startIdx {
+	return ll, llMask
+}
+
+func reportOutputLine(
+	width int, out, i string, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+
+	out = i + out
+	if len(out) < width {
+		ll = append(ll, out)
+		llMask[uint(len(ll)-1)] = view.OutputLine
 		return ll, llMask
 	}
-	for _, s := range out[startIdx:] {
+
+	subIndent := len(i + indent)
+	oo, rest := []string{out[:width]}, out[width:]
+	for len(rest)+subIndent >= width {
+		oo = append(oo, strings.TrimSpace(rest[:width-subIndent]))
+		rest = rest[width-subIndent:]
+	}
+	oo = append(oo, strings.TrimSpace(rest))
+	ll = append(ll, oo[0])
+	llMask[uint(len(ll)-1)] = view.OutputLine
+	for _, s := range oo[1:] {
 		ll = append(ll, i+indent+s)
 		llMask[uint(len(ll)-1)] = view.OutputLine
 	}
+
 	return ll, llMask
 }
 

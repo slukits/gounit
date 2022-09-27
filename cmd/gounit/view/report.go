@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/slukits/ints"
 	"github.com/slukits/lines"
 )
 
@@ -146,48 +145,41 @@ func (r *report) OnUpdate(e *lines.Env) {
 	if !ok {
 		return
 	}
-	clearing := upd.Flags()&RpClearing == RpClearing
-	ii := &ints.Set{}
+	r.Reset(lines.All, lines.NotFocusable)
+	r.listener = upd.Listener()
 	upd.For(r, func(idx uint, content string) {
-		ii.Add(int(idx))
 		lm := upd.LineMask(idx)
 		if lm&Failed > 0 {
-			r.reportFailed(upd, idx, e, content)
+			r.reportFailed(idx, lm, e, content)
 			return
 		}
 		if lm&focusable == 0 {
 			fmt.Fprint(e.LL(int(idx), lines.NotFocusable), content)
+			return
 		}
 		fmt.Fprint(e.LL(int(idx)), content)
 	})
-	if !clearing {
-		return
-	}
-	for i := 0; i < r.Len(); i++ {
-		if ii.Has(i) {
-			continue
-		}
-		r.Reset(i, lines.NotFocusable)
-	}
-	r.listener = upd.Listener()
 }
 
 func (r *report) reportFailed(
-	upd Reporter, idx uint, e *lines.Env, content string,
+	idx uint, lm LineMask, e *lines.Env, content string,
 ) {
-	spl := strings.Split(content, lines.LineFiller)
-	if len(spl) == 1 {
-		fmt.Fprint(
-			e.BG(tcell.ColorRed).FG(tcell.ColorWhite).At(
-				int(idx), 0), content)
-		return
+	sr := lines.SR{Style: tcell.StyleDefault.Background(tcell.ColorRed).
+		Foreground(tcell.ColorWhite)}
+	for _, r := range content {
+		if r != ' ' {
+			break
+		}
+		sr.IncrementStart()
 	}
-	fmt.Fprint(
-		e.BG(tcell.ColorRed).FG(tcell.ColorWhite).At(int(idx), 0),
-		spl[0],
-	)
-	fmt.Fprint(
-		e.At(int(idx), len(spl[0])), lines.LineFiller+spl[1])
+	ff := lines.LineFlags(0)
+	if lm&focusable == 0 {
+		ff = lines.NotFocusable
+	}
+	spl := strings.Split(content, lines.LineFiller)
+	sr.SetEnd(len(spl[0]))
+	fmt.Fprint(e.LL(int(idx), ff), content)
+	e.AddStyleRange(int(idx), sr)
 }
 
 // OnContext scrolls given reporting component down.  If at bottom it is
