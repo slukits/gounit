@@ -73,7 +73,7 @@ func (s *modelState) update(st *state, deleted []string) {
 	}
 	if st.latestPkg != "" {
 		if st.latestPkg != s.latestPkg {
-			st.lastSuite = ""
+			s.lastSuite = ""
 			s.latestPkg = st.latestPkg
 		}
 	}
@@ -420,6 +420,9 @@ func (p *pkg) info() (n, f, s int, d time.Duration) {
 		})
 		p.ForSuite(func(st *model.TestSuite) {
 			r := p.OfSuite(st)
+			if r == nil {
+				panic(fmt.Sprintf("suite '%s' missing result", st.Name()))
+			}
 			n += r.Len()
 			f += r.LenFailed()
 		})

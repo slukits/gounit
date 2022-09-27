@@ -330,6 +330,13 @@ func (d *Dir) Mk(dir string, path ...string) (_ *Dir, undo func()) {
 	}
 }
 
+func (d *Dir) Rm(rel string) {
+	d.t.GoT().Helper()
+	if err := d.fs().RemoveAll(fp.Join(d.path, rel)); err != nil {
+		d.t.Fatalf("gounit: fs: dir: remove: '%s': %v", rel, err)
+	}
+}
+
 // MkFile adds to given directory a new file (mod 0644) with given name
 // and given content.  MkFile fatales if the file already exists or
 // os.WriteFile fails.  MkFile panics if reset fails.

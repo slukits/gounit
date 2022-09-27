@@ -236,6 +236,14 @@ func (s *Report) Failing_packages_always(t *T) {
 	t.StarMatched(tt.Reporting().String(), fxExp["fail pp"]...)
 }
 
+func (s *Report) Panic_during_test_execution_as_package_error(t *T) {
+	_, tt := s.fxSource(t, "panic")
+	t.StarMatched(
+		tt.afterWatchScr(awReporting).String(),
+		fxExp["panic"]...,
+	)
+}
+
 func TestReport(t *testing.T) {
 	t.Parallel()
 	Run(&Report{}, t)

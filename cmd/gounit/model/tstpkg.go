@@ -176,6 +176,12 @@ func (tp *TestingPackage) Run() (*Results, error) {
 		return &Results{Duration: time.Since(start),
 			err: fmt.Sprintf("json-unmarshal stdout: %v", err)}, nil
 	}
+	if tr, ok := rr.hasPanic(); ok {
+		return &Results{
+			rr: rr, Duration: duration,
+			err: tr.panicErr(),
+		}, nil
+	}
 	return &Results{rr: rr, Duration: duration}, nil
 }
 

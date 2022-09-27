@@ -91,11 +91,16 @@ func (r *Results) Len() int { return len(r.rr) }
 // SubResult instances can't have this.
 type Result struct {
 	Passed bool
+	Panics bool
 	Output []string
 	Start  time.Time
 	End    time.Time
 	Name   string
 	subs   subResults
+}
+
+func (r *Result) panicErr() string {
+	return strings.Join(append([]string{r.Name}, r.Output...), "\n")
 }
 
 // Len is the number of executed test comprising given test result.
@@ -274,6 +279,15 @@ var reSkip = regexp.MustCompile(`^\s*(===|---)`)
 
 type results map[string]*TestResult
 
+func (r results) hasPanic() (*TestResult, bool) {
+	for _, t := range r {
+		if t.Panics {
+			return t, true
+		}
+	}
+	return nil, false
+}
+
 func (r *results) addEvent(e *event) {
 	if e.Test == "" {
 		return
@@ -292,6 +306,11 @@ func (r *results) addEvent(e *event) {
 	case acOutput:
 		if reSkip.MatchString(e.Output) {
 			break
+		}
+		if (strings.HasPrefix(e.Output, "panic:") ||
+			strings.HasPrefix(e.Output, "\tpanic:")) && !rslt.Panics {
+
+			rslt.Panics = true
 		}
 		if strings.Contains(e.Output, gounit.InitPrefix) {
 			tr, ok := (*r)[e.Test]

@@ -61,6 +61,7 @@ func (s *ADir) Fatales_if_directory_creation_fails(t *T) {
 	exp := []string{"a", "path", "of", "directories"}
 	fx, failed := tfs.NewFX(t), false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().MkdirAll(func(_ string, _ gofs.FileMode) error {
 		return errors.New("mock-err")
 	})
@@ -112,6 +113,7 @@ func (s *ADir) Fatales_if_file_to_create_exists(t *T) {
 
 	td.MkFile(expFl, expContent)
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	td.MkFile(expFl, expContent)
 
 	t.True(failed)
@@ -121,6 +123,7 @@ func (s *ADir) Fatales_if_file_write_fails(t *T) {
 	fx := tfs.NewFX(t)
 	expFl, expContent, failed := "test.txt", []byte("fearless\n"), false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().WriteFile(
 		func(s string, b []byte, fm gofs.FileMode) error {
 			return errors.New("mock-err")
@@ -153,6 +156,7 @@ func (s *ADir) Provides_a_files_content(t *T) {
 func (s *ADir) Fatales_providing_content_if_file_read_fails(t *T) {
 	fx, failed := tfs.NewFX(t), false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().ReadFile(func(s string) ([]byte, error) {
 		return nil, ErrMock
 	})
@@ -177,6 +181,7 @@ func (s *ADir) Adds_a_module_file(t *T) {
 func (s *ADir) Fatales_tiding_if_it_is_no_go_module(t *T) {
 	td, failed := t.FS().Tmp(), false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 
 	td.MkTidy()
 
@@ -220,6 +225,7 @@ func (s *ADir) Fatales_tiding_if_go_sum_cant_be_written(t *T) {
 		t.GoT().SkipNow()
 	}
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().WriteFile(
 		func(s string, b []byte, fm gofs.FileMode) error {
 			return ErrMock
@@ -264,6 +270,7 @@ func (s *ADir) Fatales_file_copy_if_file_read_fails(t *T) {
 	fx, td, expFl, _ := fxFile(t)
 	failed := false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().ReadFile(func(s string) ([]byte, error) {
 		return nil, errors.New("mock-err")
 	})
@@ -277,6 +284,7 @@ func (s *ADir) Fatales_file_copy_if_file_write_fails(t *T) {
 	fx, td, expFl, _ := fxFile(t)
 	failed := false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().WriteFile(func(s string, b []byte, fm gofs.FileMode) error {
 		return errors.New("mock-err")
 	})
@@ -333,6 +341,8 @@ func (s *ADir) Can_undo_a_directory_copy(t *T) {
 var ErrMock = errors.New("mock-err")
 
 func (s *ADir) Copy_fails_for_irregular_files_but_link(t *T) {
+	t.Log("TODO: how to create an irregular file other than " +
+		"a directory or link")
 	// TODO: how to create an irregular file other than directory and
 	// link
 
@@ -356,6 +366,7 @@ func (s *ADir) Fatales_copy_if_a_directory_cant_be_created(t *T) {
 	fx, d1, d2, _, _ := fxTwoDirs(t)
 	failed := false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().MkdirAll(func(s string, fm gofs.FileMode) error {
 		return ErrMock
 	})
@@ -368,6 +379,7 @@ func (s *ADir) Fatales_copy_if_a_file_cant_be_opened(t *T) {
 	fx, d1, d2, _, _ := fxTwoDirs(t)
 	failed := false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().Open(func(s string) (*os.File, error) {
 		return nil, ErrMock
 	})
@@ -380,6 +392,7 @@ func (s *ADir) Fatales_copy_if_a_file_cant_be_created(t *T) {
 	fx, d1, d2, _, _ := fxTwoDirs(t)
 	failed := false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().Create(func(s string) (*os.File, error) {
 		return nil, ErrMock
 	})
@@ -392,6 +405,7 @@ func (s *ADir) Fatales_copy_if_a_file_cant_be_copied(t *T) {
 	fx, d1, d2, _, _ := fxTwoDirs(t)
 	failed := false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().Copy(func(w io.Writer, r io.Reader) (int64, error) {
 		return 0, errors.New("mock-err")
 	})
@@ -404,6 +418,7 @@ func (s *ADir) Fatales_copy_if_a_file_s_mod_cant_be_adapted(t *T) {
 	fx, d1, d2, _, _ := fxTwoDirs(t)
 	failed := false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().Chmod(func(s string, fm gofs.FileMode) error {
 		return errors.New("mock-err")
 	})
@@ -420,6 +435,35 @@ func (s *ADir) Panics_if_undoing_coping_fails(t *T) {
 	undo := d1.Copy(d2)
 
 	t.Panics(undo)
+}
+
+func (s *ADir) Can_remove_a_relative_descendant(t *T) {
+	fx := tfs.NewFX(t)
+	d1, _ := fx.Tmp().Mk("base")
+	d1.Mk("test", "sub")
+	_, err := os.Stat(fp.Join(d1.Path(), "test", "sub"))
+	t.FatalOn(err)
+
+	d1.Rm("test")
+
+	_, err = os.Stat(fp.Join(d1.Path(), "test", "sub"))
+	t.ErrIs(err, os.ErrNotExist)
+}
+
+func (s *ADir) Fatales_if_descendant_removal_fails(t *T) {
+	failed := false
+	fx := tfs.NewFX(t)
+	d1, _ := fx.Tmp().Mk("base")
+	d1.Mk("test", "sub")
+	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
+	fx.Mock().RemoveAll(func(s string) error {
+		return errors.New("mock-err")
+	})
+
+	d1.Rm("test")
+
+	t.True(failed)
 }
 
 func TestADir(t *testing.T) {
@@ -475,6 +519,7 @@ func (s *WorkingDirectory) Change_can_be_undone(t *T) {
 func (s *WorkingDirectory) Change_fails_if_wd_cant_be_obtained(t *T) {
 	fx, failed := tfs.NewFX(t), false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().Getwd(func() (string, error) { return "", ErrMock })
 
 	fx.Tmp().CWD()
@@ -485,6 +530,7 @@ func (s *WorkingDirectory) Change_fails_if_wd_cant_be_obtained(t *T) {
 func (s *WorkingDirectory) Change_fails_if_wd_cant_be_changed(t *T) {
 	fx, failed := tfs.NewFX(t), false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().Chdir(func(s string) error { return ErrMock })
 
 	fx.Tmp().CWD()
@@ -561,6 +607,7 @@ func (s *ADirDiff) Fatales_if_nested_dir_cant_be_red(t *T) {
 	d1.Mk("nested")
 	d2.Mk("nested")
 	t.Mock().Canceler(func() { fatales = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().ReadDir(func(s string) ([]gofs.DirEntry, error) {
 		return []gofs.DirEntry{}, errors.New("mock-err")
 	})
@@ -588,6 +635,7 @@ func (s *ADirDiff) Fatales_if_nested_dir_s_file_info_cant_be_obtained(
 	d1.Mk("nested")
 	d2.Mk("nested")
 	t.Mock().Canceler(func() { fatales = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().ReadDir(func(s string) ([]gofs.DirEntry, error) {
 		return []gofs.DirEntry{&dirInfoMock{}}, nil
 	})
@@ -619,6 +667,7 @@ func (s *ADirDiff) Fatales_if_the_dirs_file_info_cant_be_obtained(t *T) {
 			t.Mock().Reset()
 		}
 	})
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().Stat(func(s string) (gofs.FileInfo, error) {
 		return nil, errors.New("mock-err")
 	})
@@ -713,6 +762,7 @@ func (s *Testdata) Fatales_if_directory_creation_fails(t *T) {
 	}
 	fx, failed := tfs.NewFX(t), false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().MkdirAll(func(_ string, _ gofs.FileMode) error {
 		return ErrMock
 	})
@@ -731,6 +781,7 @@ func (s *Testdata) Fatales_if_caller_cant_be_determined(t *T) {
 	}
 	fx, failed := tfs.NewFX(t), false
 	t.Mock().Canceler(func() { failed = true })
+	t.Mock().Logger(func(i ...interface{}) {})
 	fx.Mock().Caller(func(i int) (uintptr, string, int, bool) {
 		return 0, "", 0, false
 	})

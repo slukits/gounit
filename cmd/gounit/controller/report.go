@@ -6,6 +6,7 @@ package controller
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -140,8 +141,6 @@ func reportFailedPkg(
 	return reportFailedPkgSuites(p, ll, llMask)
 }
 
-var reFileLoc = regexp.MustCompile(`^.*?.go:[0-9]*?:[0-9]*?:`)
-
 func reportPkgErr(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
@@ -150,16 +149,15 @@ func reportPkgErr(
 			continue
 		}
 		s = strings.TrimPrefix(s, "./")
-		flLoc := reFileLoc.FindString(s)
-		if flLoc == "" {
-			ll = append(ll, indent+s)
-			llMask[uint(len(ll)-1)] = view.OutputLine
+		if flLoc, n, ok := pkgFileLoc(p, s); ok {
+			ll, llMask = reportOutputLine(
+				outputWidth, flLoc, indent, ll, llMask)
+			ll, llMask = reportOutputLine(
+				outputWidth, strings.TrimSpace(s[n:]), indent+indent,
+				ll, llMask)
 			continue
 		}
-		ll = append(ll, indent+filepath.Join(p.ID(), flLoc))
-		llMask[uint(len(ll)-1)] = view.OutputLine
-		ll = append(ll, indent+indent+strings.TrimSpace(s[len(flLoc):]))
-		llMask[uint(len(ll)-1)] = view.OutputLine
+		ll, llMask = reportOutputLine(outputWidth, s, indent, ll, llMask)
 	}
 	return ll, llMask
 }
@@ -413,8 +411,6 @@ func reportSubTestLine(
 	return reportOutput(p, r.Output, i+indent, ll, llMask)
 }
 
-var reOutFileLoc = regexp.MustCompile(`^.*?\.go:[0-9]+?:`)
-
 const outputWidth = 68
 
 func reportOutput(
@@ -424,13 +420,12 @@ func reportOutput(
 		return ll, llMask
 	}
 	for _, s := range out {
-		flLoc := reOutFileLoc.FindString(s)
-		if flLoc != "" {
+		if flLoc, n, ok := pkgFileLoc(p, s); ok {
 			ll, llMask = reportOutputLine(
-				outputWidth, filepath.Join(p.ID(), flLoc), i, ll, llMask)
+				outputWidth, flLoc, i, ll, llMask)
 			ll, llMask = reportOutputLine(
-				outputWidth, strings.TrimSpace(s[len(flLoc):]),
-				i+indent, ll, llMask)
+				outputWidth, strings.TrimSpace(s[n:]), i+indent,
+				ll, llMask)
 			continue
 		}
 		ll, llMask = reportOutputLine(
@@ -465,6 +460,30 @@ func reportOutputLine(
 	}
 
 	return ll, llMask
+}
+
+var reFilePos = regexp.MustCompile(`^.*?.go:[0-9]*?:[0-9]*?:`)
+var reFileLoc = regexp.MustCompile(`^.*?.go:[0-9]*`)
+
+func pkgFileLoc(p *pkg, s string) (loc string, n int, ok bool) {
+	flLoc := reFilePos.FindString(s)
+	if flLoc == "" {
+		flLoc = reFileLoc.FindString(s)
+		if flLoc == "" {
+			return "", 0, false
+		}
+	}
+	idx := strings.Index(flLoc, ":")
+	pkgPrefix := strings.TrimSuffix(p.Abs(), filepath.Dir(p.ID()))
+	if strings.HasPrefix(flLoc, pkgPrefix) {
+		return strings.TrimPrefix(flLoc, pkgPrefix), len(flLoc), true
+	}
+	_, err := os.Stat(filepath.Join(
+		p.Abs(), filepath.Base(p.ID()), flLoc[:idx]))
+	if err != nil {
+		return "", 0, false
+	}
+	return filepath.Join(p.ID(), flLoc), len(flLoc), true
 }
 
 func reportStatus(pp pkgs) *view.Statuser {

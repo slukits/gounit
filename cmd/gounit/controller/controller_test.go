@@ -284,6 +284,43 @@ func (s *Gounit) Locks_selected_go_suite_on_test_file_update(t *T) {
 	t.Contains(tt.Reporting().String(), "p4 sub 3")
 }
 
+// func (s *Gounit) Stops_reporting_a_removed_package(t *T) {
+// 	_, tt := s.fxSource(t, "del")
+// 	tt.afterWatch(func() {
+// 		tt.ClickReporting(0)
+// 	})
+// 	t.StarMatched(tt.Reporting().String(), fxExp["del before"]...)
+//
+// 	tt.beforeWatch(func() {
+// 		tt.golden.Rm("del/pkg1")
+// 	})
+// 	t.Log(tt.Reporting().String())
+// }
+
+// type dbg struct {
+// 	Suite
+// 	Fixtures
+// }
+//
+// func (s *dbg) fxSource(t *T, dir string) (*lines.Events, *Testing) {
+// 	return fxSourceDBG(t, s, dir)
+// }
+//
+// func (s *dbg) Dbg(t *T) {
+// 	_, tt := s.fxSource(t, "del")
+// 	tt.afterWatch(func() {
+// 		tt.ClickReporting(0)
+// 	})
+// 	t.StarMatched(tt.Reporting().String(), fxExp["del before"]...)
+//
+// 	tt.beforeWatch(func() {
+// 		tt.golden.Rm("del/pkg1")
+// 	})
+// 	t.Log(tt.Reporting().String())
+// }
+//
+// func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+
 func TestGounit(t *testing.T) {
 	t.Parallel()
 	Run(&Gounit{}, t)
