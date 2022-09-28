@@ -228,6 +228,7 @@ func (s *Gounit) Unfolds_package_on_folded_package_selection(t *T) {
 		tt.afterWatchScr(awReporting).String(),
 		fxExp["mixed/pp/pkg0"]...,
 	)
+
 	tt.ClickReporting(0) // select package
 	t.StarMatched(tt.Reporting().String(), fxExp["mixed/pp"]...)
 	tt.ClickReporting(3) // select package 3
@@ -284,42 +285,25 @@ func (s *Gounit) Locks_selected_go_suite_on_test_file_update(t *T) {
 	t.Contains(tt.Reporting().String(), "p4 sub 3")
 }
 
-// func (s *Gounit) Stops_reporting_a_removed_package(t *T) {
-// 	_, tt := s.fxSource(t, "del")
-// 	tt.afterWatch(func() {
-// 		tt.ClickReporting(0)
-// 	})
-// 	t.StarMatched(tt.Reporting().String(), fxExp["del before"]...)
-//
-// 	tt.beforeWatch(func() {
-// 		tt.golden.Rm("del/pkg1")
-// 	})
-// 	t.Log(tt.Reporting().String())
-// }
+func (s *Gounit) Stops_reporting_a_removed_package(t *T) {
+	_, tt := s.fxSource(t, "del")
+	tt.afterWatch(func() {
+		tt.ClickReporting(0)
+	})
+	t.StarMatched(tt.Reporting().String(), fxExp["del before"]...)
 
-// type dbg struct {
-// 	Suite
-// 	Fixtures
-// }
-//
-// func (s *dbg) fxSource(t *T, dir string) (*lines.Events, *Testing) {
-// 	return fxSourceDBG(t, s, dir)
-// }
-//
-// func (s *dbg) Dbg(t *T) {
-// 	_, tt := s.fxSource(t, "del")
-// 	tt.afterWatch(func() {
-// 		tt.ClickReporting(0)
-// 	})
-// 	t.StarMatched(tt.Reporting().String(), fxExp["del before"]...)
-//
-// 	tt.beforeWatch(func() {
-// 		tt.golden.Rm("del/pkg1")
-// 	})
-// 	t.Log(tt.Reporting().String())
-// }
-//
-// func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+	tt.beforeWatch(func() {
+		tt.golden.Rm("del/pkg1")
+	})
+	t.Not.Contains(tt.Reporting().String(), "del/pkg1")
+	t.Contains(tt.Reporting().String(), "del/pkg2")
+	// that shouldn't be needed because before watch shouldn't return
+	// before the view is updated but somehow it does.
+	// t.Within((&TimeStepper{}), func() bool {
+	// 	return strings.Contains(tt.Reporting().String(), "del/pkg2") &&
+	// 		!strings.Contains(tt.Reporting().String(), "del/pkg1")
+	// })
+}
 
 func TestGounit(t *testing.T) {
 	t.Parallel()

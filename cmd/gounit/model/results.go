@@ -279,13 +279,27 @@ var reSkip = regexp.MustCompile(`^\s*(===|---)`)
 
 type results map[string]*TestResult
 
-func (r results) hasPanic() (*TestResult, bool) {
+func (r results) hasPanic() (string, bool) {
 	for _, t := range r {
 		if t.Panics {
-			return t, true
+			return t.panicErr(), true
 		}
+		if !t.HasSubs() {
+			continue
+		}
+		err := ""
+		t.For(func(sr *SubResult) {
+			if err != "" || !sr.Panics {
+				return
+			}
+			err = sr.panicErr()
+		})
+		if err == "" {
+			continue
+		}
+		return err, true
 	}
-	return nil, false
+	return "", false
 }
 
 func (r *results) addEvent(e *event) {

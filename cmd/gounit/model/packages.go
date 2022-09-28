@@ -275,7 +275,7 @@ func newTestingPackageStat(dir string) (*pkgStat, bool) {
 		return nil, false
 	}
 
-	stat, testing := &pkgStat{abs: dir}, false
+	stat, testing := &pkgStat{abs: dir, ModTime: stt.ModTime()}, false
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
 			continue

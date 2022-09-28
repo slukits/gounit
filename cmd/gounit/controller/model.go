@@ -5,29 +5,78 @@
 package controller
 
 import (
-	"fmt"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
-	"github.com/slukits/lines"
 )
 
+// state represents the current state of a watched source directory from
+// gounit's point of view, i.e. directories which are testing go
+// packages and the results of their test runs.
 type state struct {
-	view        []interface{}
-	pp          pkgs
-	ee          map[string]bool
-	latestPkg   string
-	lastSuite   string
-	latestSuite string
+
+	// pp are the testing packages of a watched directory.
+	pp pkgs
+
+	// ee are the packages of pp which have errors or failing tests.
+	ee map[string]bool
+
+	// view holds the current view needed if an other view like help or
+	// about is shown and the use wants to go back to reported testing
+	// packages.
+	view []interface{}
+
+	// stillTheSame indicates a user input referring to a stale state.
+	stillTheSame bool
+	latestPkg    string
+	lastSuite    string
 }
 
+// ensureLatestPackage determines the latestPkg, i.e. the package to
+// report.
+func (s *state) ensureLatestPackage() *pkg {
+	if s.latestPkg != "" && s.pp[s.latestPkg] != nil {
+		return s.pp[s.latestPkg]
+	}
+	if s.latestPkg != "" {
+		s.lastSuite = ""
+	}
+	if len(s.ee) > 0 {
+		latest := ""
+		for e := range s.ee {
+			if latest == "" {
+				latest = e
+				continue
+			}
+			if s.pp[latest].ModTime.Before(s.pp[e].ModTime) {
+				latest = e
+			}
+		}
+		s.latestPkg = latest
+		return s.pp[s.latestPkg]
+	}
+	p := s.pp.latest()
+	s.latestPkg = p.ID()
+	return p
+}
+
+// modelState manages the current state of a watched source directory's
+// testing packages.
 type modelState struct {
+
+	// Mutex protects a change in state calculated by watch due to a
+	// testing package update and it protects a change of the
+	// view-property which may be a result of a state change or a user
+	// input.
 	*sync.Mutex
+
+	// state represents the current state of testing packages of a
+	// watched source directory
 	*state
+
+	// viewUpdater provides serialized access to the view.
 	viewUpdater func(...interface{})
 }
 
@@ -37,14 +86,26 @@ func (s *modelState) replaceViewUpdater(f func(...interface{})) {
 	s.viewUpdater = f
 }
 
-func (s *modelState) clone() pkgs {
+// clone returns a shallow copy of given model-state's state allowing to
+// change the state or report a different aspect of it with a minimum of
+// locking.
+func (s *modelState) clone(switchStillTheSame bool) *state {
 	s.Lock()
 	defer s.Unlock()
 	pp := pkgs{}
 	for k, v := range s.pp {
 		pp[k] = v
 	}
-	return pp
+	ee := map[string]bool{}
+	for k, v := range s.ee {
+		ee[k] = v
+	}
+	view := append([]interface{}{}, s.view...)
+	if switchStillTheSame {
+		s.stillTheSame = true
+	}
+	return &state{pp: pp, ee: ee, view: view, latestPkg: s.latestPkg,
+		lastSuite: s.lastSuite}
 }
 
 type reporter interface {
@@ -55,85 +116,33 @@ type reporter interface {
 	Folded() reporter
 }
 
-func (s *modelState) update(st *state, deleted []string) {
+func (s *modelState) updateState(st *state) {
+	if st.latestPkg != "" && len(st.ee) > 0 && !st.ee[st.latestPkg] {
+		st.latestPkg = ""
+	}
+	r := newReport(st, rprDefault, -1)
+	r.lst = s.lineListener
+	r.flags = view.RpClearing
+	status := reportStatus(st.pp)
 	s.Lock()
 	defer s.Unlock()
-	if st == nil {
-		s.remove(deleted)
-		if len(s.pp) == 0 {
-			s.viewUpdater(emptyReport, &view.Statuser{})
-			return
-		}
-		s._report(rprDefault, -1)
-		return
-	}
-	s.updateFailing(st)
-	for p := range st.pp {
-		s.pp[p] = st.pp[p]
-	}
-	if st.latestPkg != "" {
-		if st.latestPkg != s.latestPkg {
-			s.lastSuite = ""
-			s.latestPkg = st.latestPkg
-		}
-	}
-	if len(deleted) > 0 {
-		s.remove(deleted)
-	}
-	if len(s.pp) == 0 {
-		s.viewUpdater(emptyReport, &view.Statuser{})
-		return
-	}
-	if len(s.ee) > 0 {
-		status := reportStatus(s.pp)
-		s.view = []interface{}{
-			reportFailed(s.state, s.lineListener), status}
-		s.viewUpdater(s.view...)
-		return
-	}
-	s._report(rprDefault, -1)
-}
-
-func (s *modelState) remove(deleted []string) {
-	for _, pID := range deleted {
-		delete(s.pp, pID)
-		delete(s.ee, pID)
-		if s.latestPkg != pID {
-			continue
-		}
-		s.latestPkg = ""
-	}
-	if s.latestPkg != "" {
-		return
-	}
-	s.lastSuite = ""
-	s.latestSuite = ""
-}
-
-func (s *modelState) updateFailing(upd *state) {
-	if s.ee == nil {
-		s.ee = map[string]bool{}
-	}
-	for pID := range upd.pp {
-		if upd.ee[pID] {
-			s.ee[pID] = true
-			continue
-		}
-		delete(s.ee, pID)
-	}
+	s.state = st
+	s.view = []interface{}{r, status}
+	s.viewUpdater(r, status)
 }
 
 func (s *modelState) lineListener(idx int) {
-	s.Lock()
-	defer s.Unlock()
-	s._report(s.reportTransition(idx), idx)
+	st := s.clone(true)
+	report := newReport(st, reportTransition(st, idx), idx)
+	status := reportStatus(st.pp)
+	s.updateReport(st, report, status)
 }
 
 // reportTransition calculates in dependency of the current report's
 // selected line and type the new report-type for the user-request
 // response.
-func (s *modelState) reportTransition(idx int) reportType {
-	lm := s.view[0].(*report).LineMask(uint(idx))
+func reportTransition(st *state, idx int) reportType {
+	lm := st.view[0].(*report).LineMask(uint(idx))
 	switch {
 	case lm&view.PackageLine > 0:
 		return rprPackages
@@ -148,7 +157,7 @@ func (s *modelState) reportTransition(idx int) reportType {
 	case lm&view.SuiteFoldedLine > 0:
 		return rprSuite
 	case lm&view.SuiteLine > 0:
-		return rprPackage
+		return rprMixedFolded
 	case lm&view.PackageFoldedLine > 0:
 		return rprPackage
 	}
@@ -157,187 +166,32 @@ func (s *modelState) reportTransition(idx int) reportType {
 
 // report reports a report of given type.
 func (s *modelState) report(t reportType) {
+	if t == rprCurrent {
+		s.Lock()
+		defer s.Unlock()
+		s.viewUpdater(s.view...)
+		return
+	}
+	st := s.clone(true)
+	report := newReport(st, t, -1)
+	status := reportStatus(st.pp)
+	s.updateReport(st, report, status)
+}
+
+func (s *modelState) updateReport(
+	st *state, report *report, status *view.Statuser,
+) {
 	s.Lock()
 	defer s.Unlock()
-	s._report(t, -1) // panics if we have a bug
-}
-
-// _report creates report of given type.  The index is needed for the
-// use case that a folded suite was selected to determine which one.
-func (s *modelState) _report(t reportType, idx int) {
-	if t == rprCurrent {
-		s.viewUpdater(s.view...)
+	if !s.stillTheSame {
+		// state was updated meanwhile => discard user input
 		return
 	}
-	status := reportStatus(s.pp)
-	if t == rprPackages {
-		s.view = []interface{}{
-			reportPackages(s.pp, s.lineListener), status}
-		s.viewUpdater(s.view...)
-		return
-	}
-	if t == rprPackage {
-		pNm := strings.Split(s.view[0].(*report).ll[idx],
-			lines.LineFiller)[0]
-		for _, p := range s.pp {
-			if p.ID() != pNm {
-				continue
-			}
-			s.latestPkg = p.ID()
-			break
-		}
-	}
-	ll, llMask := rprLines{}, linesMask{}
-	if len(s.ee) > 0 {
-		ll, llMask = s.reportFailedPkgsBut(ll, llMask)
-	}
-	p := s.pp[s.latestPkg]
-	if p == nil {
-		panic(fmt.Sprintf("package '%s' doesn't exits", s.latestPkg))
-	}
-	if p.HasErr() {
-		ll, llMask, ls := reportFailedPkg(s.state, ll, llMask)
-		s.lastSuite = ls
-		s.view = []interface{}{&report{
-			flags:   view.RpClearing,
-			ll:      ll,
-			llMasks: llMask,
-			lst:     s.lineListener,
-		}, status}
-		s.viewUpdater(s.view...)
-		return
-	}
-	switch p.LenSuites() {
-	case 0:
-		switch t {
-		case rprGoSuite:
-			ll, llMask = reportGoOnlySuite(
-				p, s.findGoSuite(p, idx), ll, llMask)
-		default:
-			ll, llMask = reportGoOnlyPkg(p, ll, llMask)
-		}
-	default:
-		ll, llMask = s.reportMixedPkg(t, idx, p, ll, llMask)
-	}
-	s.view = []interface{}{&report{
-		flags:   view.RpClearing,
-		ll:      ll,
-		llMasks: llMask,
-		lst:     s.lineListener,
-	}, status}
-	s.viewUpdater(s.view...)
-}
-
-func (s *modelState) reportFailedPkgsBut(
-	ll rprLines, llMask linesMask,
-) (rprLines, linesMask) {
-	ee := []string{}
-	for k := range s.ee {
-		ee = append(ee, k)
-	}
-	sort.Slice(ee, func(i, j int) bool {
-		return ee[i] < ee[j]
-	})
-	for _, pID := range ee {
-		if pID == s.latestPkg {
-			continue
-		}
-		ll, llMask = reportPackageLine(
-			s.pp[pID], view.PackageFoldedLine, ll, llMask)
-	}
-	return ll, llMask
-}
-
-func (s *modelState) reportMixedPkg(
-	t reportType, idx int, p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask) {
-	switch t {
-	case rprGoTests, rprGoSuiteFolded:
-		s.lastSuite = "go-tests"
-		return reportMixedGoTests(p, ll, llMask)
-	case rprSuite:
-		var suite *model.TestSuite
-		ln := strings.Split(s.view[0].(*report).ll[idx],
-			lines.LineFiller)[0]
-		p.ForSuite(func(ts *model.TestSuite) {
-			if suite != nil {
-				return
-			}
-			if ln == ts.String() {
-				suite = ts
-			}
-		})
-		if suite == nil {
-			panic(fmt.Sprintf(
-				"pkg '%s' doesn't have suite '%s'", p.ID(), ln))
-		}
-		s.lastSuite = suite.Name()
-		return reportMixedSuite(suite, p, ll, llMask)
-	case rprGoSuite:
-		gSuite := s.findGoSuite(p, idx)
-		s.lastSuite = "go-tests:" + gSuite.Name()
-		return reportMixedGoSuite(gSuite, p, ll, llMask)
-	case rprPackage:
-		return reportMixedFolded(p, ll, llMask)
-	case rprDefault:
-		var suite *model.TestSuite
-		if s.lastSuite != "" {
-			if strings.HasPrefix(s.lastSuite, "go-tests") {
-				return s.reportLockedGoSuite(p, ll, llMask)
-			}
-			suite = p.Suite(s.lastSuite)
-		}
-		if suite == nil {
-			s.lastSuite = ""
-			suite = p.LastSuite()
-		}
-		if suite != nil {
-			return reportMixedSuite(suite, p, ll, llMask)
-		}
-		return reportMixedFolded(p, ll, llMask)
-	}
-	return ll, llMask
-}
-
-func (s *modelState) reportLockedGoSuite(
-	p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask) {
-	if p.LenTests() == 0 {
-		return reportMixedFolded(p, ll, llMask)
-	}
-	if s.lastSuite == "go-tests" {
-		return reportMixedGoTests(p, ll, llMask)
-	}
-	goSuiteName := strings.Split(s.lastSuite, ":")[1]
-	var goSuite *model.Test
-	p.ForTest(func(t *model.Test) {
-		if goSuite != nil {
-			return
-		}
-		if t.Name() != goSuiteName {
-			return
-		}
-		goSuite = t
-	})
-	if goSuite != nil {
-		return reportMixedGoSuite(goSuite, p, ll, llMask)
-	}
-	return reportMixedFolded(p, ll, llMask)
-}
-
-func (s *modelState) findGoSuite(p *pkg, idx int) *model.Test {
-	var goSuite *model.Test
-	ln := strings.TrimSpace(strings.Split(
-		s.view[0].(*report).ll[idx], lines.LineFiller)[0])
-	p.ForTest(func(t *model.Test) {
-		if goSuite != nil {
-			return
-		}
-		if ln == t.String() {
-			goSuite = t
-		}
-	})
-	return goSuite
+	report.lst = s.lineListener
+	report.flags = view.RpClearing
+	s.state = st
+	s.view = []interface{}{report, status}
+	s.viewUpdater(report, status)
 }
 
 func watch(
@@ -348,35 +202,35 @@ func watch(
 		if diff == nil {
 			return
 		}
-		pp, latest := mdl.clone(), ""
+		st := mdl.clone(false)
 		rslt, n := make(chan *pkg), 0
+		// TODO: since we don't care about the reported package order we
+		// should be able to remove the sorting of them from the model.
 		diff.For(func(tp *model.TestingPackage) (stop bool) {
-			n++
+			n++ // count expected results
 			go run(&pkg{TestingPackage: tp}, rslt)
-			latest = tp.ID()
 			return
 		})
-		ee := map[string]bool{}
+		if st.ee == nil {
+			st.ee = map[string]bool{}
+		}
 		for i := 0; i < n; i++ {
 			p := <-rslt
-			pp[p.ID()] = p
+			st.pp[p.ID()] = p
 			if !p.HasErr() && p.Passed() {
+				if st.ee[p.ID()] {
+					delete(st.ee, p.ID())
+				}
 				continue
 			}
-			ee[p.ID()] = true
+			st.ee[p.ID()] = true
 		}
-		deleted := []string{}
 		diff.ForDel(func(tp *model.TestingPackage) (stop bool) {
-			deleted = append(deleted, tp.ID())
+			delete(st.pp, tp.ID())
+			delete(st.ee, tp.ID())
 			return
 		})
-		if (len(pp) == 0 || pp[latest] == nil) && len(deleted) == 0 {
-			return
-		}
-		if len(pp) == 0 || pp[latest] == nil {
-			mdl.update(nil, deleted)
-		}
-		mdl.update(&state{pp: pp, ee: ee, latestPkg: latest}, deleted)
+		mdl.updateState(st)
 	}
 }
 
@@ -420,9 +274,6 @@ func (p *pkg) info() (n, f, s int, d time.Duration) {
 		})
 		p.ForSuite(func(st *model.TestSuite) {
 			r := p.OfSuite(st)
-			if r == nil {
-				panic(fmt.Sprintf("suite '%s' missing result", st.Name()))
-			}
 			n += r.Len()
 			f += r.LenFailed()
 		})
@@ -447,6 +298,20 @@ func (p *pkg) HasFailedSuite() bool {
 }
 
 type pkgs map[string]*pkg
+
+func (pp pkgs) latest() *pkg {
+	var l *pkg
+	for _, p := range pp {
+		if l == nil {
+			l = p
+			continue
+		}
+		if l.ModTime.Before(p.ModTime) {
+			l = p
+		}
+	}
+	return l
+}
 
 // reportType values type model-state reports which is leveraged
 // for transitioning between different views.  E.g. a click on a package
