@@ -18,6 +18,7 @@ const (
 type stater interface {
 	report(reportType)
 	setOnFlag(onMask)
+	removeOneFlag(onMask)
 }
 
 type buttons struct {
@@ -51,6 +52,7 @@ func (bb *buttons) defaultListener(label string) {
 	case bttVetOn:
 		bb.isOn &^= vetOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+		bb.modelState.removeOneFlag(vetOn)
 	case bttRaceOff:
 		bb.isOn |= raceOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
@@ -59,6 +61,7 @@ func (bb *buttons) defaultListener(label string) {
 	case bttRaceOn:
 		bb.isOn &^= raceOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+		bb.modelState.removeOneFlag(raceOn)
 	case bttStatsOff:
 		bb.isOn |= statsOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))

@@ -233,6 +233,12 @@ func (s *modelState) setOnFlag(om onMask) {
 	}, st.pp[st.latestPkg], st)
 }
 
+func (s *modelState) removeOneFlag(om onMask) {
+	s.Lock()
+	defer s.Unlock()
+	s.isOn &^= om
+}
+
 // rerunTests reruns the tests of given package using the given state's
 // isOn property to calculate the (usually modified) run-arguments for
 // the test-run.  Finally given model-states report is updated with the

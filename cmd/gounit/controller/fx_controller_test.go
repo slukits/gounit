@@ -375,7 +375,7 @@ func fxInit(
 		ee *lines.Events
 	)
 	ct.Mutex = &sync.Mutex{}
-	ct._watchTimeout = 10 * time.Second
+	ct._watchTimeout = 20 * time.Second
 	if i.dbgTimeouts {
 		ct._watchTimeout = 20 * time.Minute
 	}

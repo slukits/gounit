@@ -284,6 +284,16 @@ func (s *Report) Updated_package_vetted_if_vet_is_turned_on(t *T) {
 	t.Contains(tt.Trim(tt.Reporting()).String(), "vet/src.go:11:26")
 }
 
+func (s *Report) Current_package_not_vetted_if_vet_is_turned_off(t *T) {
+	_, tt := s.fxSource(t, "vet")
+	tt.afterWatch(func() { tt.ClickButton("vet=off") })
+	t.Contains(tt.Trim(tt.afterWatchScr(awReporting)).String(), "FAIL")
+
+	tt.ClickButton("vet=on")
+	tt.beforeWatch(func() { tt.golden.Touch("vet") })
+	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "FAIL")
+}
+
 func (s *Report) Race_in_current_package_if_race_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "race")
 	t.Contains(
@@ -321,6 +331,22 @@ func (s *Report) Race_in_updated_package_if_race_is_turned_on(t *T) {
 
 	tt.beforeWatch(func() { tt.golden.Touch("race") })
 	t.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
+}
+
+func (s *Report) No_race_if_current_package_race_is_turned_off(t *T) {
+	_, tt := s.fxSource(t, "race")
+	tt.afterWatch(func() { tt.ClickButton("race=off") })
+	t.Contains(
+		tt.Trim(tt.afterWatchScr(awReporting)).String(),
+		"WARNING: DATA RACE",
+	)
+
+	tt.ClickButton("race=on")
+	tt.beforeWatch(func() { tt.golden.Touch("race") })
+	t.Not.Contains(
+		tt.Trim(tt.Reporting()).String(),
+		"WARNING: DATA RACE",
+	)
 }
 
 func TestReport(t *testing.T) {
