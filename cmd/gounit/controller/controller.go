@@ -93,7 +93,7 @@ func New(i *InitFactories) {
 	}
 	ee := i.Events(i.View(&viewIniter{controller: i.controller}))
 	i.controller.bb.quitter = ee.QuitListening
-	i.controller.bb.reporter = i.controller.model.report
+	i.controller.bb.modelState = i.controller.model
 	go i.watch(diff, i.controller.model)
 	ee.Listen()
 }

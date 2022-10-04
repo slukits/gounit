@@ -28,6 +28,8 @@ type state struct {
 	// packages.
 	view []interface{}
 
+	isOn onMask
+
 	// stillTheSame indicates a user input referring to a stale state.
 	stillTheSame bool
 	latestPkg    string
@@ -105,7 +107,7 @@ func (s *modelState) clone(switchStillTheSame bool) *state {
 		s.stillTheSame = true
 	}
 	return &state{pp: pp, ee: ee, view: view, latestPkg: s.latestPkg,
-		lastSuite: s.lastSuite}
+		lastSuite: s.lastSuite, isOn: s.isOn}
 }
 
 type reporter interface {
@@ -116,6 +118,7 @@ type reporter interface {
 	Folded() reporter
 }
 
+// updateState through a change in the watched source directory.
 func (s *modelState) updateState(st *state) {
 	if st.latestPkg != "" && len(st.ee) > 0 && !st.ee[st.latestPkg] {
 		st.latestPkg = ""
@@ -123,7 +126,7 @@ func (s *modelState) updateState(st *state) {
 	r := newReport(st, rprDefault, -1)
 	r.lst = s.lineListener
 	r.flags = view.RpClearing
-	status := reportStatus(st.pp)
+	status := newStatus(st.pp)
 	s.Lock()
 	defer s.Unlock()
 	s.state = st
@@ -131,11 +134,39 @@ func (s *modelState) updateState(st *state) {
 	s.viewUpdater(r, status)
 }
 
+// lineListener is called back from the view iff a user-input selected a
+// line of the report component.
 func (s *modelState) lineListener(idx int) {
 	st := s.clone(true)
-	report := newReport(st, reportTransition(st, idx), idx)
-	status := reportStatus(st.pp)
-	s.updateReport(st, report, status)
+	rt := reportTransition(st, idx)
+	update := func() {
+		report := newReport(st, rt, idx)
+		status := newStatus(st.pp)
+		s.updateReport(st, report, status)
+	}
+	if rt == rprPackage && ensureRequestedPackageRun(update, st, idx) {
+		return
+	}
+	update()
+}
+
+// ensureRequestedPackageRun makes sure that a user-selected package's
+// tests have been run according to the set vet/race flags and returns
+// true if a package's tests were rerun.  This function covers the use
+// case if the user requests all packages folded, then for example turns
+// vetting on and finally selects a package to report.
+func ensureRequestedPackageRun(cb func(), st *state, idx int) bool {
+	pID, ok := findReportLine(
+		st.view[0].(*report), idx, view.PackageFoldedLine)
+	if !ok {
+		return false
+	}
+	pkg := st.pp[pID]
+	if pkg.om == st.isOn {
+		return false
+	}
+	go rerunTests(cb, pkg, st)
+	return true
 }
 
 // reportTransition calculates in dependency of the current report's
@@ -174,10 +205,65 @@ func (s *modelState) report(t reportType) {
 	}
 	st := s.clone(true)
 	report := newReport(st, t, -1)
-	status := reportStatus(st.pp)
+	status := newStatus(st.pp)
 	s.updateReport(st, report, status)
 }
 
+func (s *modelState) setOnFlag(om onMask) {
+	s.Lock()
+	if s.isOn&om == om {
+		s.Unlock()
+		return
+	}
+	s.isOn |= om
+	if s.latestPkg == "" {
+		s.Unlock()
+		return
+	}
+	s.Unlock()
+	st := s.clone(true)
+	if st.latestPkg == "" { // to be on the save side
+		return
+	}
+
+	go rerunTests(func() {
+		r := newReport(st, rprDefault, -1)
+		stt := newStatus(st.pp)
+		s.updateReport(st, r, stt)
+	}, st.pp[st.latestPkg], st)
+}
+
+// rerunTests reruns the tests of given package using the given state's
+// isOn property to calculate the (usually modified) run-arguments for
+// the test-run.  Finally given model-states report is updated with the
+// rerun package's report.
+func rerunTests(cb func(), p *pkg, st *state) {
+	rr, err := p.Run(translateToRunMask(st.isOn))
+	p.runResult = &runResult{Results: rr, err: err, om: st.isOn}
+	if p.HasErr() && !st.ee[p.ID()] {
+		st.ee[p.ID()] = true
+	}
+	if !p.HasErr() && st.ee[p.ID()] {
+		delete(st.ee, p.ID())
+	}
+	p.inf = nil
+	cb()
+}
+
+func translateToRunMask(om onMask) model.RunMask {
+	rm := model.RunMask(0)
+	if om&vetOn != 0 {
+		rm |= model.RunVet
+	}
+	if om&raceOn != 0 {
+		rm |= model.RunRace
+	}
+	return rm
+}
+
+// updateReport updates the currently reported report iff during report
+// calculation the model-state has not been updated through a source
+// change.
 func (s *modelState) updateReport(
 	st *state, report *report, status *view.Statuser,
 ) {
@@ -208,7 +294,7 @@ func watch(
 		// should be able to remove the sorting of them from the model.
 		diff.For(func(tp *model.TestingPackage) (stop bool) {
 			n++ // count expected results
-			go run(&pkg{TestingPackage: tp}, rslt)
+			go run(&pkg{TestingPackage: tp}, st.isOn, rslt)
 			return
 		})
 		if st.ee == nil {
@@ -234,15 +320,19 @@ func watch(
 	}
 }
 
-func run(p *pkg, rslt chan *pkg) {
-	rr, err := p.Run()
-	p.runResult = &runResult{Results: rr, err: err}
+func run(p *pkg, om onMask, rslt chan *pkg) {
+	rr, err := p.Run(translateToRunMask(om))
+	p.runResult = &runResult{Results: rr, err: err, om: om}
 	rslt <- p
 }
 
 type runResult struct {
+	// err represents a possible error of a failed tests-run
 	err error
+	// Results are the parsed test-results of a tests-run
 	*model.Results
+	// om documents the set flags of tests-run
+	om onMask
 }
 
 type info struct {

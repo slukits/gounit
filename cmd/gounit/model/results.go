@@ -92,6 +92,7 @@ func (r *Results) Len() int { return len(r.rr) }
 type Result struct {
 	Passed bool
 	Panics bool
+	inRace bool
 	Output []string
 	Start  time.Time
 	End    time.Time
@@ -275,7 +276,9 @@ func unmarshal(stdout []byte) (results, error) {
 	return rr, nil
 }
 
-var reSkip = regexp.MustCompile(`^\s*(===|---)`)
+var (
+	reSkip = regexp.MustCompile(`^\s*(===|---)`)
+)
 
 type results map[string]*TestResult
 
@@ -319,6 +322,9 @@ func (r *results) addEvent(e *event) {
 		rslt.End = e.Time
 	case acOutput:
 		if reSkip.MatchString(e.Output) {
+			if rslt.inRace {
+				rslt.inRace = false
+			}
 			break
 		}
 		if (strings.HasPrefix(e.Output, "panic:") ||
@@ -359,6 +365,10 @@ func (r *results) addEvent(e *event) {
 				continue
 			}
 			rslt.Output = append(rslt.Output, strings.TrimSpace(s))
+		}
+		if strings.Contains(e.Output, "WARNING: DATA RACE") {
+			rslt.inRace = true
+			rslt.Passed = false
 		}
 	}
 }

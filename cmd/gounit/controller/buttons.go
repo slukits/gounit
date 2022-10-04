@@ -15,13 +15,18 @@ const (
 	errOn
 )
 
+type stater interface {
+	report(reportType)
+	setOnFlag(onMask)
+}
+
 type buttons struct {
-	viewUpd  func(...interface{})
-	reporter func(reportType)
-	dflt     *buttoner
-	more     *buttoner
-	isOn     onMask
-	quitter  func()
+	viewUpd    func(...interface{})
+	modelState stater
+	dflt       *buttoner
+	more       *buttoner
+	isOn       onMask
+	quitter    func()
 }
 
 func newButtons(upd func(...interface{})) *buttons {
@@ -42,12 +47,15 @@ func (bb *buttons) defaultListener(label string) {
 	case bttVetOff:
 		bb.isOn |= vetOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+		bb.modelState.setOnFlag(vetOn)
 	case bttVetOn:
 		bb.isOn &^= vetOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
 	case bttRaceOff:
 		bb.isOn |= raceOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+		// TODO: removing this line we get a wired error report go figure
+		bb.modelState.setOnFlag(raceOn)
 	case bttRaceOn:
 		bb.isOn &^= raceOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
@@ -70,7 +78,7 @@ func (bb *buttons) moreButtons() *buttoner {
 func (bb *buttons) moreListener(label string) {
 	switch label {
 	case "back":
-		bb.reporter(rprCurrent)
+		bb.modelState.report(rprCurrent)
 		bb.viewUpd(bb.defaults())
 	case "help":
 		viewHelp(bb.viewUpd)

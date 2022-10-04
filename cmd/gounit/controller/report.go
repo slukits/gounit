@@ -49,6 +49,7 @@ func newReport(st *state, t reportType, idx int) *report {
 	}
 	if t == rprPackages {
 		ll, llMask := reportPackages(st.pp)
+		st.latestPkg = ""
 		return &report{ll: ll, llMasks: llMask}
 	}
 	if t == rprPackage {
@@ -613,20 +614,39 @@ func reportSubTestLine(
 
 const outputWidth = 68
 
+var raceLineBreak = regexp.MustCompile(`^\s*Goroutine \d+|^\s*Read at` +
+	`|^\s*Previous read at|^\s*Write at|^\s*Previous write at`)
+
 func reportOutput(
 	p *pkg, out []string, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	if len(out) == 0 {
 		return ll, llMask
 	}
+	var dataRace bool
 	for _, s := range out {
+		if strings.Contains(s, "WARNING: DATA RACE") {
+			dataRace = true
+		}
 		if flLoc, n, ok := pkgFileLoc(p, s); ok {
-			ll, llMask = reportOutputLine(
-				outputWidth, flLoc, i, ll, llMask)
+			if dataRace {
+				ll, llMask = reportOutputLine(
+					outputWidth, flLoc, i+indent, ll, llMask)
+			} else {
+				ll, llMask = reportOutputLine(
+					outputWidth, flLoc, i, ll, llMask)
+			}
+			if reHex.MatchString(strings.TrimSpace(s[n:])) {
+				continue
+			}
 			ll, llMask = reportOutputLine(
 				outputWidth, strings.TrimSpace(s[n:]), i+indent,
 				ll, llMask)
 			continue
+		}
+		if dataRace && raceLineBreak.MatchString(s) {
+			ll = append(ll, blankLine)
+			llMask[uint(len(ll)-1)] = view.OutputLine
 		}
 		ll, llMask = reportOutputLine(
 			outputWidth, s, i+indent, ll, llMask)
@@ -686,7 +706,7 @@ func pkgFileLoc(p *pkg, s string) (loc string, n int, ok bool) {
 	return filepath.Join(p.ID(), flLoc), len(flLoc), true
 }
 
-func reportStatus(pp pkgs) *view.Statuser {
+func newStatus(pp pkgs) *view.Statuser {
 	// count suites, tests and failed tests
 	ssLen, ttLen, ffLen := 0, 0, 0
 	for _, p := range pp {

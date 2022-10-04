@@ -109,7 +109,7 @@ func (s *Package) Reports_suite_runner(t *T) {
 func (s *Package) Reports_shell_exit_error_of_tests_run(t *T) {
 	pkg := s.fx.TestingPackage(t)
 
-	rslt, err := pkg.Run()
+	rslt, err := pkg.Run(0)
 	t.FatalOn(err)
 
 	t.True(rslt.HasErr())
@@ -161,7 +161,7 @@ func (s *PkgTestRun) Init(t *S) {
 	case <-_t.Timeout(30 * time.Millisecond):
 		t.Fatal("initial diff timed out")
 	}
-	rslt, err := pkg.Run()
+	rslt, err := pkg.Run(0)
 	t.FatalOn(err)
 	_t.FatalIfNot(_t.True(rslt.Err() == ""))
 

@@ -141,6 +141,13 @@ func (tp *TestingPackage) Suite(name string) *TestSuite {
 
 const StdErr = "shell exit error: "
 
+type RunMask uint8
+
+const (
+	RunVet RunMask = 1 << iota
+	RunRace
+)
+
 // Run executes go test for the testing package and returns its result.
 // Returned error if any is the error of command execution, i.e. a
 // timeout.  While Result.Err reflects errors from the error console.
@@ -151,12 +158,19 @@ const StdErr = "shell exit error: "
 // are reported in the order they were written, it is necessary to parse
 // the test files separately and then match the findings to the result
 // of the test run.
-func (tp *TestingPackage) Run() (*Results, error) {
+func (tp *TestingPackage) Run(rm RunMask) (*Results, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(), tp.Timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "go", "test", "-json", "-vet=off",
-		fmt.Sprintf("-timeout=%s", tp.Timeout))
+	aa := []string{"test", "-json"}
+	if rm&RunVet == 0 {
+		aa = append(aa, "-vet=off")
+	}
+	if rm&RunRace != 0 {
+		aa = append(aa, "-race")
+	}
+	aa = append(aa, fmt.Sprintf("-timeout=%s", tp.Timeout))
+	cmd := exec.CommandContext(ctx, "go", aa...)
 	cmd.Dir = tp.abs
 	start := time.Now()
 	stdout, err := cmd.CombinedOutput()
