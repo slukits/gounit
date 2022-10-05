@@ -274,7 +274,7 @@ func unmarshal(stdout []byte) (results, error) {
 		}
 		rr.addEvent(event)
 	}
-	return rr, nil
+	return rr.passSubSubs(), nil
 }
 
 var (
@@ -293,10 +293,19 @@ func (r results) hasPanic() (string, bool) {
 		}
 		err := ""
 		t.For(func(sr *SubResult) {
-			if err != "" || !sr.Panics {
+			if err != "" || (!sr.Panics && !sr.HasSubs()) {
 				return
 			}
-			err = sr.panicErr()
+			if sr.Panics {
+				err = sr.panicErr()
+				return
+			}
+			sr.For(func(sr *SubResult) {
+				if err != "" || !sr.Panics {
+					return
+				}
+				err = sr.panicErr()
+			})
 		})
 		if err == "" {
 			continue
@@ -304,6 +313,30 @@ func (r results) hasPanic() (string, bool) {
 		return err, true
 	}
 	return "", false
+}
+
+// passSubSubs it seems that go test passing sub-tests having sub-tests
+// them self is not reporting as passing; hence we make them pass if all
+// their sub-tests pass.
+func (r results) passSubSubs() results {
+	for _, t := range r {
+		if !t.HasSubs() {
+			continue
+		}
+		t.For(func(sr *SubResult) {
+			if !sr.HasSubs() {
+				return
+			}
+			sr.Passed = true
+			sr.For(func(s *SubResult) {
+				if sr.Passed && s.Passed {
+					return
+				}
+				sr.Passed = false
+			})
+		})
+	}
+	return r
 }
 
 func (r *results) addEvent(e *event) {

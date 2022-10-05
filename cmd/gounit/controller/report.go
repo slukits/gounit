@@ -604,7 +604,7 @@ func reportTestLine(
 	idx := uint(len(ll) - 1)
 	llMask[idx] = view.TestLine
 	if !r.Passed {
-		llMask[idx] = view.Failed
+		llMask[idx] |= view.Failed
 	}
 	return reportOutput(p, r.Output, i+indent, ll, llMask)
 }
@@ -618,9 +618,15 @@ func reportSubTestLine(
 	idx := uint(len(ll) - 1)
 	llMask[idx] = view.TestLine
 	if !r.Passed {
-		llMask[idx] = view.Failed
+		llMask[idx] |= view.Failed
 	}
-	return reportOutput(p, r.Output, i+indent, ll, llMask)
+	ll, llMask = reportOutput(p, r.Output, i+indent, ll, llMask)
+	if r.HasSubs() {
+		r.ForOrdered(func(sr *model.SubResult) {
+			ll, llMask = reportSubTestLine(p, sr, i+indent, ll, llMask)
+		})
+	}
+	return ll, llMask
 }
 
 const outputWidth = 68
