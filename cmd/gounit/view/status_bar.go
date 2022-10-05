@@ -94,9 +94,15 @@ func (sb *statusBar) OnUpdate(e *lines.Env) {
 
 const dfltStatus = "pkgs/suites: %d/%d; tests: %d/%d"
 
+const sourceStatsStatus = dfltStatus + "  source-stats: %d/%d %d/%d/%d"
+
 func (sb *statusBar) str() string {
-	pt := fmt.Sprintf(dfltStatus, sb.np, sb.ns, sb.nt, sb.nf)
-	return pt
+	if sb.nsr > 0 {
+		return fmt.Sprintf(sourceStatsStatus,
+			sb.np, sb.ns, sb.nt, sb.nf,
+			sb.nsr, sb.nst, sb.nc, sb.nct, sb.nd)
+	}
+	return fmt.Sprintf(dfltStatus, sb.np, sb.ns, sb.nt, sb.nf)
 }
 
 func (sb *statusBar) bg() tcell.Color {

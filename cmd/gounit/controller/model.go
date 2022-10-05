@@ -123,10 +123,10 @@ func (s *modelState) updateState(st *state) {
 	if st.latestPkg != "" && len(st.ee) > 0 && !st.ee[st.latestPkg] {
 		st.latestPkg = ""
 	}
+	status := newStatus(st.pp, s.isOn)
 	r := newReport(st, rprDefault, -1)
 	r.lst = s.lineListener
 	r.flags = view.RpClearing
-	status := newStatus(st.pp)
 	s.Lock()
 	defer s.Unlock()
 	s.state = st
@@ -140,8 +140,8 @@ func (s *modelState) lineListener(idx int) {
 	st := s.clone(true)
 	rt := reportTransition(st, idx)
 	update := func() {
+		status := newStatus(st.pp, s.isOn)
 		report := newReport(st, rt, idx)
-		status := newStatus(st.pp)
 		s.updateReport(st, report, status)
 	}
 	if rt == rprPackage && ensureRequestedPackageRun(update, st, idx) {
@@ -204,8 +204,8 @@ func (s *modelState) report(t reportType) {
 		return
 	}
 	st := s.clone(true)
+	status := newStatus(st.pp, s.isOn)
 	report := newReport(st, t, -1)
-	status := newStatus(st.pp)
 	s.updateReport(st, report, status)
 }
 
@@ -226,17 +226,29 @@ func (s *modelState) setOnFlag(om onMask) {
 		return
 	}
 
-	go rerunTests(func() {
-		r := newReport(st, rprDefault, -1)
-		stt := newStatus(st.pp)
-		s.updateReport(st, r, stt)
-	}, st.pp[st.latestPkg], st)
+	if om&(raceOn|vetOn) != 0 {
+		go rerunTests(func() {
+			stt := newStatus(st.pp, st.isOn)
+			r := newReport(st, rprDefault, -1)
+			s.updateReport(st, r, stt)
+		}, st.pp[st.latestPkg], st)
+		return
+	}
+
+	stt := newStatus(st.pp, s.isOn)
+	r := newReport(st, rprDefault, -1)
+	s.updateReport(st, r, stt)
 }
 
 func (s *modelState) removeOneFlag(om onMask) {
 	s.Lock()
 	defer s.Unlock()
 	s.isOn &^= om
+	if om&statsOn != 0 {
+		for _, p := range s.pp {
+			p.ResetSrcStats()
+		}
+	}
 }
 
 // rerunTests reruns the tests of given package using the given state's
@@ -362,6 +374,9 @@ func (p *pkg) info() (n, f, s int, d time.Duration) {
 		goSuites := 0
 		p.ForTest(func(t *model.Test) {
 			r := p.OfTest(t)
+			if r == nil {
+				return
+			}
 			n += r.Len()
 			f += r.LenFailed()
 			if r.HasSubs() {
@@ -370,6 +385,9 @@ func (p *pkg) info() (n, f, s int, d time.Duration) {
 		})
 		p.ForSuite(func(st *model.TestSuite) {
 			r := p.OfSuite(st)
+			if r == nil {
+				return
+			}
 			n += r.Len()
 			f += r.LenFailed()
 		})

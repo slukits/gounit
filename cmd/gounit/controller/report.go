@@ -518,8 +518,19 @@ func reportPackageLine(
 		return ll, llMask
 	}
 	n, f, _, d := p.info()
-	ll = append(ll, fmt.Sprintf("%s%s%d/%d %s",
-		p.ID(), lines.LineFiller, n, f, d.Round(1*time.Millisecond)))
+	content := fmt.Sprintf(
+		"%d/%d %s", n, f, d.Round(1*time.Millisecond))
+	switch p.HasSrcStats() {
+	case true:
+		ss := p.SrcStats()
+		content = fmt.Sprintf("%s%s%d/%d %d/%d/%d  %s",
+			p.ID(), lines.LineFiller, ss.Files, ss.TestFiles,
+			ss.Code, ss.TestCode, ss.Doc, content)
+	default:
+		content = fmt.Sprintf(
+			"%s%s%s", p.ID(), lines.LineFiller, content)
+	}
+	ll = append(ll, content)
 	idx := uint(len(ll) - 1)
 	llMask[idx] = lm
 	if f > 0 {
@@ -706,19 +717,43 @@ func pkgFileLoc(p *pkg, s string) (loc string, n int, ok bool) {
 	return filepath.Join(p.ID(), flLoc), len(flLoc), true
 }
 
-func newStatus(pp pkgs) *view.Statuser {
+// newStatus calculates the number for the view's status-bar which at
+// least contains the packages, suites, tests and failed tests counts.
+// Having the statsOn flags set also the sums of source stats over all
+// testing packages are calculated.  NOTE/TODO: as of now the status
+// calculation must happen BEFORE the report calculation since the
+// report calculation can not determine if source-stats are requested or
+// not.  After the status calculation the testing package can provide
+// this information through its hasSrcStats method which before the
+// status calculation may return false event though stats are turned on.
+func newStatus(pp pkgs, om onMask) *view.Statuser {
 	// count suites, tests and failed tests
 	ssLen, ttLen, ffLen := 0, 0, 0
+	cf, tf, cl, tl, dl := 0, 0, 0, 0, 0
+	sourceStats := om&statsOn == statsOn
 	for _, p := range pp {
 		n, f, s, _ := p.info()
 		ssLen += s
 		ttLen += n
 		ffLen += f
+		if sourceStats {
+			ss := p.SrcStats()
+			cf += ss.Files
+			tf += ss.TestFiles
+			cl += ss.Code
+			tl += ss.TestCode
+			dl += ss.Doc
+		}
 	}
 	return &view.Statuser{
-		Packages: len(pp),
-		Suites:   ssLen,
-		Tests:    ttLen,
-		Failed:   ffLen,
+		Packages:  len(pp),
+		Suites:    ssLen,
+		Tests:     ttLen,
+		Failed:    ffLen,
+		Files:     cf,
+		TestFiles: tf,
+		Lines:     cl,
+		TestLines: tl,
+		DocLines:  dl,
 	}
 }

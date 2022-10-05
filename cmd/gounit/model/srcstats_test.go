@@ -17,7 +17,7 @@ type srcStats struct {
 
 type fixtureSetter interface{ Set(*T, interface{}) }
 
-func setFx(t *T, fs fixtureSetter) {
+func createSourceFixture(t *T) *TestingPackage {
 	testData, _ := t.FS().Data()
 	tmp := t.FS().Tmp()
 	testData.Child("pkgfixture").Copy(tmp)
@@ -29,12 +29,12 @@ func setFx(t *T, fs fixtureSetter) {
 	}
 	tt, err := pkgStats.loadTestFiles()
 	t.FatalOn(err)
-	fs.Set(t, &TestingPackage{abs: pkgStats.abs, files: tt})
+	return &TestingPackage{abs: pkgStats.abs, files: tt}
 }
 
 func (s *srcStats) SetUp(t *T) {
 	t.Parallel()
-	setFx(t, s)
+	s.Set(t, createSourceFixture(t))
 }
 
 func (s *srcStats) fx(t *T) *TestingPackage {

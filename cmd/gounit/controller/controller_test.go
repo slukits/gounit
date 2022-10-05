@@ -305,6 +305,19 @@ func (s *Gounit) Stops_reporting_a_removed_package(t *T) {
 	// })
 }
 
+func (s *Gounit) Reports_source_stats_if_stats_turned_on(t *T) {
+	_, tt := s.fxSource(t, "srcstats")
+	tt.afterWatch(func() {
+		t.Contains(tt.ButtonBar().String(), "[s]tats=off")
+		t.Not.Contains(tt.StatusBar().String(), "source-stats")
+		tt.ClickButton("stats=off")
+	})
+
+	t.Contains(tt.ButtonBar().String(), "[s]tats=on")
+	t.Contains(tt.StatusBar().String(), "source-stats")
+	t.Contains(tt.Reporting().String(), "5/2 9/3/26")
+}
+
 func TestGounit(t *testing.T) {
 	t.Parallel()
 	Run(&Gounit{}, t)

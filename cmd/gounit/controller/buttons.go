@@ -65,9 +65,11 @@ func (bb *buttons) defaultListener(label string) {
 	case bttStatsOff:
 		bb.isOn |= statsOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+		bb.modelState.setOnFlag(statsOn)
 	case bttStatsOn:
 		bb.isOn &^= statsOn
 		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
+		bb.modelState.removeOneFlag(statsOn)
 	}
 }
 

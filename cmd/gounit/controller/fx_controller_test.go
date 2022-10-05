@@ -234,8 +234,8 @@ func fxDBG(t *gounit.T, fs fixtureSetter) (*lines.Events, *Testing) {
 	return fxSourceDBG(t, fs, "empty")
 }
 
-// initGolden guarantees that the golden module is only initialized
-// once.
+// initGolden guarantees that the golden module is only once
+// initialized.
 var initGolden = func(done bool) func(t tfs.Tester) {
 	mutex := &sync.Mutex{}
 	return func(t tfs.Tester) {
@@ -308,6 +308,9 @@ func fxSourceDBG(t *gounit.T, fs fixtureSetter, relDir string) (
 	)
 }
 
+// fxSourceAbsDBG sets up a testing fixture for debugging using given
+// absolute directory as watched source directory.  This allows to test
+// and debug against go modules from the wild.
 func fxSourceAbsDBG(t *gounit.T, fs fixtureSetter, absDir string) (
 	*lines.Events, *Testing,
 ) {

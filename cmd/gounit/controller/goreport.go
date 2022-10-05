@@ -61,6 +61,9 @@ func goSplitTests(p *pkg) (
 ) {
 	p.ForTest(func(t *model.Test) {
 		r := p.OfTest(t)
+		if r == nil {
+			return
+		}
 		d += r.End.Sub(r.Start)
 		if r.HasSubs() {
 			n += p.OfTest(t).Len()

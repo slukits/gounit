@@ -69,7 +69,7 @@ var DefaultInterval = 200 * time.Millisecond
 // DefaultTimeout is the default value for Module.Timeout which sets the
 // timeout for a module's testing package's tests run.  It is set iff at
 // the first call of [Module.Watch] no timeout is set.
-var DefaultTimeout = 10 * time.Second
+var DefaultTimeout = 60 * time.Second
 
 // DefaultIgnore is the default value for Module.Ignore a list of
 // directories which is ignored when searching for testing packages in a

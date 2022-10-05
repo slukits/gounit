@@ -90,14 +90,15 @@ func (r *Results) Len() int { return len(r.rr) }
 // report test logs of the suites Init- or Finalize-method.  While
 // SubResult instances can't have this.
 type Result struct {
-	Passed bool
-	Panics bool
-	inRace bool
-	Output []string
-	Start  time.Time
-	End    time.Time
-	Name   string
-	subs   subResults
+	Passed  bool
+	Skipped bool
+	Panics  bool
+	inRace  bool
+	Output  []string
+	Start   time.Time
+	End     time.Time
+	Name    string
+	subs    subResults
 }
 
 func (r *Result) panicErr() string {
@@ -320,6 +321,9 @@ func (r *results) addEvent(e *event) {
 		rslt.End = e.Time
 	case acFail:
 		rslt.End = e.Time
+	case acSkip:
+		rslt.Passed = true
+		rslt.Skipped = true
 	case acOutput:
 		if reSkip.MatchString(e.Output) {
 			if rslt.inRace {
@@ -374,19 +378,25 @@ func (r *results) addEvent(e *event) {
 }
 
 func (r *results) get(testName string) *Result {
-	path := strings.Split(testName, "/")
+	path := strings.SplitN(testName, "/", 3)
 	root, ok := (*r)[path[0]]
 	if !ok {
 		root = &TestResult{Result: &Result{Name: path[0]}}
 		(*r)[path[0]] = root
 	}
-	rslt := root.Result
-	for _, tn := range path[1:] {
-		r := rslt.subs.get(tn)
-		if r == nil {
-			r = root.subs.add(tn)
-		}
-		rslt = r.Result
+	if len(path) == 1 {
+		return root.Result
 	}
-	return rslt
+	rslt := root.subs.get(path[1])
+	if rslt == nil {
+		rslt = root.subs.add(path[1])
+	}
+	if len(path) == 2 {
+		return rslt.Result
+	}
+	final := rslt.subs.get(path[2])
+	if final == nil {
+		return rslt.subs.add(path[2]).Result
+	}
+	return final.Result
 }

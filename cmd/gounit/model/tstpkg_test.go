@@ -133,6 +133,25 @@ func (s *Package) Reports_suite_of_most_recent_test_file_last(t *T) {
 	})
 }
 
+func (s *Package) Has_initially_no_source_stats(t *T) {
+	fx := createSourceFixture(t)
+	t.Not.True(fx.HasSrcStats())
+}
+
+func (s *Package) Has_source_stats_after_they_were_requested(t *T) {
+	fx := createSourceFixture(t)
+	fx.SrcStats()
+	t.True(fx.HasSrcStats())
+}
+
+func (s *Package) Has_no_source_stats_after_resetting_them(t *T) {
+	fx := createSourceFixture(t)
+	fx.SrcStats()
+	t.True(fx.HasSrcStats())
+	fx.ResetSrcStats()
+	t.Not.True(fx.HasSrcStats())
+}
+
 func TestPackage(t *testing.T) {
 	t.Parallel()
 	Run(&Package{}, t)

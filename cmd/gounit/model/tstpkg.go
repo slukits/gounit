@@ -62,6 +62,28 @@ func (tp *TestingPackage) LenTests() int {
 	return len(tp.tests)
 }
 
+// HasSrcStats returns true if given testing package has its source
+// stats calculation stored.
+func (tp *TestingPackage) HasSrcStats() bool {
+	return tp.srcStats != nil
+}
+
+// ResetSrcStats resets the source stats, i.e. HasSrcStats will return
+// false after a call of ResetSrcStats until SrcStats is requested
+// again.
+func (tp *TestingPackage) ResetSrcStats() {
+	tp.srcStats = nil
+}
+
+// SrcStats provides statistics about code files/lines and documentation
+// of a testing package.
+func (tp *TestingPackage) SrcStats() *SrcStats {
+	if tp.srcStats == nil {
+		tp.srcStats = newSrcStats(tp)
+	}
+	return tp.srcStats
+}
+
 // ForTest provides given testing package's tests.  ForTest fails in
 // case of an parse error.
 func (tp *TestingPackage) ForTest(cb func(*Test)) error {
@@ -113,15 +135,6 @@ func (tp *TestingPackage) ForSortedSuite(cb func(*TestSuite)) error {
 		cb(s)
 	}
 	return nil
-}
-
-// SrcStats provides statistics about code files/lines and documentation
-// of a testing package.
-func (tp *TestingPackage) SrcStats() *SrcStats {
-	if tp.srcStats == nil {
-		tp.srcStats = newSrcStats(tp)
-	}
-	return tp.srcStats
 }
 
 func (tp *TestingPackage) LastSuite() *TestSuite {
