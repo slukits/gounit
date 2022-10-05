@@ -133,10 +133,11 @@ func (m *report) OnInit(e *lines.Env) {
 // OnClick reports clicked line to given report-listener iff the line is
 // focusable.
 func (r *report) OnClick(_ *lines.Env, _, y int) {
-	if r.listener == nil || y >= r.Len() || !r.LL(y).IsFocusable() {
+	idx := r.Scroll.CoordinateToIndex(y)
+	if r.listener == nil || y >= r.Len() || !r.LL(idx).IsFocusable() {
 		return
 	}
-	r.listener(y)
+	r.listener(idx)
 }
 
 func (r *report) OnUpdate(e *lines.Env) {
