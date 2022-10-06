@@ -54,7 +54,7 @@ func (s *Report) Go_tests_only(t *T) {
 		tt.StatusBar().String(), "1", "2", "11", "0")
 }
 
-func (s *Report) Initially_suite_of_most_recent_test_file(t *T) {
+func (s *Report) Initially_most_recently_modified_package_folded(t *T) {
 	_, tt := s.fxSourceTouched(t, "mixed/pass", "mixed/pass/suite3_test.go")
 
 	t.StarMatched(
@@ -70,10 +70,8 @@ func (s *Report) Initially_suite_of_most_recent_test_file(t *T) {
 func (s *Report) Logged_text(t *T) {
 	_, tt := s.fxSource(t, "logging")
 
-	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
-		fxExp["logging suite"]...,
-	)
+	tt.afterWatch(func() { tt.ClickReporting(3) })
+	t.StarMatched(tt.Reporting().String(), fxExp["logging suite"]...)
 
 	tt.ClickReporting(2) // go to folded view
 	t.StarMatched(
@@ -100,7 +98,8 @@ const expTxt = "Lorem ipsum dolor sit amet, consectetur adipiscing " +
 
 func (s *Report) Overlong_log_text_wrapped(t *T) {
 	_, tt := s.fxSource(t, "wrapped")
-	got := strings.ReplaceAll(tt.afterWatchScr(awReporting).String(), "\n", "")
+	tt.afterWatch(func() { tt.ClickReporting(2) })
+	got := strings.ReplaceAll(tt.Reporting().String(), "\n", "")
 	got = strings.ReplaceAll(got, " ", "")
 	exp := strings.ReplaceAll(expTxt, " ", "")
 	t.Contains(got, exp)
@@ -246,7 +245,8 @@ func (s *Report) Panic_during_test_execution_as_package_error(t *T) {
 
 func (s *Report) Current_package_vetted_if_vet_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "vet")
-	t.Contains(tt.afterWatchScr(awReporting).String(), "fails if vetted")
+	tt.afterWatch(func() { tt.ClickReporting(2) }) // unfold suite
+	t.Contains(tt.Reporting().String(), "fails if vetted")
 	t.Contains(tt.ButtonBar().String(), "[v]et=off")
 
 	tt.ClickButton("vet=off")
@@ -296,10 +296,8 @@ func (s *Report) Current_package_not_vetted_if_vet_is_turned_off(t *T) {
 
 func (s *Report) Race_in_current_package_if_race_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "race")
-	t.Contains(
-		tt.afterWatchScr(awReporting).String(),
-		"fails on race detector",
-	)
+	tt.afterWatch(func() { tt.ClickReporting(2) }) // unfold suite
+	t.Contains(tt.Reporting().String(), "fails on race detector")
 	t.Contains(tt.ButtonBar().String(), "[r]ace=off")
 
 	tt.ClickButton("race=off")
@@ -317,6 +315,7 @@ func (s *Report) Race_in_selected_package_if_race_is_turned_on(t *T) {
 	t.Contains(tt.ButtonBar().String(), "[r]ace=on")
 
 	tt.beforeWatch(func() { tt.ClickReporting(0) })
+	tt.ClickReporting(2)
 	t.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 }
 
@@ -330,12 +329,14 @@ func (s *Report) Race_in_updated_package_if_race_is_turned_on(t *T) {
 	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 
 	tt.beforeWatch(func() { tt.golden.Touch("race") })
+	tt.ClickReporting(2)
 	t.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 }
 
 func (s *Report) No_race_if_current_package_race_is_turned_off(t *T) {
 	_, tt := s.fxSource(t, "race")
-	tt.afterWatch(func() { tt.ClickButton("race=off") })
+	tt.afterWatch(func() { tt.ClickReporting(2) })
+	tt.ClickButton("race=off")
 	t.Contains(
 		tt.Trim(tt.afterWatchScr(awReporting)).String(),
 		"WARNING: DATA RACE",

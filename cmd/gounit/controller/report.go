@@ -163,7 +163,10 @@ func reportMixedPkg(
 		}
 		st.lastSuite = "go-tests:" + gSuite.Name()
 		return reportMixedGoSuite(gSuite, p, ll, llMask)
-	case rprMixedFolded:
+	case rprMixedFolded, rprPackageFolded:
+		if st.lastSuite != "" {
+			st.lastSuite = ""
+		}
 		return reportMixedFolded(p, ll, llMask)
 	case rprDefault, rprPackage:
 		var suite *model.TestSuite
@@ -175,7 +178,7 @@ func reportMixedPkg(
 		}
 		if suite == nil {
 			st.lastSuite = ""
-			suite = p.LastSuite()
+			// suite = p.LastSuite()
 		}
 		if suite != nil {
 			return reportMixedSuite(suite, p, ll, llMask)
@@ -671,28 +674,52 @@ func reportOutput(
 	return ll, llMask
 }
 
+// reportOutputLine add s given output string to given lines braking it
+// indented at the last space below given width if it is longer than
+// width.
 func reportOutputLine(
 	width int, out, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 
-	out = i + out
-	if len(out) < width {
-		ll = append(ll, out)
+	if len(out)+len(i) < width {
+		ll = append(ll, i+out)
 		llMask[uint(len(ll)-1)] = view.OutputLine
 		return ll, llMask
 	}
 
 	subIndent := len(i + indent)
-	oo, rest := []string{out[:width]}, out[width:]
-	for len(rest)+subIndent >= width {
-		oo = append(oo, strings.TrimSpace(rest[:width-subIndent]))
-		rest = rest[width-subIndent:]
+	line, oo := "", []string{}
+	strings.Split(out, " ")
+	for _, s := range strings.Split(out, " ") {
+		if subIndent+len(line)+len(s)+1 < width {
+			if line == "" {
+				line = i + indent + s
+			} else {
+				line += " " + s // +1
+			}
+			continue
+		}
+		if len(line) > 0 {
+			oo = append(oo, line)
+		}
+		if subIndent+len(s) < width {
+			line = i + indent + s
+			continue
+		}
+		j := 1
+		for j*(width-subIndent) < len(s) {
+			oo = append(oo, i+indent+
+				s[(j-1)*(width-subIndent):j*(width-subIndent)])
+			j++
+		}
+		j--
+		line = s[j*(width-subIndent):]
 	}
-	oo = append(oo, strings.TrimSpace(rest))
-	ll = append(ll, oo[0])
+	oo = append(oo, line)
+	ll = append(ll, i+strings.TrimSpace(oo[0]))
 	llMask[uint(len(ll)-1)] = view.OutputLine
 	for _, s := range oo[1:] {
-		ll = append(ll, i+indent+s)
+		ll = append(ll, s)
 		llMask[uint(len(ll)-1)] = view.OutputLine
 	}
 

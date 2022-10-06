@@ -21,62 +21,68 @@ func viewHelp(updVW func(...interface{})) {
 const help = `
 Press 'q' or 'ctrl+d' or 'ctrl+c' key to quit this application.
 
-A right click or space-key-press scrolls down in circling fashion.
-Page up/down scrolls up and down.  Clicking on a suite or test name
-the module relative file position of that suite or test is shown for
-IDE-terminal implementations supporting to jump to the file position.
+Right click or space-key-press scrolls down in circling fashion.
 
-gounit has three main-views: the "default-view", the "packages-view" and
-the "error-view".  The default-view always reports the most recently
-changed package's tests, test suites and their test results.  The 
-packages gounit reports about is the current working directory and 
-its descendants.  The packages-view provides an overview of all 
-currently watched packages.  Both views come also with a suites variant.
-The default-view's suites variants doesn't report the test results of
-the latest changed suite but a list of all suites in the currently 
-reported package.  The packages-view shows additional to all packages 
-also the suites of the currently selected package.  Clicking a suite 
-turns the suites variant of and makes the selected suite the currently
-reported suite.  You can use the buttons at the bottom of the screen to
-switch between views.
+Page up/down scrolls up and down.
 
-The error-view is shown if at least one test of the watched packages
-failed reporting the failed test(s).  The error-view comes with an
-additional error button at the bottom to switch between the other
-views and the error view.
+The typical use case of gounit is to start it in the package you are
+working on.  Write a test in that package (or one of its sub-packages)
+which fails.  gounit will automatically report the suite/go-tests with
+the failing test.  Make the test "green", refactor and write again a
+failing test etc.
 
-Default buttons
+The first line initially displays the module name and the watched
+source directory.
 
-[p]kgs switches to the packages-view and back.  Selecting a package in
-       package view makes the package the currently reported package if
-       the suite variant is turned of or if the suite variant is turned
-       on and the selected package is the "current" package in the
-       packages view.  Is the selected package not the "current" package
-       and the packages-view's suite variant is turned on the selected
-       package becomes the "current" package.
+Below is initially the most recently modified package reported.  That 
+is if all tests are passing.  If there is a failing test then always 
+the failing test of the most recently modified test file is reported.
 
-[s]uites switches the suites-variant on and off.  I.e. in default-view
-       all suites are reported of the currently reported package.
-       Selecting on of the suites reports its tests.  In package-view
-       selecting a suite switches to the default-view reporting the
-       suites package and its tests.
+NOTE if a package contains only go-test, i.e. not gounit-suites, the
+go tests are reported sorted by name and after them go-suites, i.e. 
+go-tests with sub-tests, are reported folded.  If a package contains
+also test-suites the go-tests and all suites of the package are
+reported folded.
 
-[a]rgs lets you define how test-runs are execute and their results are
-       reported by providing the switches [v]et, [r]ace and [s]tats.
+Clicking on a reported package name folds that package and shows all
+packages in the watched source directory.  Clicking in the packages
+view on a package name will report this package's tests.
 
-[m]ore switches to the buttons set: [h]elp, [a]bout and [q]uit.
+Clicking on a reported suite's name folds this suite and shows the
+reported package's go tests and test-suites.  Clicking on "go-tests"
+or a suite name will then report the go tests or the clicked suite.
 
-Args buttons
+NOTE selectable lines like package names, go-tests or suites can be
+selected using the j or k key for highlighting the next/previous
+selectable line.  Pressing enter on a highlighted line will select
+it respectively fold/unfold the selected package/suite accordingly.
 
-[v]et turns the vet switch for the next test run on/off.  The default
-       is off.
+Buttons in the bottom may be selected by clicking on them or pressing
+the embraced key.
 
-[r]ace turns the race switch for the next test run on/off.  The default
-       is off.
+[v]et switches the Go vet execution for test-runs on and off.  I.e.
+       on [v]et=off the "go test" command is run with the "-vet=off"
+       flag.  Otherwise this flag is omitted.
 
-[s]tats turns statistics on and off.  This switch extends the reported
-       numbers by the number of code lines, how many of them are for
-       testing and how many lines of documentation is found.  Stats
-       also stores the differences between starting and stopping
-       stats for later analysis.
+[r]ace switches the Go's race detector for test-runs on and off.  I.e. 
+       if [r]ace=on the "go test" command is run with the "-race"-flag.
+       Otherwise this flag is omitted.
+
+NOTE if vet or race is switched on while a particular package is
+reported this package's tests are rerun with the according flags set.
+If you are in the packages-view while you switch, the switch takes 
+effect at the next package source-change.
+
+[s]tats switches reporting source statistics on and off.  I.e. if
+       [s]tats=on for each package is the number of source files
+       including test-files, the number of test-files, the number
+       of source code lines including test-code, the number of test-code
+       lines and the number of documentation lines reported.  In the
+       status bar the same information for the total of the watched 
+       source directory is provided.
+
+[m]ore makes more buttons available like [h]elp showing this help text,
+       [a]bout with copyright and license information.
+
+Happy coding!
 `

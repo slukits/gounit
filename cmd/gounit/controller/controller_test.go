@@ -140,11 +140,9 @@ func (s *Gounit) Folds_and_unfolds_go_tests_only_package(t *T) {
 }
 
 func (s *Gounit) Folds_selected_unfolded_suite(t *T) {
-	_, tt := s.fxSourceTouched(t, "mixed/pass", "mixed/pass/suite3_test.go")
-	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
-		fxExp["mixed/pass init"]...,
-	)
+	_, tt := s.fxSource(t, "mixed/pass")
+	tt.afterWatch(func() { tt.ClickReporting(3) }) // select suite 1
+	t.Contains(tt.Reporting().String(), "suite test 1 1")
 
 	tt.ClickReporting(2)
 	t.StarMatched(
@@ -152,12 +150,11 @@ func (s *Gounit) Folds_selected_unfolded_suite(t *T) {
 }
 
 func (s *Gounit) Unfolds_selected_suite(t *T) {
-	_, tt := s.fxSourceTouched(t, "mixed/pass", "mixed/pass/suite3_test.go")
+	_, tt := s.fxSource(t, "mixed/pass")
 	t.StarMatched(
 		tt.afterWatchScr(awReporting).String(),
-		fxExp["mixed/pass init"]...,
+		fxExp["mixed/pass fold suite"]...,
 	)
-	tt.ClickReporting(2)
 
 	tt.ClickReporting(4)
 	t.StarMatched(
@@ -165,12 +162,11 @@ func (s *Gounit) Unfolds_selected_suite(t *T) {
 }
 
 func (s *Gounit) Unfolds_go_tests_with_folded_go_suites(t *T) {
-	_, tt := s.fxSourceTouched(t, "mixed/pass", "mixed/pass/suite3_test.go")
+	_, tt := s.fxSource(t, "mixed/pass")
 	t.StarMatched(
 		tt.afterWatchScr(awReporting).String(),
-		fxExp["mixed/pass init"]...,
+		fxExp["mixed/pass fold suite"]...,
 	)
-	tt.ClickReporting(2)
 
 	tt.ClickReporting(2)
 	t.StarMatched(
@@ -178,28 +174,26 @@ func (s *Gounit) Unfolds_go_tests_with_folded_go_suites(t *T) {
 }
 
 func (s *Gounit) Unfolds_folded_go_suite_in_go_tests(t *T) {
-	_, tt := s.fxSourceTouched(t, "mixed/pass", "mixed/pass/suite3_test.go")
+	_, tt := s.fxSource(t, "mixed/pass")
 	t.StarMatched(
 		tt.afterWatchScr(awReporting).String(),
-		fxExp["mixed/pass init"]...,
+		fxExp["mixed/pass fold suite"]...,
 	)
-	tt.ClickReporting(2)
-	tt.ClickReporting(2)
 
-	tt.ClickReporting(8)
+	tt.ClickReporting(2) // unfold go-tests
+	tt.ClickReporting(8) // unfold go-suite
 	t.StarMatched(
 		tt.Reporting().String(), fxExp["mixed/pass go unfolded suite"]...)
 }
 
 func (s *Gounit) Folds_go_suite_on_unfolded_go_suite_in_go_tests(t *T) {
-	_, tt := s.fxSourceTouched(t, "mixed/pass", "mixed/pass/suite3_test.go")
+	_, tt := s.fxSource(t, "mixed/pass")
 	t.StarMatched(
 		tt.afterWatchScr(awReporting).String(),
-		fxExp["mixed/pass init"]...,
+		fxExp["mixed/pass fold suite"]...,
 	)
-	tt.ClickReporting(2)
-	tt.ClickReporting(2)
-	tt.ClickReporting(8)
+	tt.ClickReporting(2) // unfold go-tests
+	tt.ClickReporting(8) // unfold go-suite
 	t.StarMatched(
 		tt.Reporting().String(), fxExp["mixed/pass go unfolded suite"]...)
 
@@ -242,9 +236,8 @@ func (s *Gounit) Unfolds_package_on_folded_package_selection(t *T) {
 func (s *Gounit) Locks_selected_suite_on_test_file_updated(t *T) {
 	_, tt := s.fxSource(t, "twosuites")
 	tt.afterWatch(func() {
-		t.FatalIfNot(t.Contains(tt.Reporting().String(), "suite 2"))
+		t.FatalIfNot(t.Contains(tt.Reporting().String(), "suite 1"))
 	})
-	tt.ClickReporting(2) // fold suite 2
 	tt.ClickReporting(3) // select suite 1
 	t.FatalIfNot(t.Contains(tt.Reporting().String(), "suite 1"))
 
@@ -257,9 +250,8 @@ func (s *Gounit) Locks_selected_suite_on_test_file_updated(t *T) {
 func (s *Gounit) Locks_selected_go_tests_on_test_file_update(t *T) {
 	_, tt := s.fxSource(t, "twosuites")
 	tt.afterWatch(func() {
-		t.FatalIfNot(t.Contains(tt.Reporting().String(), "suite 2"))
+		t.FatalIfNot(t.Contains(tt.Reporting().String(), "go-tests"))
 	})
-	tt.ClickReporting(2) // fold suite 2
 	tt.ClickReporting(2) // select go-tests
 	t.FatalIfNot(t.Contains(tt.Reporting().String(), "go-tests"))
 
@@ -272,9 +264,8 @@ func (s *Gounit) Locks_selected_go_tests_on_test_file_update(t *T) {
 func (s *Gounit) Locks_selected_go_suite_on_test_file_update(t *T) {
 	_, tt := s.fxSource(t, "twosuites")
 	tt.afterWatch(func() {
-		t.FatalIfNot(t.Contains(tt.Reporting().String(), "suite 2"))
+		t.FatalIfNot(t.Contains(tt.Reporting().String(), "go-tests"))
 	})
-	tt.ClickReporting(2) // fold suite 2
 	tt.ClickReporting(2) // select go-tests
 	tt.ClickReporting(8) // select go-suite
 	t.FatalIfNot(t.Contains(tt.Reporting().String(), "p4 sub 3"))

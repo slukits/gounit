@@ -123,7 +123,7 @@ func (s *modelState) updateState(st *state) {
 	if st.latestPkg != "" && len(st.ee) > 0 && !st.ee[st.latestPkg] {
 		st.latestPkg = ""
 	}
-	status := newStatus(st.pp, s.isOn)
+	status := newStatus(st.pp, st.isOn)
 	r := newReport(st, rprDefault, -1)
 	r.lst = s.lineListener
 	r.flags = view.RpClearing
@@ -132,6 +132,15 @@ func (s *modelState) updateState(st *state) {
 	s.state = st
 	s.view = []interface{}{r, status}
 	s.viewUpdater(r, status)
+}
+
+func (s *modelState) isInit(st *state) bool {
+	s.Lock()
+	defer s.Unlock()
+	if s.view[0] == initReport && len(st.ee) == 0 {
+		return false
+	}
+	return true
 }
 
 // lineListener is called back from the view iff a user-input selected a
@@ -184,7 +193,7 @@ func reportTransition(st *state, idx int) reportType {
 	case lm&view.GoTestsFoldedLine > 0:
 		return rprGoTests
 	case lm&view.GoTestsLine > 0:
-		return rprPackage
+		return rprPackageFolded
 	case lm&view.SuiteFoldedLine > 0:
 		return rprSuite
 	case lm&view.SuiteLine > 0:
@@ -333,6 +342,7 @@ func watch(
 
 func run(p *pkg, om onMask, rslt chan *pkg) {
 	rr, err := p.Run(translateToRunMask(om))
+	p.TrimTo(rr)
 	p.runResult = &runResult{Results: rr, err: err, om: om}
 	rslt <- p
 }
@@ -367,9 +377,6 @@ func (p *pkg) info() (n, f, s int, d time.Duration) {
 		goSuites := 0
 		p.ForTest(func(t *model.Test) {
 			r := p.OfTest(t)
-			if r == nil {
-				return
-			}
 			n += r.Len()
 			f += r.LenFailed()
 			if r.HasSubs() {

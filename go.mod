@@ -9,6 +9,8 @@ require (
 	github.com/slukits/lines v0.0.0-20221005171617-fd857bd23ac5
 )
 
+require golang.org/x/exp v0.0.0-20221004215720-b9f4876ce741 // indirect
+
 require (
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/gdamore/tcell/v2 v2.5.3

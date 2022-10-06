@@ -18,6 +18,7 @@ import (
 	"unicode"
 
 	"github.com/slukits/ints"
+	"golang.org/x/exp/slices"
 )
 
 // A TestingPackage provides information on a module's package's tests
@@ -115,6 +116,34 @@ func (tp *TestingPackage) ForSuite(cb func(*TestSuite)) error {
 		cb(s)
 	}
 	return nil
+}
+
+// TrimTo removes all parsed tests and suites which are not found in
+// given results.  (This may happen if tests are excluded due to build
+// tags)
+func (tp *TestingPackage) TrimTo(rr *Results) {
+	if err := tp.ensureParsing(); err != nil {
+		return
+	}
+	var delTT, delSS []int
+	for idx, t := range tp.tests {
+		if r := rr.OfTest(t); r != nil {
+			continue
+		}
+		delTT = append(delTT, idx)
+	}
+	for i, idx := range delTT {
+		tp.tests = slices.Delete(tp.tests, idx-i, (idx-i)+1)
+	}
+	for idx, s := range tp.suites {
+		if r := rr.OfSuite(s); r != nil {
+			continue
+		}
+		delSS = append(delSS, idx)
+	}
+	for i, idx := range delSS {
+		tp.suites = slices.Delete(tp.suites, idx-i, (idx-i)+1)
+	}
 }
 
 // ForSortedSuite calls back for each suite of given package whereas the
