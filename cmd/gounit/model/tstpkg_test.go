@@ -67,7 +67,7 @@ func (s *Package) Reports_tests(t *T) {
 	t.Eq(len(exp), n)
 }
 
-func (s *Package) Reports_suits(t *T) {
+func (s *Package) Reports_suites(t *T) {
 	exp, n := map[string]bool{fxSuiteA: true, fxSuiteB: true}, 0
 	pkg := s.fx.TestingPackage(t)
 
@@ -77,6 +77,33 @@ func (s *Package) Reports_suits(t *T) {
 	})
 
 	t.Eq(len(exp), n)
+}
+
+func (s *Package) Reports_the_number_of_suites(t *T) {
+	pkg := s.fx.TestingPackage(t)
+	t.Eq(2, pkg.LenSuites())
+}
+
+func (s *Package) Reports_suites_ordered(t *T) {
+	pkg, n := s.fx.TestingPackage(t), 0
+	exp := []string{"FxSuiteA", "FxSuiteB"}
+
+	pkg.ForSortedSuite(func(st *TestSuite) {
+		t.Eq(exp[n], st.Name())
+		n++
+	})
+
+	t.Eq(2, n)
+}
+
+func (s *Package) Provides_suite_by_name(t *T) {
+	pkg := s.fx.TestingPackage(t)
+	t.Eq("FxSuiteA", pkg.Suite("FxSuiteA").Name())
+}
+
+func (s *Package) Provides_last_parsed_suite(t *T) {
+	pkg := s.fx.TestingPackage(t)
+	t.Eq("FxSuiteB", pkg.LastSuite().Name())
 }
 
 func (s *Package) Reports_suite_tests(t *T) {
@@ -152,148 +179,21 @@ func (s *Package) Has_no_source_stats_after_resetting_them(t *T) {
 	t.Not.True(fx.HasSrcStats())
 }
 
+func (s *Package) Reported_tests_stringers_are_humanized_names(t *T) {
+	fx, count := createFixturePkg(t, "humanizefx"), 0
+	exp := map[string]bool{
+		"broken END": true, "HTTP acronym": true, "HTTP2 acronym": true,
+		"camel snake mixed": true, "HTTP2 snake case": true,
+		"increment ID": true,
+	}
+	fx.ForTest(func(tst *Test) {
+		t.True(exp[tst.String()])
+		count++
+	})
+	t.Eq(6, count)
+}
+
 func TestPackage(t *testing.T) {
 	t.Parallel()
 	Run(&Package{}, t)
-}
-
-type PkgTestRun struct {
-	Suite
-	rslt *Results
-	pkg  *TestingPackage
-}
-
-func (s *PkgTestRun) Init(t *S) {
-	_t := NewT(t.GoT())
-	fx := NewFX(_t).Set(FxMod | FxParsing | FxTidy)
-	fx.Interval = 1 * time.Millisecond
-	diff, _, err := fx.Watch()
-	t.FatalOn(err)
-	var pkg *TestingPackage
-	select {
-	case diff := <-diff:
-		diff.For(func(tp *TestingPackage) (stop bool) {
-			pkg = tp
-			return true
-		})
-		_t.FatalIfNot(_t.True(pkg != nil))
-	case <-_t.Timeout(30 * time.Millisecond):
-		t.Fatal("initial diff timed out")
-	}
-	rslt, err := pkg.Run(0)
-	t.FatalOn(err)
-	_t.FatalIfNot(_t.True(rslt.Err() == ""))
-
-	s.pkg = pkg
-	s.rslt = rslt
-}
-
-func (s *PkgTestRun) Reports_a_result_for_each_test(t *T) {
-	s.pkg.ForTest(func(tst *Test) {
-		t.True(s.rslt.OfTest(tst) != nil)
-	})
-}
-
-func (s *PkgTestRun) Reports_a_result_for_each_suite(t *T) {
-	s.pkg.ForSuite(func(tst *TestSuite) {
-		t.True(s.rslt.OfSuite(tst) != nil)
-	})
-}
-
-func (s *PkgTestRun) Reports_results_for_suite_tests(t *T) {
-	s.pkg.ForSuite(func(st *TestSuite) {
-		st.ForTest(func(tst *Test) {
-			t.True(s.rslt.OfSuite(st).OfTest(tst) != nil)
-		})
-	})
-}
-
-func (s *PkgTestRun) Reports_failing_and_passing_of_tests(t *T) {
-	s.pkg.ForTest(func(tst *Test) {
-		switch tst.Name() {
-		case fxTestA:
-			t.Not.True(s.rslt.OfTest(tst).Passed)
-		case fxTestB:
-			t.True(s.rslt.OfTest(tst).Passed)
-		}
-	})
-}
-
-func (s *PkgTestRun) Reports_failing_and_passing_of_suite_tests(
-	t *T,
-) {
-	s.pkg.ForSuite(func(ts *TestSuite) {
-		sr := s.rslt.OfSuite(ts)
-		ts.ForTest(func(tst *Test) {
-			if ts.Name() == fxSuiteB && tst.Name() == fxStBTest1 {
-				t.Not.True(sr.OfTest(tst).Passed)
-				return
-			}
-			t.True(sr.OfTest(tst).Passed)
-		})
-	})
-}
-
-func (s *PkgTestRun) Reports_the_number_of_tests(t *T) {
-	t.Eq(4, s.rslt.Len())
-}
-
-func (s *PkgTestRun) Reports_number_of_suite_tests(t *T) {
-	s.pkg.ForSuite(func(ts *TestSuite) {
-		sr := s.rslt.OfSuite(ts)
-		t.Eq(2, sr.Len())
-	})
-}
-
-func (s *PkgTestRun) Reports_number_of_failed_suite_tests(t *T) {
-	s.pkg.ForSuite(func(ts *TestSuite) {
-		sr := s.rslt.OfSuite(ts)
-		switch ts.Name() {
-		case fxSuiteA:
-			t.Eq(0, sr.LenFailed())
-		case fxSuiteB:
-			t.Eq(1, sr.LenFailed())
-		}
-	})
-}
-
-func (s *PkgTestRun) Reports_test_logs(t *T) {
-	s.pkg.ForTest(func(tst *Test) {
-		if tst.Name() != fxTestB {
-			return
-		}
-		t.True(len(s.rslt.OfTest(tst).Output) > 0)
-	})
-}
-
-func (s *PkgTestRun) Reports_suite_test_logs(t *T) {
-	s.pkg.ForSuite(func(st *TestSuite) {
-		if st.Name() != fxSuiteA {
-			return
-		}
-		sr := s.rslt.OfSuite(st)
-		st.ForTest(func(tst *Test) {
-			if tst.Name() != fxStATest1 {
-				return
-			}
-			t.Eq(2, len(sr.OfTest(tst).Output))
-		})
-	})
-}
-
-func (s *PkgTestRun) Reports_suit_init_finalize_logs(t *T) {
-	s.pkg.ForSuite(func(st *TestSuite) {
-		sr := s.rslt.OfSuite(st)
-		switch st.Name() {
-		case fxSuiteA:
-			t.Eq(1, len(sr.InitOut))
-		case fxSuiteB:
-			t.Eq(1, len(sr.FinalizeOut))
-		}
-	})
-}
-
-func TestPkgTestRun(t *testing.T) {
-	t.Parallel()
-	Run(&PkgTestRun{}, t)
 }

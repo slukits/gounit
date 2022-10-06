@@ -275,3 +275,22 @@ func (x *ModuleFX) newPackageName() string {
 func (x *ModuleFX) packageNameOf(n int) string {
 	return fmt.Sprintf(fmtPackageName, strconv.Itoa(n))
 }
+
+// createFixturePkg is a cheaper version of creating a TestingPackage
+// without a go.mod and go.sum file, i.e. running its tests will fail
+// but it suffices for evaluating tests-parsing results and source
+// statistics.
+func createFixturePkg(t *gounit.T, testDataDir string) *TestingPackage {
+	testData, _ := t.FS().Data()
+	tmp := t.FS().Tmp()
+	testData.Child(testDataDir).Copy(tmp)
+	pkgStats, ok := newTestingPackageStat(
+		tmp.Child(testDataDir).Path())
+	if !ok {
+		t.Fatalf("failed to obtain package stats of %s",
+			tmp.Child(testDataDir).Path())
+	}
+	tt, err := pkgStats.loadTestFiles()
+	t.FatalOn(err)
+	return &TestingPackage{abs: pkgStats.abs, files: tt}
+}

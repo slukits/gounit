@@ -137,6 +137,8 @@ func (tp *TestingPackage) ForSortedSuite(cb func(*TestSuite)) error {
 	return nil
 }
 
+// LastSuite returns the last parsed suite of the most recently modified
+// test file in given testing package.
 func (tp *TestingPackage) LastSuite() *TestSuite {
 	if err := tp.ensureParsing(); err != nil {
 		return nil
@@ -147,6 +149,7 @@ func (tp *TestingPackage) LastSuite() *TestSuite {
 	return tp.suites[len(tp.suites)-1]
 }
 
+// Suite returns the test suite with given name or nil.
 func (tp *TestingPackage) Suite(name string) *TestSuite {
 	if err := tp.ensureParsing(); err != nil {
 		return nil
@@ -165,10 +168,13 @@ func (tp *TestingPackage) Suite(name string) *TestSuite {
 
 const StdErr = "shell exit error: "
 
+// RunMask controls set flags for a test run.
 type RunMask uint8
 
 const (
+	// RunVet removes the -vet=off flag from a test run
 	RunVet RunMask = 1 << iota
+	// RunRace adds the -race flag to a test run
 	RunRace
 )
 
@@ -262,7 +268,11 @@ type Test struct {
 // Name returns a tests name.
 func (t *Test) Name() string { return t.name }
 
-var camelRe = regexp.MustCompile(`[A-Z]`)
+var (
+	camelRe   = regexp.MustCompile(`\p{Lu}+[0-9.,!\- ]*`)
+	endsInNum = regexp.MustCompile(`\p{Lu}+[0-9.,!\- ]+`)
+	brokenEnd = regexp.MustCompile(`\p{Lu} \p{Ll}$`)
+)
 
 func (t *Test) String() string {
 	name := t.name
@@ -280,19 +290,39 @@ func apostrophe(name string) string {
 	name = strings.ReplaceAll(name, " s ", "'s ")
 	name = strings.ReplaceAll(name, "dont", "don't")
 	name = strings.ReplaceAll(name, "doesnt", "doesn't")
-	name = strings.ReplaceAll(name, "havnt", "havn't")
+	name = strings.ReplaceAll(name, "havent", "haven't")
+	name = strings.ReplaceAll(name, "hasnt", "hasn't")
+	name = strings.ReplaceAll(name, "isnt", "isn't")
 	return name
 }
 
 func camelCaseToHuman(str string) string {
 	str = strings.TrimSpace(camelRe.ReplaceAllStringFunc(
 		str, func(s string) string {
-			return " " + strings.ToLower(s)
+			if len(s) == 1 {
+				return " " + strings.ToLower(s)
+			}
+			if endsInNum.MatchString(s) {
+				return " " + s
+			}
+			return " " + s[:len(s)-1] + " " + strings.ToLower(string(s[len(s)-1]))
 		}))
-	strings.TrimPrefix(str, "test ")
-	str = strings.ReplaceAll(str, " d b", " DB ")
-	str = strings.ReplaceAll(str, " i d", " ID ")
-	return str
+	str = strings.ReplaceAll(str, "  ", " ")
+	str = brokenEnd.ReplaceAllStringFunc(str, func(s string) string {
+		prefix := rune(0)
+		for i, r := range s {
+			if i == 0 {
+				prefix = r
+				continue
+			}
+			if r == ' ' {
+				continue
+			}
+			return string(prefix) + strings.ToUpper(string(r))
+		}
+		return s
+	})
+	return strings.TrimPrefix(str, "test ")
 }
 
 // Pos returns a tests absolute filename with line and column number.

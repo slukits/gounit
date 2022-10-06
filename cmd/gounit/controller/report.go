@@ -723,6 +723,11 @@ func pkgFileLoc(p *pkg, s string) (loc string, n int, ok bool) {
 	return filepath.Join(p.ID(), flLoc), len(flLoc), true
 }
 
+type statusCount struct {
+	ssLen, ttLen, ffLen int
+	cf, tf, cl, tl, dl  int
+}
+
 // newStatus calculates the number for the view's status-bar which at
 // least contains the packages, suites, tests and failed tests counts.
 // Having the statsOn flags set also the sums of source stats over all
@@ -736,19 +741,35 @@ func newStatus(pp pkgs, om onMask) *view.Statuser {
 	// count suites, tests and failed tests
 	ssLen, ttLen, ffLen := 0, 0, 0
 	cf, tf, cl, tl, dl := 0, 0, 0, 0, 0
+	n, rslt := 0, make(chan *statusCount)
 	sourceStats := om&statsOn == statsOn
 	for _, p := range pp {
-		n, f, s, _ := p.info()
-		ssLen += s
-		ttLen += n
-		ffLen += f
+		n++
+		go func(p *pkg, srcStt bool, rslt chan *statusCount) {
+			n, f, s, _ := p.info()
+			sc := statusCount{ssLen: s, ttLen: n, ffLen: f}
+			if srcStt {
+				ss := p.SrcStats()
+				sc.cf = ss.Files
+				sc.tf = ss.TestFiles
+				sc.cl = ss.Code
+				sc.tl = ss.TestCode
+				sc.dl = ss.Doc
+			}
+			rslt <- &sc
+		}(p, sourceStats, rslt)
+	}
+	for i := 0; i < n; i++ {
+		sc := <-rslt
+		ssLen += sc.ssLen
+		ttLen += sc.ttLen
+		ffLen += sc.ffLen
 		if sourceStats {
-			ss := p.SrcStats()
-			cf += ss.Files
-			tf += ss.TestFiles
-			cl += ss.Code
-			tl += ss.TestCode
-			dl += ss.Doc
+			cf += sc.cf
+			tf += sc.tf
+			cl += sc.cl
+			tl += sc.tl
+			dl += sc.dl
 		}
 	}
 	return &view.Statuser{

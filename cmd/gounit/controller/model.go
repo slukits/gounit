@@ -210,23 +210,10 @@ func (s *modelState) report(t reportType) {
 }
 
 func (s *modelState) setOnFlag(om onMask) {
-	s.Lock()
-	if s.isOn&om == om {
-		s.Unlock()
-		return
-	}
-	s.isOn |= om
-	if s.latestPkg == "" {
-		s.Unlock()
-		return
-	}
-	s.Unlock()
 	st := s.clone(true)
-	if st.latestPkg == "" { // to be on the save side
-		return
-	}
+	st.isOn |= om
 
-	if om&(raceOn|vetOn) != 0 {
+	if st.latestPkg != "" && om&(raceOn|vetOn) != 0 {
 		go rerunTests(func() {
 			stt := newStatus(st.pp, st.isOn)
 			r := newReport(st, rprDefault, -1)
@@ -235,8 +222,14 @@ func (s *modelState) setOnFlag(om onMask) {
 		return
 	}
 
-	stt := newStatus(st.pp, s.isOn)
-	r := newReport(st, rprDefault, -1)
+	stt := newStatus(st.pp, st.isOn)
+	var r *report
+	if st.latestPkg != "" {
+		r = newReport(st, rprDefault, -1)
+	}
+	if st.latestPkg == "" {
+		r = newReport(st, rprPackages, -1)
+	}
 	s.updateReport(st, r, stt)
 }
 
@@ -364,8 +357,8 @@ type pkg struct {
 	inf *info
 }
 
-// info counts a package's tests, failed tests and the provides the
-// (actual) duration of the package's test run.
+// info counts a package's tests, failed tests, the number of suites and
+// provides the (actual) duration of the package's test run.
 func (p *pkg) info() (n, f, s int, d time.Duration) {
 	if p.HasErr() {
 		return 0, 0, 0, 0

@@ -18,18 +18,7 @@ type srcStats struct {
 type fixtureSetter interface{ Set(*T, interface{}) }
 
 func createSourceFixture(t *T) *TestingPackage {
-	testData, _ := t.FS().Data()
-	tmp := t.FS().Tmp()
-	testData.Child("pkgfixture").Copy(tmp)
-	pkgStats, ok := newTestingPackageStat(
-		tmp.Child("pkgfixture").Path())
-	if !ok {
-		t.Fatalf("failed to obtain package stats of %s",
-			tmp.Child("pkgfixture").Path())
-	}
-	tt, err := pkgStats.loadTestFiles()
-	t.FatalOn(err)
-	return &TestingPackage{abs: pkgStats.abs, files: tt}
+	return createFixturePkg(t, "pkgfixture")
 }
 
 func (s *srcStats) SetUp(t *T) {
