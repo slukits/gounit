@@ -144,6 +144,9 @@ func fxDBG(t *gounit.T, fs fixtureSetter) (
 	return ee, tt, fx
 }
 
+// ClickButton emulates a mouse click the button in currently set button
+// bar having given label using given testing instance.  It fatales if
+// there is no button bar or no button with given label.
 func (fx *viewFX) ClickButton(tt *lines.Testing, label string) {
 	if len(fx.CC) < 4 {
 		fx.t.Fatal("gounit: view: fixture: expected 4 ui components")
@@ -163,7 +166,9 @@ func (fx *viewFX) ClickButton(tt *lines.Testing, label string) {
 	fx.t.Fatalf("gounit: view: fixture: no button labeled %q", label)
 }
 
-func (fx *viewFX) twoPointFiveTimesReportedLines() (int, string) {
+// TwoPointFiveTimesReportedLines fills the reporting area with 2.5
+// times the displayed lines.  Handy for scrolling tests.
+func (fx *viewFX) TwoPointFiveTimesReportedLines() (int, string) {
 	len, lastLine := 0, ""
 	fx.updateReporting(&reporterFX{f: func(
 		r lines.Componenter, f func(uint, string),
@@ -187,6 +192,8 @@ func (fx *viewFX) twoPointFiveTimesReportedLines() (int, string) {
 	return len, lastLine
 }
 
+// reporterFX structure implements the Reporter interface to update the
+// reporting component in tests.
 type reporterFX struct {
 	content  string
 	ll       []string

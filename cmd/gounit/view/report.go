@@ -86,7 +86,8 @@ const (
 	ZeroLineMod LineMask = 0
 )
 
-const focusable LineMask = PackageLine | PackageFoldedLine |
+// Focusable combines all line mode flags of selectable lines.
+const Focusable LineMask = PackageLine | PackageFoldedLine |
 	GoTestsLine | GoTestsFoldedLine | GoSuiteLine | GoSuiteFoldedLine |
 	SuiteLine | SuiteFoldedLine
 
@@ -154,11 +155,12 @@ func (r *report) OnUpdate(e *lines.Env) {
 			r.reportFailed(idx, lm, e, content)
 			return
 		}
-		if lm&focusable == 0 {
+		if lm&Focusable == 0 {
 			fmt.Fprint(e.LL(int(idx), lines.NotFocusable), content)
 			return
 		}
-		fmt.Fprint(e.LL(int(idx)), content)
+
+		r.passedSelectable(idx, e, content)
 	})
 }
 
@@ -167,19 +169,35 @@ func (r *report) reportFailed(
 ) {
 	sr := lines.SR{Style: tcell.StyleDefault.Background(tcell.ColorRed).
 		Foreground(tcell.ColorWhite)}
-	for _, r := range content {
+	for _, r := range content { // find first non-blank
 		if r != ' ' {
 			break
 		}
 		sr.IncrementStart()
 	}
 	ff := lines.LineFlags(0)
-	if lm&focusable == 0 {
+	if lm&Focusable == 0 {
 		ff = lines.NotFocusable
+	} else {
+		sr.Style = sr.Underline(true)
 	}
 	spl := strings.Split(content, lines.LineFiller)
 	sr.SetEnd(len(spl[0]))
 	fmt.Fprint(e.LL(int(idx), ff), content)
+	e.AddStyleRange(int(idx), sr)
+}
+
+func (r *report) passedSelectable(idx uint, e *lines.Env, content string) {
+	sr := lines.SR{Style: tcell.StyleDefault.Underline(true)}
+	for _, r := range content {
+		if r != ' ' {
+			break
+		}
+		sr.IncrementStart()
+	}
+	spl := strings.Split(content, lines.LineFiller)
+	sr.SetEnd(len(spl[0]))
+	fmt.Fprint(e.LL(int(idx)), content)
 	e.AddStyleRange(int(idx), sr)
 }
 

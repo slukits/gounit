@@ -338,7 +338,7 @@ func (s *AView) Reports_click_in_reporting_component(t *T) {
 func (s *AView) Reporting_component_scrolls_on_context(t *T) {
 	_, tt, fx := s.fx(t)
 
-	nLines, _ := fx.twoPointFiveTimesReportedLines()
+	nLines, _ := fx.TwoPointFiveTimesReportedLines()
 	scr := tt.ScreenOf(fx.Report).TrimHorizontal()
 	t.Eq(nLines, 2*len(scr)+len(scr)/2) // fixture test
 
@@ -351,7 +351,7 @@ func (s *AView) Reporting_component_scrolls_on_context(t *T) {
 
 func (s *AView) Reporting_component_at_bottom_scrolls_to_top(t *T) {
 	_, tt, fx := s.fx(t)
-	_, LastLine := fx.twoPointFiveTimesReportedLines()
+	_, LastLine := fx.TwoPointFiveTimesReportedLines()
 	firstLine := tt.ScreenOf(fx.Report).TrimHorizontal()[0].String()
 
 	tt.FireComponentContext(fx.Report, 0, 0)

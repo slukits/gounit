@@ -92,6 +92,24 @@ func (s *Reporting) Component_s_test_lines_are_not_selectable(t *T) {
 	t.Eq(3, fx.reportedLine)
 }
 
+func (s *Reporting) Component_s_selectable_lines_are_underlined(t *T) {
+	_, tt, fx := s.fx(t)
+	fx.updateReporting(&reporterFX{
+		content:  "selectable line",
+		mm:       map[uint]LineMask{0: PackageLine},
+		listener: fx.listenReporting,
+	})
+
+	line := tt.ScreenOf(fx.Report)[0]
+	ss := line.Styles()
+	for i, r := range line.String() {
+		if r == ' ' {
+			continue
+		}
+		t.FatalIfNot(t.True(ss.Of(i).Has(tcell.AttrUnderline)))
+	}
+}
+
 func TestReporting(t *testing.T) {
 	t.Parallel()
 	Run(&Reporting{}, t)
