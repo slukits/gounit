@@ -53,7 +53,7 @@ type InitFactories struct {
 	// packages and updates accordingly the view; defaults to a
 	// controller internal function and is there for testing
 	// interceptions.
-	watch func(<-chan *model.PackagesDiff, *modelState)
+	watch func(<-chan *model.PackagesDiff, *modelState, chan bool)
 
 	// dbgTimeouts set to true increases lines.Events.sync-timeout to
 	// 20min as well as controller.Testing.watchTimeout.
@@ -94,7 +94,7 @@ func New(i *InitFactories) {
 	ee := i.Events(i.View(&viewIniter{controller: i.controller}))
 	i.controller.bb.quitter = ee.QuitListening
 	i.controller.bb.modelState = i.controller.model
-	go i.watch(diff, i.controller.model)
+	go i.watch(diff, i.controller.model, nil)
 	ee.Listen()
 }
 

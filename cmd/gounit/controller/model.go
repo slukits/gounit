@@ -85,6 +85,9 @@ type modelState struct {
 	// msgUpdater is a closure which calculates the update of the view's
 	// message bar in case of an state change.
 	msgUpdater func(string) string
+
+	// isSuspended controls if model-state change updates the view.
+	isSuspended bool
 }
 
 func msgUpdater(mdlName, srcDir string) func(string) string {
@@ -94,6 +97,19 @@ func msgUpdater(mdlName, srcDir string) func(string) string {
 		}
 		return fmt.Sprintf("%s: %s", mdlName, s)
 	}
+}
+
+func (s *modelState) suspend() {
+	s.Lock()
+	defer s.Unlock()
+	s.isSuspended = true
+}
+
+func (s *modelState) resume() {
+	s.Lock()
+	s.isSuspended = false
+	s.Unlock()
+	s.report(rprCurrent)
 }
 
 func (s *modelState) replaceViewUpdater(f func(...interface{})) {
@@ -211,6 +227,9 @@ func (s *modelState) report(t reportType) {
 	if t == rprCurrent {
 		s.Lock()
 		defer s.Unlock()
+		if s.isSuspended {
+			return
+		}
 		s.viewUpdater(s.view...)
 		return
 	}
@@ -268,6 +287,9 @@ func (s *modelState) updateView(
 	report.lst = s.lineListener
 	report.flags = view.RpClearing
 	st.view = []interface{}{report, status, s.msgUpdater(st.latestPkg)}
+	if s.isSuspended {
+		return
+	}
 	s.viewUpdater(st.view...)
 }
 
@@ -313,6 +335,7 @@ func translateToRunMask(om onMask) model.RunMask {
 func watch(
 	watched <-chan *model.PackagesDiff,
 	mdl *modelState,
+	afterUpdate chan bool,
 ) {
 	for diff := range watched {
 		if diff == nil {
@@ -347,6 +370,9 @@ func watch(
 			return
 		})
 		mdl.updateState(st)
+		if afterUpdate != nil {
+			afterUpdate <- true
+		}
 	}
 }
 

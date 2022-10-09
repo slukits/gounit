@@ -46,10 +46,7 @@ func (s *Report) fxSourceTouched(
 func (s *Report) Go_tests_only(t *T) {
 	_, tt := s.fxSource(t, "go/pass")
 
-	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
-		fxExp["go/pass"]...,
-	)
+	t.StarMatched(tt.Reporting().String(), fxExp["go/pass"]...)
 	t.StarMatched( // number of pkgs, suites, passed, failed
 		tt.StatusBar().String(), "1", "2", "11", "0")
 }
@@ -58,7 +55,7 @@ func (s *Report) Initially_most_recently_modified_package_folded(t *T) {
 	_, tt := s.fxSourceTouched(t, "mixed/pass", "mixed/pass/suite3_test.go")
 
 	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
+		tt.Reporting().String(),
 		fxExp["mixed/pass init"]...,
 	)
 
@@ -70,7 +67,7 @@ func (s *Report) Initially_most_recently_modified_package_folded(t *T) {
 func (s *Report) Logged_text(t *T) {
 	_, tt := s.fxSource(t, "logging")
 
-	tt.afterWatch(func() { tt.ClickReporting(3) })
+	tt.ClickReporting(3)
 	t.StarMatched(tt.Reporting().String(), fxExp["logging suite"]...)
 
 	tt.ClickReporting(2) // go to folded view
@@ -98,7 +95,7 @@ const expTxt = "Lorem ipsum dolor sit amet, consectetur adipiscing " +
 
 func (s *Report) Overlong_log_text_wrapped(t *T) {
 	_, tt := s.fxSource(t, "wrapped")
-	tt.afterWatch(func() { tt.ClickReporting(2) })
+	tt.ClickReporting(2)
 	got := strings.ReplaceAll(tt.Reporting().String(), "\n", "")
 	got = strings.ReplaceAll(got, " ", "")
 	exp := strings.ReplaceAll(expTxt, " ", "")
@@ -118,7 +115,7 @@ func (s *Report) lineIsFailing(l lines.TestLine) bool {
 func (s *Report) Failing_go_tests_only_package(t *T) {
 	failingLines := []int{0, 2, 8}
 	_, tt := s.fxSource(t, "fail/gonly")
-	got := tt.afterWatchScr(awReporting)
+	got := tt.Reporting()
 	t.FatalIfNot(t.True(len(got) > 8))
 	for _, l := range failingLines {
 		t.True(s.lineIsFailing(got[l]))
@@ -135,17 +132,14 @@ func (s *Report) Failing_go_tests_only_package(t *T) {
 
 func (s *Report) Failing_package_due_to_compile_error(t *T) {
 	_, tt := s.fxSource(t, "fail/compile")
-	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
-		fxExp["fail compile"]...,
-	)
+	t.StarMatched(tt.Reporting().String(), fxExp["fail compile"]...)
 }
 
 func (s *Report) Failing_package_s_failing_go_tests_initially(t *T) {
 	failingLines := []int{0, 2, 5, 10}
 	_, tt := s.fxSource(t, "fail/mixed")
 
-	got := tt.afterWatchScr(awReporting)
+	got := tt.Reporting()
 	t.FatalIfNot(t.True(len(got) > 10))
 	for _, l := range failingLines {
 		t.True(s.lineIsFailing(got[l]))
@@ -156,7 +150,7 @@ func (s *Report) Always_failing_package_s_failing_suites(t *T) {
 	failingLines := []int{13, 14}
 	_, tt := s.fxSource(t, "fail/mixed")
 
-	got := tt.afterWatchScr(awReporting)
+	got := tt.Reporting()
 	t.FatalIfNot(t.True(len(got) > 15))
 	for _, l := range failingLines {
 		t.True(s.lineIsFailing(got[l]))
@@ -165,10 +159,9 @@ func (s *Report) Always_failing_package_s_failing_suites(t *T) {
 
 func (s *Report) Failing_go_suite_test(t *T) {
 	_, tt := s.fxSource(t, "fail/mixed")
-	tt.afterWatch(func() {
-		tt.ClickReporting(10)
-		t.StarMatched(tt.Reporting().String(), "go-tests", "p4 sub 2")
-	})
+
+	tt.ClickReporting(10)
+	t.StarMatched(tt.Reporting().String(), "go-tests", "p4 sub 2")
 
 	exp, got := 0, 0
 	for _, f := range fxExp["fail mixed go-suite"] {
@@ -186,12 +179,10 @@ func (s *Report) Failing_go_suite_test(t *T) {
 func (s *Report) Failing_suite_test_along_failing_suites_and_go_suite(
 	t *T,
 ) {
-
 	_, tt := s.fxSource(t, "fail/mixed")
-	tt.afterWatch(func() {
-		tt.ClickReporting(14)
-		t.Contains(tt.Reporting().String(), "suite test 4 3")
-	})
+
+	tt.ClickReporting(14)
+	t.Contains(tt.Reporting().String(), "suite test 4 3")
 
 	exp, got := 0, 0
 	for _, f := range fxExp["fail mixed suite"] {
@@ -208,13 +199,12 @@ func (s *Report) Failing_suite_test_along_failing_suites_and_go_suite(
 
 func (s *Report) Failing_packages_always(t *T) {
 	_, tt := s.fxSource(t, "fail/pp")
-	tt.afterWatch(func() {
-		t.Contains(tt.Reporting().String(), "fail/pp/fail1")
-		t.Contains(tt.Reporting().String(), "fail/pp/fail2")
-		tt.collapseAll()
-		t.StarMatched(
-			tt.Reporting().String(), fxExp["fail pp collapsed"]...)
-	})
+	t.Contains(tt.Reporting().String(), "fail/pp/fail1")
+	t.Contains(tt.Reporting().String(), "fail/pp/fail2")
+	tt.collapseAll()
+	t.StarMatched(
+		tt.Reporting().String(), fxExp["fail pp collapsed"]...)
+
 	fx1, fx2 := "fail/pp/fail2", "fail/pp/pass"
 	for i, l := range tt.Reporting() {
 		if !strings.HasPrefix(l.String(), fx1) {
@@ -238,41 +228,39 @@ func (s *Report) Failing_packages_always(t *T) {
 func (s *Report) Panic_during_test_execution_as_package_error(t *T) {
 	_, tt := s.fxSource(t, "panic")
 	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
+		tt.Reporting().String(),
 		fxExp["panic"]...,
 	)
 }
 
 func (s *Report) Current_package_vetted_if_vet_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "vet")
-	tt.afterWatch(func() { tt.ClickReporting(2) }) // unfold suite
+	tt.ClickReporting(2) // unfold suite
 	t.Contains(tt.Reporting().String(), "fails if vetted")
 	t.Contains(tt.ButtonBar().String(), "[v]et=off")
 
-	tt.ClickButton("vet=off")
+	tt.beforeView(func() { tt.ClickButton("vet=off") })
 	t.Contains(tt.ButtonBar().String(), "[v]et=on")
-	t.Contains(
-		tt.Trim(tt.afterWatchScr(awReporting)).String(), "FAIL")
-	t.Contains(
-		tt.Trim(tt.Reporting()).String(), "vet/src.go:11:26")
+	t.Contains(tt.Trim(tt.Reporting()).String(), "FAIL")
+	t.Contains(tt.Trim(tt.Reporting()).String(), "vet/src.go:11:26")
 }
 
 func (s *Report) Selected_package_vetted_if_vet_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "vet")
-	tt.afterWatch(func() { tt.ClickReporting(0) })
+	tt.ClickReporting(0)
 	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "fails if vetted")
 
 	tt.ClickButton("vet=off")
 	t.Contains(tt.ButtonBar().String(), "[v]et=on")
 
-	tt.beforeWatch(func() { tt.ClickReporting(0) })
+	tt.beforeView(func() { tt.ClickReporting(0) })
 	t.Contains(tt.Trim(tt.Reporting()).String(), "FAIL")
 	t.Contains(tt.Trim(tt.Reporting()).String(), "vet/src.go:11:26")
 }
 
 func (s *Report) Updated_package_vetted_if_vet_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "vet")
-	tt.afterWatch(func() { tt.ClickReporting(0) })
+	tt.ClickReporting(0)
 	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "fails if vetted")
 
 	tt.ClickButton("vet=off")
@@ -286,8 +274,8 @@ func (s *Report) Updated_package_vetted_if_vet_is_turned_on(t *T) {
 
 func (s *Report) Current_package_not_vetted_if_vet_is_turned_off(t *T) {
 	_, tt := s.fxSource(t, "vet")
-	tt.afterWatch(func() { tt.ClickButton("vet=off") })
-	t.Contains(tt.Trim(tt.afterWatchScr(awReporting)).String(), "FAIL")
+	tt.beforeView(func() { tt.ClickButton("vet=off") })
+	t.Contains(tt.Trim(tt.Reporting()).String(), "FAIL")
 
 	tt.ClickButton("vet=on")
 	tt.beforeWatch(func() { tt.golden.Touch("vet") })
@@ -296,32 +284,31 @@ func (s *Report) Current_package_not_vetted_if_vet_is_turned_off(t *T) {
 
 func (s *Report) Race_in_current_package_if_race_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "race")
-	tt.afterWatch(func() { tt.ClickReporting(2) }) // unfold suite
+	tt.ClickReporting(2) // unfold suite
 	t.Contains(tt.Reporting().String(), "fails on race detector")
 	t.Contains(tt.ButtonBar().String(), "[r]ace=off")
 
-	tt.ClickButton("race=off")
+	tt.beforeView(func() { tt.ClickButton("race=off") })
 	t.Contains(tt.ButtonBar().String(), "[r]ace=on")
-	t.Contains(tt.Trim(tt.afterWatchScr(awReporting)).String(),
-		"WARNING: DATA RACE")
+	t.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 }
 
 func (s *Report) Race_in_selected_package_if_race_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "race")
-	tt.afterWatch(func() { tt.ClickReporting(0) })
+	tt.ClickReporting(0)
 	t.Not.Contains(tt.Reporting().String(), "fails on race detector")
 
 	tt.ClickButton("race=off")
 	t.Contains(tt.ButtonBar().String(), "[r]ace=on")
 
-	tt.beforeWatch(func() { tt.ClickReporting(0) })
-	tt.ClickReporting(2)
+	tt.beforeView(func() { tt.ClickReporting(0) })
+	tt.beforeView(func() { tt.ClickReporting(2) })
 	t.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 }
 
 func (s *Report) Race_in_updated_package_if_race_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "race")
-	tt.afterWatch(func() { tt.ClickReporting(0) })
+	tt.ClickReporting(0)
 	t.Not.Contains(tt.Reporting().String(), "fails on race detector")
 
 	tt.ClickButton("race=off")
@@ -329,18 +316,15 @@ func (s *Report) Race_in_updated_package_if_race_is_turned_on(t *T) {
 	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 
 	tt.beforeWatch(func() { tt.golden.Touch("race") })
-	tt.ClickReporting(2)
+	tt.beforeView(func() { tt.ClickReporting(2) })
 	t.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 }
 
 func (s *Report) No_race_if_current_package_race_is_turned_off(t *T) {
 	_, tt := s.fxSource(t, "race")
-	tt.afterWatch(func() { tt.ClickReporting(2) })
-	tt.ClickButton("race=off")
-	t.Contains(
-		tt.Trim(tt.afterWatchScr(awReporting)).String(),
-		"WARNING: DATA RACE",
-	)
+	tt.ClickReporting(2)
+	tt.beforeView(func() { tt.ClickButton("race=off") })
+	t.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 
 	tt.ClickButton("race=on")
 	tt.beforeWatch(func() { tt.golden.Touch("race") })

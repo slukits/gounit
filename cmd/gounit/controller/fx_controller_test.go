@@ -39,6 +39,8 @@ type Testing struct {
 	// reported and closed after an subsequent update of the view.
 	_afterWatch chan struct{}
 
+	_afterView chan struct{}
+
 	// _watchTimeout is the time span Testing's AfterWatch-method waits
 	// for an update of the view.  Practically that means the time span
 	// between a reported packages of a source watcher and the update in
@@ -120,20 +122,21 @@ func (tt *Testing) clickButtons(ll ...string) {
 // was processed.  This enables a test to wait on afterWatch to ensure
 // the view and screen update process has completed.
 func (tt *Testing) _fxWatchMock(
-	c <-chan *model.PackagesDiff, m *modelState,
+	c <-chan *model.PackagesDiff, m *modelState, _ chan bool,
 ) {
 	watchRelay := make(chan *model.PackagesDiff)
+	afterWatch := make(chan bool)
 	m.replaceViewUpdater(
 		func(vu func(...interface{})) func(i ...interface{}) {
 			return func(i ...interface{}) {
 				vu(i...)
 				tt.Lock()
-				close(tt._afterWatch)
-				tt._afterWatch = make(chan struct{})
+				close(tt._afterView)
+				tt._afterView = make(chan struct{})
 				tt.Unlock()
 			}
 		}(m.viewUpdater))
-	go watch(watchRelay, m)
+	go watch(watchRelay, m, afterWatch)
 	for pd := range c {
 		if pd == nil {
 			close(watchRelay)
@@ -144,6 +147,11 @@ func (tt *Testing) _fxWatchMock(
 			return
 		}
 		watchRelay <- pd
+		<-afterWatch
+		tt.Lock()
+		close(tt._afterWatch)
+		tt._afterWatch = make(chan struct{})
+		tt.Unlock()
 	}
 }
 
@@ -156,46 +164,20 @@ const (
 	awButtons
 )
 
-// afterWatchScr returns the requested screen portion after the watcher of
-// a source directory has reported a change to the view which in turn
-// has updated the screen.
-func (tt *Testing) afterWatchScr(c uiCmp) lines.TestScreen {
+// beforeView executes given function and waits for a view update.
+// beforeView fatales wrapped test if a set timeout occurs before a view
+// update happened.
+func (tt *Testing) beforeView(f func()) {
 	tt.T.GoT().Helper()
 	tt.Lock()
-	cn := tt._afterWatch
+	cn := tt._afterView
 	tt.Unlock()
+	f()
 	select {
 	case <-cn:
-		switch c {
-		case awMessageBar:
-			return tt.MessageBar()
-		case awReporting:
-			return tt.Reporting()
-		case awStatusBar:
-			return tt.StatusBar()
-		case awButtons:
-			return tt.ButtonBar()
-		}
 	case <-tt.T.Timeout(tt._watchTimeout):
-		tt.T.Fatal("controller: testing: after watch: " +
-			"timed out without a watch-update")
-	}
-	return nil
-}
-
-// afterWatch waits for an update of watched directory and executes
-// after it given function.
-func (tt *Testing) afterWatch(f func()) {
-	tt.T.GoT().Helper()
-	tt.Lock()
-	cn := tt._afterWatch
-	tt.Unlock()
-	select {
-	case <-cn:
-		f()
-	case <-tt.T.Timeout(tt._watchTimeout):
-		tt.T.Fatal("controller: testing: after watch: " +
-			"timed out without a watch-update")
+		tt.T.Fatal("controller: testing: before view: " +
+			"timed out without a view-update")
 	}
 }
 
@@ -211,7 +193,7 @@ func (tt *Testing) beforeWatch(f func()) {
 	select {
 	case <-cn:
 	case <-tt.T.Timeout(tt._watchTimeout):
-		tt.T.Fatal("controller: testing: after watch: " +
+		tt.T.Fatal("controller: testing: before watch: " +
 			"timed out without a watch-update")
 	}
 }
@@ -368,7 +350,11 @@ func fxSetupSource(t *gounit.T, relDir string) (golden *tfs.Dir) {
 	return golden
 }
 
-// fxInit is like fx but also takes an instance of init factories
+// fxInit creates controller test fixture providing the controllers
+// Events instance and its testing instance.  fxInit guarantees to no
+// return before the initial report of the first model-report about the
+// watched source directory.  I.e. tests on an non-testing source
+// directory may not used this fixture factory.
 func fxInit(
 	t *gounit.T, fs fixtureSetter, i InitFactories, golden *tfs.Dir,
 ) (*lines.Events, *Testing) {
@@ -383,6 +369,7 @@ func fxInit(
 		ct._watchTimeout = 20 * time.Minute
 	}
 	ct._afterWatch = make(chan struct{})
+	ct._afterView = make(chan struct{})
 	ct.golden = golden
 
 	if i.Fatal == nil {
@@ -407,6 +394,7 @@ func fxInit(
 		return ee
 	}
 
+	ensureInit := ct._afterWatch
 	New(&i)
 
 	ct._controller = i.controller
@@ -415,6 +403,9 @@ func fxInit(
 	}
 	if fs != nil {
 		fs.Set(t, ct.cleanUp)
+	}
+	if !strings.HasSuffix(i.Watcher.SourcesDir(), "empty") {
+		<-ensureInit
 	}
 	return ee, &ct
 }
@@ -428,7 +419,7 @@ type watcherMock struct {
 const (
 	mckModule    = "mock-module"
 	mckModuleDir = "mock/module/dir"
-	mckSourceDir = "mock/source/dir"
+	mckSourceDir = "mock/source/empty"
 )
 
 func (m *watcherMock) ModuleName() string { return mckModule }

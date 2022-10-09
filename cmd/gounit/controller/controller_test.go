@@ -84,7 +84,7 @@ func (s *Gounit) Shows_initially_module_and_watched_pkg_name(t *T) {
 	t.StarMatched(tt.MessageBar().String(), exp...)
 }
 
-func (s *Gounit) Reports_initially_most_recently_modified_package(t *T) {
+func (s *Gounit) Reports_initially_waiting_report(t *T) {
 	_, tt := s.fx(t)
 	t.Contains(tt.Reporting().String(), initReport)
 }
@@ -127,10 +127,7 @@ func (s *Gounit) Shows_last_report_going_back_from_about_and_help(t *T) {
 
 func (s *Gounit) Folds_and_unfolds_go_tests_only_package(t *T) {
 	_, tt := s.fxSource(t, "go/pass")
-	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
-		fxExp["go/pass"]...,
-	)
+	t.StarMatched(tt.Reporting().String(), fxExp["go/pass"]...)
 
 	tt.ClickReporting(0)
 	t.Not.StarMatched(tt.Reporting().String(), fxExp["go/pass"]...)
@@ -142,7 +139,7 @@ func (s *Gounit) Folds_and_unfolds_go_tests_only_package(t *T) {
 
 func (s *Gounit) Folds_selected_unfolded_suite(t *T) {
 	_, tt := s.fxSource(t, "mixed/pass")
-	tt.afterWatch(func() { tt.ClickReporting(3) }) // select suite 1
+	tt.ClickReporting(3) // select suite 1
 	t.Contains(tt.Reporting().String(), "suite test 1 1")
 
 	tt.ClickReporting(2)
@@ -153,7 +150,7 @@ func (s *Gounit) Folds_selected_unfolded_suite(t *T) {
 func (s *Gounit) Unfolds_selected_suite(t *T) {
 	_, tt := s.fxSource(t, "mixed/pass")
 	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
+		tt.Reporting().String(),
 		fxExp["mixed/pass fold suite"]...,
 	)
 
@@ -165,7 +162,7 @@ func (s *Gounit) Unfolds_selected_suite(t *T) {
 func (s *Gounit) Unfolds_go_tests_with_folded_go_suites(t *T) {
 	_, tt := s.fxSource(t, "mixed/pass")
 	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
+		tt.Reporting().String(),
 		fxExp["mixed/pass fold suite"]...,
 	)
 
@@ -177,7 +174,7 @@ func (s *Gounit) Unfolds_go_tests_with_folded_go_suites(t *T) {
 func (s *Gounit) Unfolds_folded_go_suite_in_go_tests(t *T) {
 	_, tt := s.fxSource(t, "mixed/pass")
 	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
+		tt.Reporting().String(),
 		fxExp["mixed/pass fold suite"]...,
 	)
 
@@ -190,7 +187,7 @@ func (s *Gounit) Unfolds_folded_go_suite_in_go_tests(t *T) {
 func (s *Gounit) Folds_go_suite_on_unfolded_go_suite_in_go_tests(t *T) {
 	_, tt := s.fxSource(t, "mixed/pass")
 	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
+		tt.Reporting().String(),
 		fxExp["mixed/pass fold suite"]...,
 	)
 	tt.ClickReporting(2) // unfold go-tests
@@ -206,10 +203,7 @@ func (s *Gounit) Folds_go_suite_on_unfolded_go_suite_in_go_tests(t *T) {
 func (s *Gounit) Folds_package_on_unfolded_package_selection(t *T) {
 	_, tt := s.fxSourceTouched(t, "mixed/pp", "mixed/pp/pkg0")
 
-	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
-		fxExp["mixed/pp/pkg0"]...,
-	)
+	t.StarMatched(tt.Reporting().String(), fxExp["mixed/pp/pkg0"]...)
 	t.Not.SpaceMatched(tt.Reporting().String(), fxExp["mixed/pp"]...)
 
 	tt.ClickReporting(0) // select package
@@ -219,26 +213,18 @@ func (s *Gounit) Folds_package_on_unfolded_package_selection(t *T) {
 func (s *Gounit) Unfolds_package_on_folded_package_selection(t *T) {
 	_, tt := s.fxSourceTouched(t, "mixed/pp", "mixed/pp/pkg0")
 
-	t.StarMatched(
-		tt.afterWatchScr(awReporting).String(),
-		fxExp["mixed/pp/pkg0"]...,
-	)
+	t.StarMatched(tt.Reporting().String(), fxExp["mixed/pp/pkg0"]...)
 
 	tt.ClickReporting(0) // select package
 	t.StarMatched(tt.Reporting().String(), fxExp["mixed/pp"]...)
 	tt.ClickReporting(3) // select package 3
 
-	t.SpaceMatched(
-		tt.Reporting().String(),
-		fxExp["mixed/pp/pkg3"]...,
-	)
+	t.SpaceMatched(tt.Reporting().String(), fxExp["mixed/pp/pkg3"]...)
 }
 
 func (s *Gounit) Locks_selected_suite_on_test_file_updated(t *T) {
 	_, tt := s.fxSource(t, "twosuites")
-	tt.afterWatch(func() {
-		t.FatalIfNot(t.Contains(tt.Reporting().String(), "suite 1"))
-	})
+	t.FatalIfNot(t.Contains(tt.Reporting().String(), "suite 1"))
 	tt.ClickReporting(3) // select suite 1
 	t.FatalIfNot(t.Contains(tt.Reporting().String(), "suite 1"))
 
@@ -250,9 +236,7 @@ func (s *Gounit) Locks_selected_suite_on_test_file_updated(t *T) {
 
 func (s *Gounit) Locks_selected_go_tests_on_test_file_update(t *T) {
 	_, tt := s.fxSource(t, "twosuites")
-	tt.afterWatch(func() {
-		t.FatalIfNot(t.Contains(tt.Reporting().String(), "go-tests"))
-	})
+	t.FatalIfNot(t.Contains(tt.Reporting().String(), "go-tests"))
 	tt.ClickReporting(2) // select go-tests
 	t.FatalIfNot(t.Contains(tt.Reporting().String(), "go-tests"))
 
@@ -264,9 +248,7 @@ func (s *Gounit) Locks_selected_go_tests_on_test_file_update(t *T) {
 
 func (s *Gounit) Locks_selected_go_suite_on_test_file_update(t *T) {
 	_, tt := s.fxSource(t, "twosuites")
-	tt.afterWatch(func() {
-		t.FatalIfNot(t.Contains(tt.Reporting().String(), "go-tests"))
-	})
+	t.FatalIfNot(t.Contains(tt.Reporting().String(), "go-tests"))
 	tt.ClickReporting(2) // select go-tests
 	tt.ClickReporting(8) // select go-suite
 	t.FatalIfNot(t.Contains(tt.Reporting().String(), "p4 sub 3"))
@@ -279,31 +261,19 @@ func (s *Gounit) Locks_selected_go_suite_on_test_file_update(t *T) {
 
 func (s *Gounit) Stops_reporting_a_removed_package(t *T) {
 	_, tt := s.fxSource(t, "del")
-	tt.afterWatch(func() {
-		tt.ClickReporting(0)
-	})
+	tt.ClickReporting(0)
 	t.StarMatched(tt.Reporting().String(), fxExp["del before"]...)
 
-	tt.beforeWatch(func() {
-		tt.golden.Rm("del/pkg1")
-	})
+	tt.beforeWatch(func() { tt.golden.Rm("del/pkg1") })
 	t.Not.Contains(tt.Reporting().String(), "del/pkg1")
 	t.Contains(tt.Reporting().String(), "del/pkg2")
-	// that shouldn't be needed because before watch shouldn't return
-	// before the view is updated but somehow it does.
-	// t.Within((&TimeStepper{}), func() bool {
-	// 	return strings.Contains(tt.Reporting().String(), "del/pkg2") &&
-	// 		!strings.Contains(tt.Reporting().String(), "del/pkg1")
-	// })
 }
 
 func (s *Gounit) Reports_source_stats_if_stats_turned_on(t *T) {
 	_, tt := s.fxSource(t, "srcstats")
-	tt.afterWatch(func() {
-		t.Contains(tt.ButtonBar().String(), "[s]tats=off")
-		t.Not.Contains(tt.StatusBar().String(), "source-stats")
-		tt.ClickButton("stats=off")
-	})
+	t.Contains(tt.ButtonBar().String(), "[s]tats=off")
+	t.Not.Contains(tt.StatusBar().String(), "source-stats")
+	tt.beforeView(func() { tt.ClickButton("stats=off") })
 
 	t.Contains(tt.ButtonBar().String(), "[s]tats=on")
 	t.Contains(tt.StatusBar().String(), "source-stats")
@@ -313,18 +283,29 @@ func (s *Gounit) Reports_source_stats_if_stats_turned_on(t *T) {
 func (s *Gounit) Shows_reported_package_ID_in_message_bar(t *T) {
 	_, tt := s.fxSource(t, "mixed/pp")
 	exp := ""
-	tt.afterWatch(func() { // extract reported package name
-		ss := []string{}
-		for _, r := range strings.TrimSpace(tt.Reporting()[0].String()) {
-			if r == ' ' {
-				break
-			}
-			ss = append(ss, string(r))
+	ss := []string{} // extract reported package name
+	for _, r := range strings.TrimSpace(tt.Reporting()[0].String()) {
+		if r == ' ' {
+			break
 		}
-		exp = strings.Join(ss, "")
-	})
+		ss = append(ss, string(r))
+	}
+	exp = strings.Join(ss, "")
 
 	t.Contains(tt.MessageBar().String(), exp)
+}
+
+func (s *Gounit) Suspends_model_change_reporting_showing_something_else(
+	t *T,
+) {
+	_, tt := s.fxSource(t, "mixed/pp")
+	tt.clickButtons("more")
+	tt.clickButtons("about")
+	t.FatalIfNot(t.Contains(
+		tt.Reporting().String(), "gounit Copyright"))
+
+	tt.beforeWatch(func() { tt.golden.Touch("mixed/pp/pkg3") })
+	t.Contains(tt.Reporting().String(), "gounit Copyright")
 }
 
 func TestGounit(t *testing.T) {

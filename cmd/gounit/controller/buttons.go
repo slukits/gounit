@@ -19,6 +19,8 @@ type stater interface {
 	report(reportType)
 	setOnFlag(onMask)
 	removeOneFlag(onMask)
+	suspend()
+	resume()
 }
 
 type buttons struct {
@@ -83,13 +85,15 @@ func (bb *buttons) moreButtons() *buttoner {
 func (bb *buttons) moreListener(label string) {
 	switch label {
 	case "back":
-		bb.modelState.report(rprCurrent)
 		bb.viewUpd(bb.defaults())
+		bb.modelState.resume()
 	case "help":
+		bb.modelState.suspend()
 		viewHelp(bb.viewUpd)
 	case "quit":
 		bb.quitter()
 	case "about":
+		bb.modelState.suspend()
 		viewAbout(bb.viewUpd)
 	}
 }
