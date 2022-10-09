@@ -48,8 +48,8 @@ func newReport(st *state, t reportType, idx int) *report {
 		return emptyReport
 	}
 	if t == rprPackages {
-		ll, llMask := reportPackages(st.pp)
 		st.latestPkg = ""
+		ll, llMask := reportPackages(st.pp)
 		return &report{ll: ll, llMasks: llMask}
 	}
 	if t == rprPackage {

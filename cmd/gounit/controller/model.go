@@ -5,6 +5,7 @@
 package controller
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -80,6 +81,19 @@ type modelState struct {
 
 	// viewUpdater provides serialized access to the view.
 	viewUpdater func(...interface{})
+
+	// msgUpdater is a closure which calculates the update of the view's
+	// message bar in case of an state change.
+	msgUpdater func(string) string
+}
+
+func msgUpdater(mdlName, srcDir string) func(string) string {
+	return func(s string) string {
+		if s == "" || s == srcDir {
+			return ""
+		}
+		return fmt.Sprintf("%s: %s", mdlName, s)
+	}
 }
 
 func (s *modelState) replaceViewUpdater(f func(...interface{})) {
@@ -125,22 +139,10 @@ func (s *modelState) updateState(st *state) {
 	}
 	status := newStatus(st.pp, st.isOn)
 	r := newReport(st, rprDefault, -1)
-	r.lst = s.lineListener
-	r.flags = view.RpClearing
 	s.Lock()
 	defer s.Unlock()
 	s.state = st
-	s.view = []interface{}{r, status}
-	s.viewUpdater(r, status)
-}
-
-func (s *modelState) isInit(st *state) bool {
-	s.Lock()
-	defer s.Unlock()
-	if s.view[0] == initReport && len(st.ee) == 0 {
-		return false
-	}
-	return true
+	s.updateView(st, r, status)
 }
 
 // lineListener is called back from the view iff a user-input selected a
@@ -242,6 +244,33 @@ func (s *modelState) setOnFlag(om onMask) {
 	s.updateReport(st, r, stt)
 }
 
+// updateReport updates the currently reported report iff during report
+// calculation the model-state has not been updated through a source
+// change.
+func (s *modelState) updateReport(
+	st *state, report *report, status *view.Statuser,
+) {
+	s.Lock()
+	defer s.Unlock()
+	if !s.stillTheSame {
+		// state was updated meanwhile => discard user input
+		return
+	}
+	s.state = st
+	s.updateView(st, report, status)
+}
+
+// updateView is the final step to get a new report to the view.  It
+// adds if needed an update of the message bar.
+func (s *modelState) updateView(
+	st *state, report *report, status *view.Statuser,
+) {
+	report.lst = s.lineListener
+	report.flags = view.RpClearing
+	st.view = []interface{}{report, status, s.msgUpdater(st.latestPkg)}
+	s.viewUpdater(st.view...)
+}
+
 func (s *modelState) removeOneFlag(om onMask) {
 	s.Lock()
 	defer s.Unlock()
@@ -279,25 +308,6 @@ func translateToRunMask(om onMask) model.RunMask {
 		rm |= model.RunRace
 	}
 	return rm
-}
-
-// updateReport updates the currently reported report iff during report
-// calculation the model-state has not been updated through a source
-// change.
-func (s *modelState) updateReport(
-	st *state, report *report, status *view.Statuser,
-) {
-	s.Lock()
-	defer s.Unlock()
-	if !s.stillTheSame {
-		// state was updated meanwhile => discard user input
-		return
-	}
-	report.lst = s.lineListener
-	report.flags = view.RpClearing
-	s.state = st
-	s.view = []interface{}{report, status}
-	s.viewUpdater(report, status)
 }
 
 func watch(

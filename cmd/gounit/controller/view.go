@@ -38,7 +38,7 @@ type viewIniter struct {
 func (i *viewIniter) Fatal() func(...interface{}) { return i.ftl }
 
 func (i *viewIniter) Message(msg func(string)) string {
-	i.controller.view.msg = msg
+	i.controller.view.msgUpd = msg
 	srcDir := strings.TrimPrefix(
 		i.controller.watcher.SourcesDir(),
 		i.controller.watcher.ModuleDir(),
@@ -46,6 +46,8 @@ func (i *viewIniter) Message(msg func(string)) string {
 	if srcDir == "" {
 		srcDir = filepath.Base(i.controller.watcher.ModuleDir())
 	}
+	i.controller.model.msgUpdater = msgUpdater(
+		i.controller.watcher.ModuleName(), srcDir)
 	return fmt.Sprintf("%s: %s",
 		i.controller.watcher.ModuleName(), srcDir,
 	)
@@ -72,8 +74,8 @@ type viewUpdater struct {
 	// Mutex avoids that the view is updated concurrently.
 	*sync.Mutex
 
-	// msg updates the view's message bar
-	msg func(string)
+	// msgUpd updates the view's message bar
+	msgUpd func(string)
 
 	// sttUpd updates the view's status bar
 	sttUpd func(view.Statuser)
@@ -99,6 +101,8 @@ func (vw *viewUpdater) Update(dd ...interface{}) {
 			vw.rprUpd(updData)
 		case *view.Statuser:
 			vw.sttUpd(*updData)
+		case string:
+			vw.msgUpd(updData)
 		}
 	}
 }

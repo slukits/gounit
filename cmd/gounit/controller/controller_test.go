@@ -6,6 +6,7 @@ package controller
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	. "github.com/slukits/gounit"
@@ -83,7 +84,7 @@ func (s *Gounit) Shows_initially_module_and_watched_pkg_name(t *T) {
 	t.StarMatched(tt.MessageBar().String(), exp...)
 }
 
-func (s *Gounit) Shows_initially_initial_report(t *T) {
+func (s *Gounit) Reports_initially_most_recently_modified_package(t *T) {
 	_, tt := s.fx(t)
 	t.Contains(tt.Reporting().String(), initReport)
 }
@@ -307,6 +308,23 @@ func (s *Gounit) Reports_source_stats_if_stats_turned_on(t *T) {
 	t.Contains(tt.ButtonBar().String(), "[s]tats=on")
 	t.Contains(tt.StatusBar().String(), "source-stats")
 	t.Contains(tt.Reporting().String(), "5/2 9/3/26")
+}
+
+func (s *Gounit) Shows_reported_package_ID_in_message_bar(t *T) {
+	_, tt := s.fxSource(t, "mixed/pp")
+	exp := ""
+	tt.afterWatch(func() { // extract reported package name
+		ss := []string{}
+		for _, r := range strings.TrimSpace(tt.Reporting()[0].String()) {
+			if r == ' ' {
+				break
+			}
+			ss = append(ss, string(r))
+		}
+		exp = strings.Join(ss, "")
+	})
+
+	t.Contains(tt.MessageBar().String(), exp)
 }
 
 func TestGounit(t *testing.T) {
