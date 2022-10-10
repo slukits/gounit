@@ -237,6 +237,7 @@ func (s *Report) Current_package_vetted_if_vet_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "vet")
 	tt.ClickReporting(2) // unfold suite
 	t.Contains(tt.Reporting().String(), "fails if vetted")
+	tt.ClickButton("switches")
 	t.Contains(tt.ButtonBar().String(), "[v]et=off")
 
 	tt.beforeView(func() { tt.ClickButton("vet=off") })
@@ -250,6 +251,7 @@ func (s *Report) Selected_package_vetted_if_vet_is_turned_on(t *T) {
 	tt.ClickReporting(0)
 	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "fails if vetted")
 
+	tt.ClickButton("switches")
 	tt.ClickButton("vet=off")
 	t.Contains(tt.ButtonBar().String(), "[v]et=on")
 
@@ -263,6 +265,7 @@ func (s *Report) Updated_package_vetted_if_vet_is_turned_on(t *T) {
 	tt.ClickReporting(0)
 	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "fails if vetted")
 
+	tt.ClickButton("switches")
 	tt.ClickButton("vet=off")
 	t.Contains(tt.ButtonBar().String(), "[v]et=on")
 	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "FAIL")
@@ -274,6 +277,7 @@ func (s *Report) Updated_package_vetted_if_vet_is_turned_on(t *T) {
 
 func (s *Report) Current_package_not_vetted_if_vet_is_turned_off(t *T) {
 	_, tt := s.fxSource(t, "vet")
+	tt.ClickButton("switches")
 	tt.beforeView(func() { tt.ClickButton("vet=off") })
 	t.Contains(tt.Trim(tt.Reporting()).String(), "FAIL")
 
@@ -286,6 +290,7 @@ func (s *Report) Race_in_current_package_if_race_is_turned_on(t *T) {
 	_, tt := s.fxSource(t, "race")
 	tt.ClickReporting(2) // unfold suite
 	t.Contains(tt.Reporting().String(), "fails on race detector")
+	tt.ClickButton("switches")
 	t.Contains(tt.ButtonBar().String(), "[r]ace=off")
 
 	tt.beforeView(func() { tt.ClickButton("race=off") })
@@ -298,6 +303,7 @@ func (s *Report) Race_in_selected_package_if_race_is_turned_on(t *T) {
 	tt.ClickReporting(0)
 	t.Not.Contains(tt.Reporting().String(), "fails on race detector")
 
+	tt.ClickButton("switches")
 	tt.ClickButton("race=off")
 	t.Contains(tt.ButtonBar().String(), "[r]ace=on")
 
@@ -311,6 +317,7 @@ func (s *Report) Race_in_updated_package_if_race_is_turned_on(t *T) {
 	tt.ClickReporting(0)
 	t.Not.Contains(tt.Reporting().String(), "fails on race detector")
 
+	tt.ClickButton("switches")
 	tt.ClickButton("race=off")
 	t.Contains(tt.ButtonBar().String(), "[r]ace=on")
 	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
@@ -323,6 +330,7 @@ func (s *Report) Race_in_updated_package_if_race_is_turned_on(t *T) {
 func (s *Report) No_race_if_current_package_race_is_turned_off(t *T) {
 	_, tt := s.fxSource(t, "race")
 	tt.ClickReporting(2)
+	tt.ClickButton("switches")
 	tt.beforeView(func() { tt.ClickButton("race=off") })
 	t.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 

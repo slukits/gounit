@@ -27,7 +27,7 @@ type buttons struct {
 	viewUpd    func(...interface{})
 	modelState stater
 	dflt       *buttoner
-	more       *buttoner
+	cls        *buttoner
 	isOn       onMask
 	quitter    func()
 }
@@ -38,63 +38,86 @@ func newButtons(upd func(...interface{})) *buttons {
 
 func (bb *buttons) defaults() *buttoner {
 	if bb.dflt == nil {
-		bb.dflt = defaultButtons(bb.isOn, bb.defaultListener)
+		bb.dflt = defaultButtons(bb.defaultListener)
 	}
 	return bb.dflt
 }
 
 func (bb *buttons) defaultListener(label string) {
 	switch label {
-	case "more":
-		bb.viewUpd(bb.moreButtons())
-	case bttVetOff:
-		bb.isOn |= vetOn
-		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
-		bb.modelState.setOnFlag(vetOn)
-	case bttVetOn:
-		bb.isOn &^= vetOn
-		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
-		bb.modelState.removeOneFlag(vetOn)
-	case bttRaceOff:
-		bb.isOn |= raceOn
-		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
-		// TODO: removing this line we get a wired error report go figure
-		bb.modelState.setOnFlag(raceOn)
-	case bttRaceOn:
-		bb.isOn &^= raceOn
-		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
-		bb.modelState.removeOneFlag(raceOn)
-	case bttStatsOff:
-		bb.isOn |= statsOn
-		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
-		bb.modelState.setOnFlag(statsOn)
-	case bttStatsOn:
-		bb.isOn &^= statsOn
-		bb.viewUpd(defaultButtons(bb.isOn, bb.defaultListener))
-		bb.modelState.removeOneFlag(statsOn)
-	}
-}
-
-func (bb *buttons) moreButtons() *buttoner {
-	if bb.more == nil {
-		bb.more = moreButtons(bb.moreListener)
-	}
-	return bb.more
-}
-
-func (bb *buttons) moreListener(label string) {
-	switch label {
-	case "back":
+	case "close":
 		bb.viewUpd(bb.defaults())
 		bb.modelState.resume()
+	case "switches":
+		bb.viewUpd(bb.switchButtons())
 	case "help":
 		bb.modelState.suspend()
-		viewHelp(bb.viewUpd)
+		bb.viewUpd(viewHelp(), bb.close())
 	case "quit":
 		bb.quitter()
 	case "about":
 		bb.modelState.suspend()
-		viewAbout(bb.viewUpd)
+		bb.viewUpd(viewAbout(), bb.close())
+	}
+}
+
+func (bb *buttons) close() *buttoner {
+	if bb.cls == nil {
+		bb.cls = &buttoner{
+			replace:  true,
+			listener: bb.defaultListener,
+			newBB:    []view.ButtonDef{{Label: "close", Rune: 'c'}},
+		}
+	}
+	return bb.cls
+}
+
+func (bb *buttons) switchButtons() *buttoner {
+	return switchButtons(bb.isOn, bb.switchesListener)
+}
+
+func (bb *buttons) switchesListener(label string) {
+	switch label {
+	case "back":
+		bb.viewUpd(bb.defaults())
+	case bttVetOff:
+		bb.isOn |= vetOn
+		bb.viewUpd(switchButtons(bb.isOn, bb.switchesListener))
+		bb.modelState.setOnFlag(vetOn)
+	case bttVetOn:
+		bb.isOn &^= vetOn
+		bb.viewUpd(switchButtons(bb.isOn, bb.switchesListener))
+		bb.modelState.removeOneFlag(vetOn)
+	case bttRaceOff:
+		bb.isOn |= raceOn
+		bb.viewUpd(switchButtons(bb.isOn, bb.switchesListener))
+		// TODO: removing this line we get a wired error report go figure
+		bb.modelState.setOnFlag(raceOn)
+	case bttRaceOn:
+		bb.isOn &^= raceOn
+		bb.viewUpd(switchButtons(bb.isOn, bb.switchesListener))
+		bb.modelState.removeOneFlag(raceOn)
+	case bttStatsOff:
+		bb.isOn |= statsOn
+		bb.viewUpd(switchButtons(bb.isOn, bb.switchesListener))
+		bb.modelState.setOnFlag(statsOn)
+	case bttStatsOn:
+		bb.isOn &^= statsOn
+		bb.viewUpd(switchButtons(bb.isOn, bb.switchesListener))
+		bb.modelState.removeOneFlag(statsOn)
+	}
+}
+
+func defaultButtons(l func(string)) *buttoner {
+	return &buttoner{
+		replace:  true,
+		listener: l,
+		newBB: []view.ButtonDef{
+			{Label: "switches", Rune: 's'},
+			{Label: "help", Rune: 'h'},
+			{Label: "about", Rune: 'a'},
+			{Label: "quit", Rune: 'q'},
+		},
 	}
 }
 
@@ -110,7 +133,7 @@ const (
 	bttErrOn    = "err=on"
 )
 
-func defaultButtons(on onMask, l func(string)) *buttoner {
+func switchButtons(on onMask, l func(string)) *buttoner {
 	bb := &buttoner{
 		replace:  true,
 		listener: l,
@@ -118,7 +141,7 @@ func defaultButtons(on onMask, l func(string)) *buttoner {
 			{Label: bttVetOff, Rune: 'v'},
 			{Label: bttRaceOff, Rune: 'r'},
 			{Label: bttStatsOff, Rune: 's'},
-			{Label: bttMore, Rune: 'm'},
+			{Label: "back", Rune: 'b'},
 		},
 	}
 	if on&vetOn > 0 {
@@ -131,19 +154,6 @@ func defaultButtons(on onMask, l func(string)) *buttoner {
 		bb.newBB[2].Label = bttStatsOn
 	}
 	return bb
-}
-
-func moreButtons(l func(string)) *buttoner {
-	return &buttoner{
-		replace:  true,
-		listener: l,
-		newBB: []view.ButtonDef{
-			{Label: "help", Rune: 'h'},
-			{Label: "about", Rune: 'a'},
-			{Label: "quit", Rune: 'q'},
-			{Label: "back", Rune: 'b'},
-		},
-	}
 }
 
 type buttoner struct {

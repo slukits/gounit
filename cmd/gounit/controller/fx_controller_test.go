@@ -75,11 +75,11 @@ func (tt *Testing) isOn(o onMask) bool {
 	return tt._controller.bb.isOn&o == o
 }
 
-// dfltButtonLabel returns the currently set argument button label as it
+// switchButtonLabel returns the currently set switch button label as it
 // appears in the view, derived from given short label like "vet",
 // "race" or "stats".
-func (tt *Testing) dfltButtonLabel(shortLabel string) (string, string) {
-	bb := defaultButtons(tt._controller.bb.isOn, nil)
+func (tt *Testing) switchButtonLabel(shortLabel string) (string, string) {
+	bb := switchButtons(tt._controller.bb.isOn, nil)
 	lbl, vw := "", ""
 	bb.ForNew(func(bd view.ButtonDef) error {
 		if lbl != "" {
@@ -106,8 +106,8 @@ func (tt *Testing) splitTrimmed(s string) []string {
 	return ss
 }
 
-// clickButtons is a short cut for several subsequent ClickButton-calls.
-func (tt *Testing) clickButtons(ll ...string) {
+// ClickButtons is a short cut for several subsequent ClickButton-calls.
+func (tt *Testing) ClickButtons(ll ...string) {
 	tt.T.GoT().Helper()
 	for _, l := range ll {
 		tt.ClickButton(l)

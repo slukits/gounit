@@ -5,6 +5,8 @@
 package controller
 
 import (
+	"testing"
+
 	. "github.com/slukits/gounit"
 	"github.com/slukits/lines"
 )
@@ -22,74 +24,82 @@ func (s *Buttons) fx(t *T) (*lines.Events, *Testing) {
 	return fx(t, s)
 }
 
-var dfltBttFX = []string{"[v]et=off", "[r]ace=off", "[s]tats=off", "[m]ore"}
-var moreBttFX = []string{"[h]elp", "[a]bout", "[q]uit", "[b]ack"}
+var switchBttFX = []string{"[v]et=off", "[r]ace=off", "[s]tats=off", "[b]ack"}
+var dfltBttFX = []string{"[s]witches", "[h]elp", "[a]bout", "[q]uit"}
 
 func (s *Buttons) Init(t *S) {
 	initGolden(t)
 }
 
-func (s *Buttons) Switch_to_more_if_more_selected(t *T) {
+func (s *Buttons) Switch_to_switches_if_switches_selected(t *T) {
 	_, tt := s.fx(t)
 	t.SpaceMatched(tt.ButtonBar().String(), dfltBttFX...)
 
-	tt.ClickButton("more")
-	t.SpaceMatched(tt.ButtonBar().String(), moreBttFX...)
+	tt.ClickButton("switches")
+	t.SpaceMatched(tt.ButtonBar().String(), switchBttFX...)
 
 	tt.ClickButton("back")
 	t.SpaceMatched(tt.ButtonBar().String(), dfltBttFX...)
 
-	tt.FireRune('m')
-	t.SpaceMatched(tt.ButtonBar().String(), moreBttFX...)
+	tt.FireRune('s')
+	t.SpaceMatched(tt.ButtonBar().String(), switchBttFX...)
 }
 
 func (s *Buttons) Switches_vet_button(t *T) {
 	_, tt := s.fx(t)
+	tt.ClickButton("switches")
 
-	label, vw := tt.dfltButtonLabel("vet")
+	label, vw := tt.switchButtonLabel("vet")
 	t.Contains(tt.ButtonBar().String(), vw)
 
 	tt.ClickButton(label)
-	label, vw2 := tt.dfltButtonLabel("vet")
+	label, vw2 := tt.switchButtonLabel("vet")
 	t.FatalIfNot(t.Not.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
 
 	tt.ClickButton(label)
-	_, vw2 = tt.dfltButtonLabel("vet")
+	_, vw2 = tt.switchButtonLabel("vet")
 	t.FatalIfNot(t.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
 }
 
-func (s *Buttons) Switches_race_arg(t *T) {
+func (s *Buttons) Switches_race_button(t *T) {
 	_, tt := s.fx(t)
+	tt.ClickButton("switches")
 
-	label, vw := tt.dfltButtonLabel("race")
+	label, vw := tt.switchButtonLabel("race")
 	t.Contains(tt.ButtonBar().String(), vw)
 
 	tt.ClickButton(label)
-	label, vw2 := tt.dfltButtonLabel("race")
+	label, vw2 := tt.switchButtonLabel("race")
 	t.FatalIfNot(t.Not.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
 
 	tt.ClickButton(label)
-	_, vw2 = tt.dfltButtonLabel("race")
+	_, vw2 = tt.switchButtonLabel("race")
 	t.FatalIfNot(t.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
 }
 
-func (s *Buttons) Switches_stats_arg(t *T) {
+func (s *Buttons) Switches_stats_button(t *T) {
 	_, tt := s.fx(t)
+	tt.ClickButton("switches")
 
-	label, vw := tt.dfltButtonLabel("race")
+	label, vw := tt.switchButtonLabel("stats")
 	t.Contains(tt.ButtonBar().String(), vw)
 
 	tt.ClickButton(label)
-	label, vw2 := tt.dfltButtonLabel("race")
+	label, vw2 := tt.switchButtonLabel("stats")
 	t.FatalIfNot(t.Not.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
 
 	tt.ClickButton(label)
-	_, vw2 = tt.dfltButtonLabel("race")
+	_, vw2 = tt.switchButtonLabel("stats")
 	t.FatalIfNot(t.Eq(vw, vw2))
 	t.Contains(tt.ButtonBar().String(), vw2)
+}
+
+func TestButtons(t *testing.T) {
+	t.Parallel()
+	Run(&Buttons{}, t)
 }

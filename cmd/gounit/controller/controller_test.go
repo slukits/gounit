@@ -71,7 +71,7 @@ func (s *Gounit) fxSourceTouched(
 }
 
 func (s *Gounit) Shows_initially_default_buttons(t *T) {
-	exp := []string{"[v]et=off", "[r]ace=off", "[s]tats=off", "[m]ore"}
+	exp := []string{"[s]witches", "[h]elp", "[a]bout", "[q]uit"}
 	_, tt := s.fx(t)
 
 	t.SpaceMatched(tt.ButtonBar().String(), exp...)
@@ -91,7 +91,7 @@ func (s *Gounit) Reports_initially_waiting_report(t *T) {
 
 func (s *Gounit) Shows_help_screen(t *T) {
 	_, tt := s.fx(t)
-	tt.clickButtons("more", "help")
+	tt.ClickButtons("help")
 	got := tt.splitTrimmed(tt.Trim(tt.Reporting()).String())
 	t.SpaceMatched(help, got...)
 }
@@ -99,14 +99,14 @@ func (s *Gounit) Shows_help_screen(t *T) {
 func (s *Gounit) Shows_last_report_going_back_from_help(t *T) {
 	_, tt := s.fx(t)
 	exp := tt.Trim(tt.Reporting()).String()
-	tt.clickButtons("more", "help", "back")
+	tt.ClickButtons("help", "close")
 
 	t.Eq(exp, tt.Trim(tt.Reporting()).String())
 }
 
 func (s *Gounit) Shows_about_screen(t *T) {
 	_, tt := s.fx(t)
-	tt.clickButtons("more", "about")
+	tt.ClickButtons("about")
 	got := tt.splitTrimmed(tt.Trim(tt.Reporting()).String())
 	t.SpaceMatched(about, got...)
 }
@@ -114,14 +114,7 @@ func (s *Gounit) Shows_about_screen(t *T) {
 func (s *Gounit) Shows_last_report_going_back_from_about(t *T) {
 	_, tt := s.fx(t)
 	exp := tt.Trim(tt.Reporting()).String()
-	tt.clickButtons("more", "about", "back")
-	t.Eq(exp, tt.Trim(tt.Reporting()).String())
-}
-
-func (s *Gounit) Shows_last_report_going_back_from_about_and_help(t *T) {
-	_, tt := s.fx(t)
-	exp := tt.Trim(tt.Reporting()).String()
-	tt.clickButtons("more", "about", "help", "back")
+	tt.ClickButtons("about", "close")
 	t.Eq(exp, tt.Trim(tt.Reporting()).String())
 }
 
@@ -271,6 +264,7 @@ func (s *Gounit) Stops_reporting_a_removed_package(t *T) {
 
 func (s *Gounit) Reports_source_stats_if_stats_turned_on(t *T) {
 	_, tt := s.fxSource(t, "srcstats")
+	tt.ClickButton("switches")
 	t.Contains(tt.ButtonBar().String(), "[s]tats=off")
 	t.Not.Contains(tt.StatusBar().String(), "source-stats")
 	tt.beforeView(func() { tt.ClickButton("stats=off") })
@@ -299,8 +293,7 @@ func (s *Gounit) Suspends_model_change_reporting_showing_something_else(
 	t *T,
 ) {
 	_, tt := s.fxSource(t, "mixed/pp")
-	tt.clickButtons("more")
-	tt.clickButtons("about")
+	tt.ClickButtons("about")
 	t.FatalIfNot(t.Contains(
 		tt.Reporting().String(), "gounit Copyright"))
 

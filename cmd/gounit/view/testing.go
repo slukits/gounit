@@ -37,6 +37,7 @@ func NewTesting(
 // ClickButton does not return before subsequent view-changes triggered
 // by requested button click are processed.
 func (t *Testing) ClickButton(label string) {
+	t.T.GoT().Helper()
 	bb := t.getButtonBar()
 	if bb == nil {
 		return

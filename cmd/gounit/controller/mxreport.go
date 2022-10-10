@@ -23,8 +23,7 @@ func reportMixedFolded(
 	if p.LenTests() > 0 {
 		ll, llMask = reportGoTestsFolded(p, ll, llMask)
 	}
-	ll, llMask = reportSuitesFolded(p, ll, llMask)
-	return ll, llMask
+	return reportSuitesFolded(p, ll, llMask)
 }
 
 func reportMixedGoTests(

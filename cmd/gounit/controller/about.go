@@ -10,12 +10,11 @@ import (
 	"github.com/slukits/gounit/cmd/gounit/view"
 )
 
-func viewAbout(updVW func(...interface{})) {
-	a := strings.Split(strings.TrimSpace(about), "\n")
-	updVW(&report{
+func viewAbout() *report {
+	return &report{
 		flags: view.RpClearing,
-		ll:    a,
-	})
+		ll:    strings.Split(strings.TrimSpace(about), "\n"),
+	}
 }
 
 const about = `

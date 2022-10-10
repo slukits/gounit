@@ -61,6 +61,7 @@ func newReport(st *state, rt reportType, idx int) *report {
 			return &report{ll: ll, llMasks: llMask}
 		}
 		st.latestPkg = ln
+		st.lastSuite = ""
 	}
 	p := st.ensureLatestPackage()
 	ll, llMask := rprLines{}, linesMask{}
@@ -171,7 +172,7 @@ func reportMixedPkg(
 			}
 			suite = p.Suite(st.lastSuite)
 		}
-		if suite == nil {
+		if suite == nil && st.lastSuite != "" {
 			st.lastSuite = ""
 		}
 		if suite != nil {
