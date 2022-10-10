@@ -315,6 +315,10 @@ func (s *source) Reports_deleted_package_to_registered_watcher(t *T) {
 	t.Eq(1, n)
 }
 
+func (s *source) Fail(t *T) {
+	t.True(true)
+}
+
 func TestSource(t *testing.T) {
 	t.Parallel()
 	Run(&source{}, t)

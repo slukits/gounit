@@ -6,6 +6,7 @@ package controller
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
@@ -14,19 +15,67 @@ import (
 
 const blankLine = ""
 
-func reportGoOnlyPkg(
-	p *pkg, ll rprLines, llMask linesMask,
+func reportGoOnly(
+	st *state, p *pkg, rt reportType, idx int,
+	ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
-
-	n, f, _, withoutSubs, withSubs := goSplitTests(p)
-	ll, llMask = goWithoutSubs(p, ll, llMask, n, f, withoutSubs)
-
-	ll = append(ll, blankLine)
-	for _, t := range withSubs {
-		ll, llMask = reportGoSuiteLine(
-			p.OfTest(t), view.GoSuiteFoldedLine, "", ll, llMask)
+	switch rt {
+	case rprGoSuite:
+		gs := findGoSuite(st, p, idx)
+		if gs == nil {
+			return reportPackages(st.pp)
+		}
+		st.lastSuite = "go-tests:" + gs.Name()
+		ll, llMask = reportGoOnlySuite(p, gs, ll, llMask)
+	case rprGoSuiteFolded:
+		st.lastSuite = ""
+		fallthrough
+	default:
+		if strings.HasPrefix(st.lastSuite, "go-tests:") {
+			return reportLockedGoSuite(st, p, ll, llMask)
+		}
+		var goSuite string
+		ll, llMask, goSuite = reportGoOnlyPkg(p, rt, ll, llMask)
+		if goSuite != "" {
+			st.lastSuite = "go-tests:" + goSuite
+		}
 	}
 	return ll, llMask
+}
+
+func reportGoOnlyPkg(
+	p *pkg, rt reportType, ll rprLines, llMask linesMask,
+) (rprLines, linesMask, string) {
+
+	n, f, _, withoutSubs, withSubs := goSplitTests(p)
+
+	folded := func() (rprLines, linesMask, string) {
+		ll, llMask = goWithoutSubs(p, ll, llMask, n, f, withoutSubs)
+		ll = append(ll, blankLine)
+		for _, t := range withSubs {
+			ll, llMask = reportGoSuiteLine(
+				p.OfTest(t), view.GoSuiteFoldedLine, "", ll, llMask)
+		}
+		return ll, llMask, ""
+	}
+
+	if withoutSubs.haveFailed(p) {
+		return folded()
+	}
+
+	var fld *model.Test
+	for _, t := range withSubs {
+		if p.OfTest(t).Passed {
+			continue
+		}
+		fld = t
+	}
+	if fld != nil && !userRequestsParticular(rt) {
+		ll, llMask = reportGoOnlySuite(p, fld, ll, llMask)
+		return ll, llMask, fld.Name()
+	}
+
+	return folded()
 }
 
 func reportGoOnlySuite(
@@ -41,6 +90,50 @@ func reportGoOnlySuite(
 		ll, llMask = reportSubTestLine(p, sr, indent+indent, ll, llMask)
 	})
 	return ll, llMask
+}
+
+func reportLockedGoSuite(
+	st *state, p *pkg, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	if p.LenTests() == 0 {
+		return reportMixedFolded(p, ll, llMask)
+	}
+	if st.lastSuite == "go-tests" {
+		return reportMixedGoTests(p, ll, llMask)
+	}
+	goSuiteName := strings.Split(st.lastSuite, ":")[1]
+	var goSuite *model.Test
+	p.ForTest(func(t *model.Test) {
+		if goSuite != nil {
+			return
+		}
+		if t.Name() != goSuiteName {
+			return
+		}
+		goSuite = t
+	})
+	if goSuite != nil {
+		return reportMixedGoSuite(goSuite, p, ll, llMask)
+	}
+	return reportMixedFolded(p, ll, llMask)
+}
+
+func findGoSuite(st *state, p *pkg, idx int) *model.Test {
+	var goSuite *model.Test
+	ln, ok := findReportLine(st.view[0].(*report), idx,
+		view.GoSuiteFoldedLine|view.GoSuiteLine)
+	if !ok {
+		return nil
+	}
+	p.ForTest(func(t *model.Test) {
+		if goSuite != nil {
+			return
+		}
+		if ln == t.String() {
+			goSuite = t
+		}
+	})
+	return goSuite
 }
 
 type goTests []*model.Test

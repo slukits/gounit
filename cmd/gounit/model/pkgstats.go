@@ -159,6 +159,7 @@ func newTestingPackageStat(dir string) (*pkgStat, bool) {
 	}
 
 	stat, testing := &pkgStat{abs: dir, ModTime: stt.ModTime()}, false
+	// init := true
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
 			continue
@@ -170,6 +171,11 @@ func newTestingPackageStat(dir string) (*pkgStat, bool) {
 		if stat.ModTime.Before(s.ModTime()) {
 			stat.ModTime = s.ModTime()
 		}
+		// consider only go-files stats if there are any for modification
+		// if init {
+		// 	stat.ModTime = s.ModTime()
+		// 	init = false
+		// }
 		if testing {
 			continue
 		}

@@ -5,7 +5,6 @@
 package controller
 
 import (
-	"fmt"
 	"sort"
 	"time"
 
@@ -32,10 +31,7 @@ func reportMixedGoTests(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 
-	n, f, _, d := p.info()
-	ll = append(ll, fmt.Sprintf("%s: %d/%d %v", p.ID(), n, f,
-		d.Round(1*time.Millisecond)))
-	llMask[uint(len(ll)-1)] = view.PackageLine
+	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
 	ll = append(ll, blankLine)
 	ll, llMask, _ = reportGoTestWithSubsFolded(p, ll, llMask)
 	ll, llMask = reportFailedPkgSuitesHeader(p, ll, llMask)
@@ -50,7 +46,11 @@ func reportMixedGoSuite(
 	n, f, d, _, _ := goSplitTests(p)
 	ll, llMask = reportGoTestsLine(
 		n, f, d, view.GoTestsLine, ll, llMask)
-	ll, llMask = reportFailedGoTests(p, ll, llMask)
+	ll = append(ll, blankLine)
+	ll, llMask, reported := reportFailedGoTests(p, ll, llMask)
+	if reported {
+		ll = append(ll, blankLine)
+	}
 	tr := p.OfTest(goSuite)
 	ll, llMask = reportGoSuiteLine(
 		tr, view.GoSuiteLine, indent, ll, llMask)
@@ -66,16 +66,20 @@ func reportMixedGoSuite(
 
 func reportFailedGoTests(
 	p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask) {
+) (rprLines, linesMask, bool) {
 
+	reportedFailing := false
 	p.ForTest(func(t *model.Test) {
 		if p.OfTest(t).Passed || p.OfTest(t).HasSubs() {
 			return
 		}
+		if !reportedFailing {
+			reportedFailing = true
+		}
 		ll, llMask = reportTestLine(p, p.OfTest(t), indent, ll, llMask)
 	})
 
-	return ll, llMask
+	return ll, llMask, reportedFailing
 }
 
 func reportFailedSuitesBut(

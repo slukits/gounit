@@ -393,6 +393,17 @@ func (d *Dir) FileContent(relName string) []byte {
 	return bb
 }
 
+// WriteContent replaces the content of the file with given name in
+// given directory with given bytes.  WriteContent fatales if writing
+// the file fails.
+func (d *Dir) WriteContent(relName string, bb []byte) {
+	d.t.GoT().Helper()
+	err := d.fs().WriteFile(fp.Join(d.Path(), relName), bb, 0644)
+	if err != nil {
+		d.t.Fatalf("gounit: fs: dir: write content: %s: %v", relName, err)
+	}
+}
+
 // FileMod returns a directory-file's modification time.  It fatales iff
 // stats can't be obtained.
 func (d *Dir) FileMod(relName string) time.Time {

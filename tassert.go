@@ -29,6 +29,12 @@ func (t *T) True(value bool) bool {
 	return true
 }
 
+func (t *T) TODO() bool {
+	t.t.Helper()
+	t.Error("not implemented yet")
+	return false
+}
+
 // notTrueErr default message for failed 'false'-assertion.
 const notTrueErr = "expected given value be not true"
 
@@ -151,7 +157,7 @@ func (n *not) Contains(str, sub string) bool {
 	passed := n.t.Contains(str, sub)
 	n.t.errorer = err
 	if passed {
-		n.t.Errorf(assertErr, "doesn't contain",
+		n.t.Errorf(assertErr, "does't contain",
 			fmt.Sprintf(notContainsErr, str, sub))
 		return false
 	}

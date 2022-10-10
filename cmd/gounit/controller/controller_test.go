@@ -195,7 +195,7 @@ func (s *Gounit) Folds_go_suite_on_unfolded_go_suite_in_go_tests(t *T) {
 	t.StarMatched(
 		tt.Reporting().String(), fxExp["mixed/pass go unfolded suite"]...)
 
-	tt.ClickReporting(3)
+	tt.ClickReporting(4)
 	t.StarMatched(
 		tt.Reporting().String(), fxExp["mixed/pass go folded subs"]...)
 }
@@ -306,6 +306,48 @@ func (s *Gounit) Suspends_model_change_reporting_showing_something_else(
 
 	tt.beforeWatch(func() { tt.golden.Touch("mixed/pp/pkg3") })
 	t.Contains(tt.Reporting().String(), "gounit Copyright")
+}
+
+func (s *Gounit) Sticks_to_sole_failed_suite_on_passing(t *T) {
+	_, tt := s.fxSource(t, "fail/suite")
+	t.StarMatched(tt.Reporting().String(), "suite test 2", "fail_test")
+	dir := tt.golden.Child("fail").Child("suite")
+
+	tt.beforeWatch(func() {
+		dir.WriteContent("fail_test.go", fxPassingSuite)
+	})
+	got := tt.Trim(tt.Reporting()).String()
+	t.Contains(got, "suite test 2")
+	t.Not.Contains(got, "fail_test")
+}
+
+func (s *Gounit) Sticks_to_sole_failed_go_suite_on_passing(t *T) {
+	_, tt := s.fxSource(t, "fail/gosuite")
+	t.StarMatched(tt.Reporting().String(), "p2 sub", "fail_test")
+	dir := tt.golden.Child("fail").Child("gosuite")
+
+	tt.beforeWatch(func() {
+		dir.WriteContent("fail_test.go", fxPassingGoSuite)
+	})
+	got := tt.Trim(tt.Reporting()).String()
+	t.Contains(got, "p2 sub")
+	t.Not.Contains(got, "fail_test")
+}
+
+func (s *Gounit) Folds_failing_suite(t *T) {
+	_, tt := s.fxSource(t, "fail/suite")
+	t.Contains(tt.Trim(tt.Reporting()).String(), "fail_test")
+
+	tt.ClickReporting(2)
+	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "fail_test")
+}
+
+func (s *Gounit) Folds_failing_go_suite(t *T) {
+	_, tt := s.fxSource(t, "fail/gosuite")
+	t.Contains(tt.Trim(tt.Reporting()).String(), "fail_test")
+
+	tt.ClickReporting(2)
+	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "fail_test")
 }
 
 func TestGounit(t *testing.T) {

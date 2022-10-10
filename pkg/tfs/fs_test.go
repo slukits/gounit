@@ -6,6 +6,7 @@ package tfs_test
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	gofs "io/fs"
@@ -822,6 +823,12 @@ func (s *Testdata) Is_cached(t *T) {
 	t.Eq(td, cached)
 }
 
+var nogounit = flag.Bool("nogounit", false, "skip 'testdata' tests")
+
 func TestTestdata(t *testing.T) {
-	Run(&Testdata{}, t)
+	if *nogounit {
+		Run(&Testdata{}, t)
+		return
+	}
+	t.Skip("skipped: execute with 'go test -args -nogounit'")
 }

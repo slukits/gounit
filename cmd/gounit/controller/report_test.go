@@ -316,7 +316,7 @@ func (s *Report) Race_in_updated_package_if_race_is_turned_on(t *T) {
 	t.Not.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 
 	tt.beforeWatch(func() { tt.golden.Touch("race") })
-	tt.beforeView(func() { tt.ClickReporting(2) })
+	// tt.beforeView(func() { tt.ClickReporting(2) })
 	t.Contains(tt.Trim(tt.Reporting()).String(), "WARNING: DATA RACE")
 }
 
@@ -332,6 +332,10 @@ func (s *Report) No_race_if_current_package_race_is_turned_off(t *T) {
 		tt.Trim(tt.Reporting()).String(),
 		"WARNING: DATA RACE",
 	)
+}
+
+func (s *Report) Fail(t *T) {
+	t.True(true)
 }
 
 func TestReport(t *testing.T) {

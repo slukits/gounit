@@ -43,16 +43,17 @@ var emptyReport = &report{
 // case given report type and state are inconsistent newReport falls
 // back reporting all packages folded.  The later may happen if
 // user-input and watch-update happen at the same time.
-func newReport(st *state, t reportType, idx int) *report {
+func newReport(st *state, rt reportType, idx int) *report {
 	if len(st.pp) == 0 {
 		return emptyReport
 	}
-	if t == rprPackages {
+	if rt == rprPackages {
 		st.latestPkg = ""
+		st.lastSuite = ""
 		ll, llMask := reportPackages(st.pp)
 		return &report{ll: ll, llMasks: llMask}
 	}
-	if t == rprPackage {
+	if rt == rprPackage {
 		ln, ok := findReportLine(st.view[0].(*report), idx,
 			view.PackageFoldedLine|view.PackageLine)
 		if !ok {
@@ -66,28 +67,22 @@ func newReport(st *state, t reportType, idx int) *report {
 	if len(st.ee) > 0 {
 		ll, llMask = reportFailedPkgsBut(st, ll, llMask)
 	}
-	if st.ee[st.latestPkg] {
-		ll, llMask := reportFailedPkg(st, t, idx, ll, llMask)
+	if st.ee[st.latestPkg] && !userRequestsParticular(rt) {
+		ll, llMask := reportFailedPkg(st, rt, idx, ll, llMask)
 		return &report{ll: ll, llMasks: llMask}
 	}
 	switch p.LenSuites() {
 	case 0:
-		switch t {
-		case rprGoSuite:
-			gs := findGoSuite(st, p, idx)
-			if gs == nil {
-				ll, llMask := reportPackages(st.pp)
-				return &report{ll: ll, llMasks: llMask}
-			}
-			st.lastSuite = "go-tests:" + gs.Name()
-			ll, llMask = reportGoOnlySuite(p, gs, ll, llMask)
-		default:
-			ll, llMask = reportGoOnlyPkg(p, ll, llMask)
-		}
+		ll, llMask = reportGoOnly(st, p, rt, idx, ll, llMask)
 	default:
-		ll, llMask = reportMixedPkg(st, t, idx, p, ll, llMask)
+		ll, llMask = reportMixedPkg(st, rt, idx, p, ll, llMask)
 	}
 	return &report{ll: ll, llMasks: llMask}
+}
+
+func userRequestsParticular(t reportType) bool {
+	return t == rprMixedFolded || t == rprSuite || t == rprGoSuite ||
+		t == rprGoSuiteFolded || t == rprGoTests || t == rprPackageFolded
 }
 
 // Flags control the processing of the report in the view.  E.g. if
@@ -178,7 +173,6 @@ func reportMixedPkg(
 		}
 		if suite == nil {
 			st.lastSuite = ""
-			// suite = p.LastSuite()
 		}
 		if suite != nil {
 			return reportMixedSuite(suite, p, ll, llMask)
@@ -206,50 +200,6 @@ func findSuite(st *state, p *pkg, idx int) *model.TestSuite {
 	})
 
 	return suite
-}
-
-func reportLockedGoSuite(
-	st *state, p *pkg, ll rprLines, llMask linesMask,
-) (rprLines, linesMask) {
-	if p.LenTests() == 0 {
-		return reportMixedFolded(p, ll, llMask)
-	}
-	if st.lastSuite == "go-tests" {
-		return reportMixedGoTests(p, ll, llMask)
-	}
-	goSuiteName := strings.Split(st.lastSuite, ":")[1]
-	var goSuite *model.Test
-	p.ForTest(func(t *model.Test) {
-		if goSuite != nil {
-			return
-		}
-		if t.Name() != goSuiteName {
-			return
-		}
-		goSuite = t
-	})
-	if goSuite != nil {
-		return reportMixedGoSuite(goSuite, p, ll, llMask)
-	}
-	return reportMixedFolded(p, ll, llMask)
-}
-
-func findGoSuite(st *state, p *pkg, idx int) *model.Test {
-	var goSuite *model.Test
-	ln, ok := findReportLine(st.view[0].(*report), idx,
-		view.GoSuiteFoldedLine|view.GoSuiteLine)
-	if !ok {
-		return nil
-	}
-	p.ForTest(func(t *model.Test) {
-		if goSuite != nil {
-			return
-		}
-		if ln == t.String() {
-			goSuite = t
-		}
-	})
-	return goSuite
 }
 
 func findReportLine(r *report, idx int, lm view.LineMask) (string, bool) {
@@ -289,6 +239,11 @@ func reportFailedPkg(
 		ll, llMask = reportPkgErr(p, ll, llMask)
 		return ll, llMask
 	}
+
+	if p.LenSuites() == 0 {
+		return reportGoOnly(st, p, rt, idx, ll, llMask)
+	}
+
 	var gs *model.Test
 	if rt == rprGoSuite {
 		gs = findGoSuite(st, p, idx)
@@ -297,31 +252,30 @@ func reportFailedPkg(
 			return ll, llMask
 		}
 	}
-
-	if p.LenSuites() == 0 {
-		switch rt {
-		case rprGoSuite:
-			ll, llMask = reportGoOnlySuite(p, gs, ll, llMask)
-			return ll, llMask
-		default:
-			ll, llMask = reportGoOnlyPkg(p, ll, llMask)
-			return ll, llMask
-		}
-	}
-
 	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
 	ll = append(ll, blankLine)
 	ll, llMask, goTestsFailed := reportFailedPkgGoTests(p, ll, llMask, gs)
 
-	if goTestsFailed && rt != rprSuite {
+	if goTestsFailed != "" && rt != rprSuite {
+		st.lastSuite = goTestsFailed
 		return reportFailedPkgSuitesHeader(p, ll, llMask)
 	}
 
 	var suite *model.TestSuite
 	if rt == rprSuite {
 		suite = findSuite(st, p, idx)
+		if suite != nil {
+			st.lastSuite = suite.Name()
+		}
 	}
-	return reportFailedPkgSuites(p, ll, llMask, suite)
+	ll, llMask, rprSuite := reportFailedPkgSuites(p, ll, llMask, suite)
+	if rprSuite != nil {
+		if suite != nil && suite.Name() == rprSuite.Name() {
+			return ll, llMask
+		}
+		st.lastSuite = rprSuite.Name()
+	}
+	return ll, llMask
 }
 
 var reHex = regexp.MustCompile(`\s*[+]0x[0-9a-z]*\s*`)
@@ -356,15 +310,13 @@ func reportPkgErr(
 // two cases false is returned; true otherwise.
 func reportFailedPkgGoTests(
 	p *pkg, ll rprLines, llMask linesMask, gs *model.Test,
-) (rprLines, linesMask, bool) {
+) (rprLines, linesMask, string) {
 	if p.LenTests() == 0 {
-		return ll, llMask, false
+		return ll, llMask, ""
 	}
 	n, f, d, without, with := goSplitTests(p)
 	if f == 0 {
-		ll, llMask = reportGoTestsLine(
-			n, f, d, view.GoTestsFoldedLine, ll, llMask)
-		return ll, llMask, false
+		return ll, llMask, ""
 	}
 	ll, llMask = reportGoTestsLine(n, f, d, view.GoTestsLine, ll, llMask)
 	if without.haveFailed(p) {
@@ -378,7 +330,7 @@ func reportFailedPkgGoTests(
 		ll = append(ll, blankLine)
 		if gs == nil {
 			ll, llMask = reportGoSuitesFolded(p, with, ll, llMask)
-			return ll, llMask, true
+			return ll, llMask, "go-tests"
 		}
 	}
 	var tt []*model.Test
@@ -399,7 +351,7 @@ func reportFailedPkgGoTests(
 			p.OfTest(t), view.GoSuiteFoldedLine, indent, ll, llMask)
 	}
 	ll, llMask = reportGoSuite(p, p.OfTest(gs), ll, llMask)
-	return ll, llMask, true
+	return ll, llMask, fmt.Sprintf("go-tests:%s", gs.Name())
 }
 
 func reportGoSuitesFolded(
@@ -416,6 +368,9 @@ func reportGoSuite(
 	p *pkg, r *model.TestResult, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 	ll, llMask = reportGoSuiteLine(r, view.GoSuiteLine, indent, ll, llMask)
+	if r.Skipped {
+		return reportOutput(p, r.Output, indent+indent, ll, llMask)
+	}
 	r.ForOrdered(func(r *model.SubResult) {
 		ll, llMask = reportSubTestLine(p, r, indent+indent, ll, llMask)
 	})
@@ -449,7 +404,7 @@ func reportFailedPkgSuitesHeader(
 
 func reportFailedPkgSuites(
 	p *pkg, ll rprLines, llMask linesMask, suite *model.TestSuite,
-) (rprLines, linesMask) {
+) (rprLines, linesMask, *model.TestSuite) {
 
 	ss := []*model.TestSuite{}
 	p.ForSuite(func(s *model.TestSuite) {
@@ -459,7 +414,7 @@ func reportFailedPkgSuites(
 		ss = append(ss, s)
 	})
 	if len(ss) == 0 && suite == nil {
-		return ll, llMask
+		return ll, llMask, nil
 	}
 	sort.Slice(ss[:len(ss)-1], func(i, j int) bool {
 		return ss[i].Name() < ss[j].Name()
@@ -476,7 +431,7 @@ func reportFailedPkgSuites(
 			p, s, view.SuiteFoldedLine, ll, llMask)
 	}
 	ll, llMask = reportSuite(p, suite, ll, llMask)
-	return ll, llMask
+	return ll, llMask, suite
 }
 
 func reportSuite(
@@ -485,6 +440,9 @@ func reportSuite(
 
 	ll, llMask = reportSuiteLine(p, s, view.SuiteLine, ll, llMask)
 	rr := p.OfSuite(s)
+	if rr.Skipped {
+		return reportOutput(p, rr.Output, indent, ll, llMask)
+	}
 	if len(rr.InitOut) > 0 {
 		ll = append(ll, indent+"init-log:")
 		llMask[uint(len(ll)-1)] = view.OutputLine

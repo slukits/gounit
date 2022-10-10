@@ -121,14 +121,7 @@ func (s *run) Provides_its_test_to_init_and_finalize(t *gounit.T) {
 			suite.Logs)
 }
 
-func TestRun(t *testing.T) {
-	t.Parallel()
-	gounit.Run(&run{}, t)
-}
-
-type suite struct{ gounit.Suite }
-
-func (s *suite) Canceler_implementation_overwrites_cancellation(
+func (s *run) Canceler_implementation_overwrites_cancellation(
 	t *gounit.T,
 ) {
 	suite := &fx.TestCancelerImplementation{}
@@ -143,7 +136,7 @@ func (s *suite) Canceler_implementation_overwrites_cancellation(
 	t.True(len(suite.Got) == 10)
 }
 
-func TestSuite(t *testing.T) {
+func TestRun(t *testing.T) {
 	t.Parallel()
-	gounit.Run(&suite{}, t)
+	gounit.Run(&run{}, t)
 }
