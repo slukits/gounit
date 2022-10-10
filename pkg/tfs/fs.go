@@ -61,7 +61,8 @@ type Tester interface {
 // testing, e.g.  without error handling, preset file/dir-mod,
 // constructors for unique temp-dir as well as testdata directory, and
 // with undo functionality.  In general failing file system operations
-// fatal associated testing instance; failing undo function calls panic.
+// fatal associated testing instance while failing undo function-calls
+// panic.
 type FS struct {
 	t     Tester
 	td    *Dir

@@ -24,7 +24,8 @@ func (s *Buttons) fx(t *T) (*lines.Events, *Testing) {
 	return fx(t, s)
 }
 
-var switchBttFX = []string{"[v]et=off", "[r]ace=off", "[s]tats=off", "[b]ack"}
+var switchBttFX = []string{
+	"[v]et=off", "[r]ace=off", "[s]tats=off", "[c]urrent=off", "[b]ack"}
 var dfltBttFX = []string{"[s]witches", "[h]elp", "[a]bout", "[q]uit"}
 
 func (s *Buttons) Init(t *S) {

@@ -4,7 +4,7 @@
 
 /*
 Package view utilizes the github.com/slukits/lines package to provide
-gounit's terminal user interface (note: the actual ui has no frames)
+gounit's terminal user interface.
 
 	+------------------------------------------------------------------+
 	|                                                                  |
@@ -30,6 +30,8 @@ gounit's terminal user interface (note: the actual ui has no frames)
 	+------------------------------------------------------------------+
 	|      [v]et=off      [r]ace=off      [s]tats=off      [m]ore      |
 	+------------------------------------------------------------------+
+
+Note: the actual ui has no frames.
 */
 package view
 

@@ -225,7 +225,7 @@ func newSubTestFactory(
 				errorer:  t.Error,
 				canceler: t.FailNow,
 			}
-			suiteT.Not = not{t: suiteT}
+			suiteT.Not = Not{t: suiteT}
 			if hasLogger {
 				suiteT.logger = suiteLogging.Logger()
 			}

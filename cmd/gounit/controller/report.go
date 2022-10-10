@@ -670,7 +670,7 @@ func reportOutputLine(
 			j++
 		}
 		j--
-		line = s[j*(width-subIndent):]
+		line = i + indent + s[j*(width-subIndent):]
 	}
 	oo = append(oo, line)
 	ll = append(ll, i+strings.TrimSpace(oo[0]))
