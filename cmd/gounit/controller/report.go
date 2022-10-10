@@ -314,11 +314,11 @@ func reportFailedPkgGoTests(
 	if p.LenTests() == 0 {
 		return ll, llMask, ""
 	}
-	n, f, d, without, with := goSplitTests(p)
+	n, f, without, with := goSplitTests(p)
 	if f == 0 {
 		return ll, llMask, ""
 	}
-	ll, llMask = reportGoTestsLine(n, f, d, view.GoTestsLine, ll, llMask)
+	ll, llMask = reportGoTestsLine(n, f, view.GoTestsLine, ll, llMask)
 	if without.haveFailed(p) {
 		ll = append(ll, blankLine)
 		for _, t := range without {
@@ -501,14 +501,12 @@ func reportPackageLine(
 }
 
 func reportGoTestsLine(
-	n, f int, d time.Duration, lm view.LineMask,
-	ll rprLines, llMask linesMask,
+	n, f int, lm view.LineMask, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
 
 	content := "go-tests"
 	if lm == view.GoTestsFoldedLine {
-		content = fmt.Sprintf("%s%s%d/%d %s", content,
-			lines.LineFiller, n, f, d.Round(1*time.Millisecond))
+		content = fmt.Sprintf("%s%s%d/%d", content, lines.LineFiller, n, f)
 	}
 	ll = append(ll, content)
 	idx := uint(len(ll) - 1)

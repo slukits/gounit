@@ -334,10 +334,6 @@ func (s *Report) No_race_if_current_package_race_is_turned_off(t *T) {
 	)
 }
 
-func (s *Report) Fail(t *T) {
-	t.True(true)
-}
-
 func TestReport(t *testing.T) {
 	t.Parallel()
 	Run(&Report{}, t)

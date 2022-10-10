@@ -43,9 +43,9 @@ func reportMixedGoSuite(
 ) (rprLines, linesMask) {
 	ll, llMask = reportPackageLine(p, view.PackageLine, ll, llMask)
 	ll = append(ll, blankLine)
-	n, f, d, _, _ := goSplitTests(p)
+	n, f, _, _ := goSplitTests(p)
 	ll, llMask = reportGoTestsLine(
-		n, f, d, view.GoTestsLine, ll, llMask)
+		n, f, view.GoTestsLine, ll, llMask)
 	ll = append(ll, blankLine)
 	ll, llMask, reported := reportFailedGoTests(p, ll, llMask)
 	if reported {
@@ -138,7 +138,7 @@ func reportFailedGoTestsHeader(
 	}
 
 	return reportGoTestsLine(
-		n, f, d, view.GoTestsFoldedLine, ll, llMask)
+		n, f, view.GoTestsFoldedLine, ll, llMask)
 }
 
 func reportSuitesFolded(
@@ -154,23 +154,22 @@ func reportSuitesFolded(
 func reportGoTestsFolded(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
-	n, f, d := 0, 0, time.Duration(0)
+	n, f := 0, 0
 	p.ForTest(func(t *model.Test) {
 		r := p.OfTest(t)
 		n += r.Len()
 		f += r.LenFailed()
-		d += r.End.Sub(r.Start)
 	})
 	ll, llMask = reportGoTestsLine(
-		n, f, d, view.GoTestsFoldedLine, ll, llMask)
+		n, f, view.GoTestsFoldedLine, ll, llMask)
 	return ll, llMask
 }
 
 func reportGoTestWithSubsFolded(
 	p *pkg, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask, bool) {
-	n, f, d, without, withSubs := goSplitTests(p)
-	ll, llMask = reportGoTestsLine(n, f, d, view.GoTestsLine, ll, llMask)
+	n, f, without, withSubs := goSplitTests(p)
+	ll, llMask = reportGoTestsLine(n, f, view.GoTestsLine, ll, llMask)
 	if len(without) > 0 {
 		ll = append(ll, blankLine)
 	}

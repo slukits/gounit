@@ -304,7 +304,10 @@ var (
 )
 
 func (t *Test) String() string {
-	name := t.name
+	return HumanReadable(t.name)
+}
+
+func HumanReadable(name string) string {
 	if strings.Contains(name, "_") {
 		name = strings.ReplaceAll(name, "_", " ")
 		for i, c := range name {

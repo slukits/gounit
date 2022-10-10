@@ -7,7 +7,6 @@ package controller
 import (
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/slukits/gounit/cmd/gounit/model"
 	"github.com/slukits/gounit/cmd/gounit/view"
@@ -47,7 +46,7 @@ func reportGoOnlyPkg(
 	p *pkg, rt reportType, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask, string) {
 
-	n, f, _, withoutSubs, withSubs := goSplitTests(p)
+	n, f, withoutSubs, withSubs := goSplitTests(p)
 
 	folded := func() (rprLines, linesMask, string) {
 		ll, llMask = goWithoutSubs(p, ll, llMask, n, f, withoutSubs)
@@ -150,11 +149,10 @@ func (tt goTests) haveFailed(p *pkg) bool {
 
 // goSplitTests splits go test into tests without and with sub-tests.
 func goSplitTests(p *pkg) (
-	n, f int, d time.Duration, without, with goTests,
+	n, f int, without, with goTests,
 ) {
 	p.ForTest(func(t *model.Test) {
 		r := p.OfTest(t)
-		d += r.End.Sub(r.Start)
 		if r.HasSubs() {
 			n += p.OfTest(t).Len()
 			f += p.OfTest(t).LenFailed()
@@ -173,7 +171,7 @@ func goSplitTests(p *pkg) (
 	sort.Slice(with, func(i, j int) bool {
 		return with[i].Name() < with[j].Name()
 	})
-	return n, f, d, without, with
+	return n, f, without, with
 }
 
 // goWithoutSubs reports the package-line and the go-tests without

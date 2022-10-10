@@ -6,6 +6,7 @@ package controller
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -84,18 +85,28 @@ type modelState struct {
 
 	// msgUpdater is a closure which calculates the update of the view's
 	// message bar in case of an state change.
-	msgUpdater func(string) string
+	msgUpdater func(*state) string
 
 	// isSuspended controls if model-state change updates the view.
 	isSuspended bool
 }
 
-func msgUpdater(mdlName, srcDir string) func(string) string {
-	return func(s string) string {
-		if s == "" || s == srcDir {
+func msgUpdater(mdlName, srcDir string) func(*state) string {
+	return func(st *state) string {
+		isDefault := st.latestPkg == srcDir && st.lastSuite == ""
+		if st.latestPkg == "" || isDefault {
 			return ""
 		}
-		return fmt.Sprintf("%s: %s", mdlName, s)
+		if st.lastSuite == "" {
+			return fmt.Sprintf("%s: %s", mdlName, st.latestPkg)
+		}
+		if strings.HasPrefix(st.lastSuite, "go-tests:") {
+			return fmt.Sprintf("%s: %s/%s", mdlName, st.latestPkg,
+				model.HumanReadable(strings.TrimPrefix(
+					st.lastSuite, "go-tests:")))
+		}
+		return fmt.Sprintf("%s: %s/%s", mdlName, st.latestPkg,
+			model.HumanReadable(st.lastSuite))
 	}
 }
 
@@ -286,7 +297,7 @@ func (s *modelState) updateView(
 ) {
 	report.lst = s.lineListener
 	report.flags = view.RpClearing
-	st.view = []interface{}{report, status, s.msgUpdater(st.latestPkg)}
+	st.view = []interface{}{report, status, s.msgUpdater(st)}
 	if s.isSuspended {
 		return
 	}
