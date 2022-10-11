@@ -40,20 +40,20 @@ sub-tests.  While on the other hand suite tests are also executed using
 the "go test" command.  A suit test is a method of a
 gounit.Suite-embedder which is public, not special, and has exactly one
 argument (which then must be of type *gounit.T but this is not
-validated, i.e. gounit will produce a panic if not).  Special methods
-are Init, SetUp, TearDown and Finalize as well as Get, Set and Del.  The
-first four methods behave as you expect: Init and Finalize are executed
-before respectively after all suite-tests.  SetUp and TearDown are
-executed before respectively after each suite-test.  The other three
-methods are considered special because they are implemented by the
-[gounit.Fixtures]-utility and it turned out to be a quite natural use
-case to embedded the Fixtures-type next to the Suite type in a test
-suite.  Special methods along with compact assertions provided by
-gounit.T allow you in a systematic way to remove noise from your tests
-with the goal to make your suite-test implementations the specification
-of your production API.  While suite tests reported in the order they
-were written will outline the behavior of your production code and the
-thought process which led there.
+validated, i.e. gounit will panic if not).  Special methods are Init,
+SetUp, TearDown and Finalize as well as Get, Set and Del.  The first
+four methods behave as you expect: Init and Finalize are executed before
+respectively after all suite-tests.  SetUp and TearDown are executed
+before respectively after each suite-test.  The other three methods are
+considered special because they are implemented by the [Fixtures]
+utility and it turned out to be a quite natural use case to embedded the
+Fixtures-type next to the Suite type in a test suite.  Special methods
+along with compact assertions provided by gounit.T allow you in a
+systematic way to remove noise from your tests with the goal to make
+your suite-test implementations the specification of your production
+API.  While suite tests reported in the order they were written will
+outline the behavior of your production code and the thought process
+which led there.
 
 NOTE:
 
