@@ -23,6 +23,7 @@ module.  The gounit command
 
 ![simple gounit use-case](gounit.gif)
 
+# gounit types
 
 From the gounit package you will mainly use the types gounit.Suite and
 gounit.T (gounit.S for Init and Finalize) as well as the function
@@ -136,3 +137,23 @@ full-blown test suite (in pseudo-code) might look like this:
 	    Run(&testedSubject{}, t)
 	}
 ```
+
+# gounit command
+
+Execute gounit in the go source directory which you want gounit to
+watch.  Note this directory must be located inside a go module.  Click
+gounit's help button to learn how the ui is working.
+
+## Trap for the unwary
+
+To avoid unnecessary overhead gounit investigates a go package if it is
+testing.  I.e. if it at least contains one go test.  It does so by
+parsing packages *_test.go files for a go test.  Lets assume you
+implement a test suite and after it you implement the suite-runner which
+is a go test, i.e. the package is considered testing.  If you now have a
+syntax error in you suite code, i.e. the parser stops before the suite
+runner is reached, then the package is considered not testing.  The
+later may be confusing if you are unaware of that syntax error.
+
+Hence before you file an issue about not reported suite tests make sure
+your tests compile.
