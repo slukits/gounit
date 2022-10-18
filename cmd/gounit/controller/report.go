@@ -32,9 +32,14 @@ type report struct {
 	lst     func(int)
 }
 
-var emptyReport = &report{
-	ll:    []string{initReport},
-	flags: view.RpClearing,
+// emptyReport provides the default report.  Note it can't be a constant
+// since we get race conditions between different tests otherwise.
+func emptyReport() *report {
+	return &report{
+		ll:    []string{initReport},
+		flags: view.RpClearing,
+	}
+
 }
 
 // newReport calculates from given state and requested report type a
@@ -45,7 +50,7 @@ var emptyReport = &report{
 // user-input and watch-update happen at the same time.
 func newReport(st *state, rt reportType, idx int) *report {
 	if len(st.pp) == 0 {
-		return emptyReport
+		return emptyReport()
 	}
 	if rt == rprPackages {
 		st.latestPkg = ""
