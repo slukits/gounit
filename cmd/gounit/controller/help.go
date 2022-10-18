@@ -57,7 +57,8 @@ selectable line.  Pressing enter on a highlighted line will select
 it respectively fold/unfold the selected package/suite accordingly.
 
 Buttons in the bottom may be selected by clicking on them or pressing
-the embraced key.
+the embraced key. "[s]witches" switches to a button bar with switches
+for test runs:
 
 [v]et switches the Go vet execution for test-runs on and off.  I.e.
        on [v]et=off the "go test" command is run with the "-vet=off"
@@ -70,7 +71,7 @@ the embraced key.
 NOTE if vet or race is switched on while a particular package is
 reported this package's tests are rerun with the according flags set.
 If you are in the packages-view while you switch, the switch takes 
-effect at the next package source-change.
+effect at the next package source-change or if a package is selected.
 
 [s]tats switches reporting source statistics on and off.  I.e. if
        [s]tats=on for each package is the number of source files
@@ -79,9 +80,6 @@ effect at the next package source-change.
        lines and the number of documentation lines reported.  In the
        status bar the same information for the total of the watched 
        source directory is provided.
-
-[m]ore makes more buttons available like [h]elp showing this help text,
-       [a]bout with copyright and license information.
 
 Happy coding!
 `

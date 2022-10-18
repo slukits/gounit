@@ -140,11 +140,11 @@ full-blown test suite (in pseudo-code) might look like this:
 
 # gounit command
 
-Execute gounit in the go source directory which you want gounit to
-watch.  Note this directory must be located inside a go module.  Click
-gounit's help button to learn how the ui is working.
+Execute gounit in the go source directory which you want it to watch.
+This directory must be located inside a go module.  Click gounit's
+help button to learn how its ui is working.
 
-## Trap for the unwary
+## Traps for the unwary
 
 To avoid unnecessary overhead gounit investigates a go package if it is
 testing.  I.e. if it at least contains one go test.  It does so by
@@ -157,3 +157,12 @@ later may be confusing if you are unaware of that syntax error.
 
 Hence before you file an issue about not reported suite tests make sure
 your tests compile.
+
+The timing which is reported to packages is the total time needed for
+the system-command running a package's tests while "go test" usually
+reports only the time for the tests execution.  It is rather difficult
+to say something about the overhead introduced by the features of
+gounit.  Timings I did suggest an overhead between 25 and 50 percent.
+Practically I haven't experienced a notable difference.
+
+Happy coding!

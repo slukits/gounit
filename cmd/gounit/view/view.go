@@ -12,15 +12,15 @@ gounit's terminal user interface.
 	|                                                                  |
 	+------------------------------------------------------------------+
 	|                                                                  |
-	| view: 21/0 243ms, 10/5, 1454/684 340                             |
+	| view:                            21/0 243ms, 10/5, 1454/684 340  |
 	|                                                                  |
-	| A new view displays initially given (4/0 8ms)                    |
+	| A new view displays initially given                         4/0  |
 	|     message                                                      |
 	|     status                                                       |
 	|     main_info                                                    |
 	|     buttons                                                      |
 	|                                                                  |
-	| A view 17/0 13ms                                                 |
+	| A view                                                     17/0  |
 	|                                                                  |
 	| ...                                                              |
 	|                                                                  |
@@ -38,6 +38,7 @@ package view
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/slukits/lines"
 )
@@ -84,7 +85,7 @@ type view struct {
 	lines.Component
 	lines.Stacking
 	fatal       func(...interface{})
-	ee          *lines.Events
+	ll          *lines.Lines
 	runeButtons map[rune]*button
 }
 
@@ -92,19 +93,22 @@ type view struct {
 // initialize a new returned view instance.  In turn the Initer
 // implementation is provided with the functionality to modify created
 // view instance.  New's return value implements the lines.Componenter
-// interface and should be only ever used to initialize a lines Events
-// instance, e.g.:
+// interface and should be only ever used to initialize a Lines instance
+// e.g.:
 //
-//	lines.New(view.New(i))
+//	lines.Term(view.New(i))
 //
 // or a testing instance
 //
 //	func (s *MySuite) My_suite_test(t *T) {
-//		tt := view.Test{t, view.New(i)}
-//		ee, lt := lines.Test(tt)
+//	    tt := view.Test{t, view.New(i)}
+//	    ee, lt := lines.Test(tt)
 //	}
 func New(i Initer) *view {
 	new := &view{fatal: i.Fatal()}
+	if new.fatal == nil {
+		new.fatal = log.Fatal
+	}
 	new.CC = append(new.CC, &messageBar{
 		dflt: i.Message(new.updateMessageBar)})
 	r := i.Reporting(new.updateLines)
@@ -126,11 +130,11 @@ func initButtons(i Initer, v *view) {
 }
 
 func (v *view) OnInit(e *lines.Env) {
-	v.ee = e.EE
-	if err := e.EE.MoveFocus(v.reporting()); err != nil {
+	v.ll = e.Lines
+	if err := e.Lines.Focus(v.reporting()); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: move focus: %v", err))
 	}
-	width, _ := e.ScreenSize()
+	width, _ := e.DisplaySize()
 	if width > 80 {
 		v.Dim().SetWidth(80)
 	}
@@ -139,13 +143,13 @@ func (v *view) OnInit(e *lines.Env) {
 func (v *view) reporting() lines.Componenter { return v.CC[1] }
 
 func (v *view) OnLayout(e *lines.Env) {
-	width, _ := e.ScreenSize()
+	width, _ := e.DisplaySize()
 	if width > 80 {
 		v.Dim().SetWidth(80)
 	}
 }
 
-func (v *view) OnRune(_ *lines.Env, r rune) {
+func (v *view) OnRune(_ *lines.Env, r rune, m lines.Modifier) {
 	b, ok := v.runeButtons[r]
 	if !ok || b.listener == nil {
 		return
@@ -154,20 +158,20 @@ func (v *view) OnRune(_ *lines.Env, r rune) {
 }
 
 func (v *view) updateMessageBar(s string) {
-	if err := v.ee.Update(v.CC[0], s, nil); err != nil {
+	if err := v.ll.Update(v.CC[0], s, nil); err != nil {
 		v.fatal(fmt.Sprintf(
 			"gounit: view update: message-bar: %v", err))
 	}
 }
 
 func (v *view) updateStatusBar(upd Statuser) {
-	if err := v.ee.Update(v.CC[2], upd, nil); err != nil {
+	if err := v.ll.Update(v.CC[2], upd, nil); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: update: statusbar: %v", err))
 	}
 }
 
 func (v *view) updateLines(l Reporter) {
-	if err := v.ee.Update(v.CC[1], l, nil); err != nil {
+	if err := v.ll.Update(v.CC[1], l, nil); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: update: lines: %v", err))
 	}
 }
@@ -183,14 +187,14 @@ func (v *view) updateButtons(bb Buttoner) {
 			return
 		}
 		v.runeButtons = map[rune]*button{}
-		v.ee.Update(v.CC[3], &buttonsUpdate{
+		v.ll.Update(v.CC[3], &buttonsUpdate{
 			bb: bb, setRune: v.setRune}, nil)
 		return
 	}
 	if err := v.validateButtoner(bb, false); err != nil {
 		return
 	}
-	v.ee.Update(v.CC[3], &buttonsUpdate{
+	v.ll.Update(v.CC[3], &buttonsUpdate{
 		bb: bb, setRune: v.setRune}, nil)
 }
 
@@ -267,12 +271,12 @@ func (v *view) validateButtoner(bb Buttoner, init bool) error {
 			err = ErrLabelMustNotBeZero
 			return err
 		}
-		if _, ok := ll[bd.Label]; !ok {
+		if _, ok := ll[bd.Label]; ok {
 			err = fmt.Errorf("%w%s", ErrButtonLabelAmbiguity, bd.Label)
 			return err
 		}
 		ll[bd.Label] = nil
-		if _, ok := rr[bd.Rune]; !ok {
+		if _, ok := rr[bd.Rune]; ok {
 			err = fmt.Errorf("%w%c", ErrButtonRuneAmbiguity, bd.Rune)
 			return err
 		}

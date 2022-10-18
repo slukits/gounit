@@ -18,33 +18,23 @@ type _test struct {
 	Fixtures
 }
 
-func (s *_test) SetUp(t *T) {
-	t.Parallel()
-}
+func (s *_test) SetUp(t *T) { t.Parallel() }
 
-func (s *_test) TearDown(t *T) {
-	quit := s.Get(t)
-	if quit == nil {
-		return
+// fx creates and returns a new view fixture and in case of a given
+// string pointer test-error reporting is mocked up to report to given
+// string pointer.
+func (s *_test) fx(t *T, str *string, i ...Initer) *Testing {
+	var tt *Testing
+	if len(i) == 0 {
+		tt = Fixture(t, 0, nil)
+	} else {
+		tt = Fixture(t, 0, i[0])
 	}
-	quit.(func())()
-}
 
-// fx creates a new view fixture (see newFX) and initializes with it a
-// lines.Test whose returned Events and Testing instances are returned
-// along with the view fixture.  A so obtained Events instance listens
-// for ever and is quit by TearDown.
-func (s *_test) fx(t *T, str *string) (
-	*lines.Events, *viewFX, *Testing,
-) {
-	fx := newFX(t)
-	ee, tt := lines.Test(t.GoT(), fx)
-	ee.Listen()
-	s.Set(t, ee.QuitListening)
 	if str != nil {
 		mckFtl(str, t)
 	}
-	return ee, fx, &Testing{t, tt, fx.view}
+	return tt
 }
 
 func mckFtl(msg *string, t *T) {
@@ -65,120 +55,155 @@ const (
 
 func (s *_test) Fails_providing_message_bar_if_not_first_cmp(t *T) {
 	var ftlMsg string
-	_, _, tv := s.fx(t, &ftlMsg)
+	tt := s.fx(t, &ftlMsg)
 
-	cc := tv.CC
-	tv.CC = nil
-	tv.MessageBar()
+	cc := tt.CC
+	tt.CC = nil
+	tt.MessageBarCells()
 	t.Eq(noCmp, ftlMsg)
 
-	tv.CC = cc[1:]
-	tv.MessageBar()
+	tt.CC = cc[1:]
+	tt.MessageBarCells()
 	t.True(strings.HasSuffix(ftlMsg, msgErr))
 }
 
 func (s *_test) Provides_message_bar_screen_portion(t *T) {
-	_, _, tv := s.fx(t, nil)
-	t.Eq(fxMsg, tv.Trim(tv.MessageBar()).String())
+	tt := s.fx(t, nil)
+	t.Eq(fxMsg, tt.MessageBarCells().Trimmed())
 }
 
 const rprErr = "expected second component to be reporting"
 
 func (s *_test) Fails_providing_reporting_if_not_second_cmp(t *T) {
 	var ftlMsg string
-	_, _, tv := s.fx(t, &ftlMsg)
+	tt := s.fx(t, &ftlMsg)
 
-	cc := tv.CC
-	tv.CC = nil
-	tv.Reporting()
+	cc := tt.CC
+	tt.CC = nil
+	tt.ReportCells()
 	t.Eq(notEnough, ftlMsg)
 
-	tv.CC = append([]lines.Componenter{&button{}}, cc...)
-	tv.Reporting()
+	tt.CC = append([]lines.Componenter{&button{}}, cc...)
+	tt.ReportCells()
 	t.True(strings.HasSuffix(ftlMsg, rprErr))
 }
 
 func (s *_test) Provides_reporting_screen_portion(t *T) {
-	_, _, tv := s.fx(t, nil)
-	t.Eq(fxReporting, tv.Trim(tv.Reporting()).String())
+	tt := s.fx(t, nil)
+	t.Eq(fxReporting, tt.ReportCells().Trimmed())
 }
 
 const sttErr = "expected third component to be the status bar"
 
 func (s *_test) Fails_providing_status_bar_if_not_third_cmp(t *T) {
 	var ftlMsg string
-	_, _, tv := s.fx(t, &ftlMsg)
+	tt := s.fx(t, &ftlMsg)
 
-	cc := tv.CC
-	tv.CC = nil
-	tv.StatusBar()
+	cc := tt.CC
+	tt.CC = nil
+	tt.StatusBarCells()
 	t.Eq(notEnough, ftlMsg)
 
-	tv.CC = append([]lines.Componenter{&button{}}, cc...)
-	tv.StatusBar()
+	tt.CC = append([]lines.Componenter{&button{}}, cc...)
+	tt.StatusBarCells()
 	t.True(strings.HasSuffix(ftlMsg, sttErr))
 }
 
 func (s *_test) Provides_status_bar_screen_portion(t *T) {
-	_, _, tv := s.fx(t, nil)
-	t.Eq(fxStatus, tv.Trim(tv.StatusBar()).String())
+	tt := s.fx(t, nil)
+	t.Eq(fxStatus, tt.StatusBarCells().Trimmed())
 }
 
 const bbrErr = "expected forth component to be a button bar"
 
 func (s *_test) Fails_providing_button_bar_if_not_forth_cmp(t *T) {
 	var ftlMsg string
-	_, _, tv := s.fx(t, &ftlMsg)
+	tt := s.fx(t, &ftlMsg)
 
-	cc := tv.CC
-	tv.CC = nil
-	tv.ButtonBar()
+	cc := tt.CC
+	tt.CC = nil
+	tt.ButtonBarCells()
 	t.Eq(notEnough, ftlMsg)
 
-	tv.CC = append([]lines.Componenter{&button{}}, cc...)
-	tv.ButtonBar()
+	tt.CC = append([]lines.Componenter{&button{}}, cc...)
+	tt.ButtonBarCells()
 	t.True(strings.HasSuffix(ftlMsg, bbrErr))
 }
 
 func (s *_test) Provides_button_bar_screen_portion(t *T) {
-	_, _, tv := s.fx(t, nil)
-	t.SpaceMatched(tv.Trim(tv.ButtonBar()).String(), "first", "second")
+	tt := s.fx(t, nil)
+	t.SpaceMatched(tt.ButtonBarCells().Trimmed(), "first", "second")
 }
 
 func (s *_test) Fails_button_bar_click_if_not_forth_cmp(t *T) {
 	var ftlMsg string
-	_, _, tv := s.fx(t, &ftlMsg)
+	tt := s.fx(t, &ftlMsg)
 
-	cc := tv.CC
-	tv.CC = nil
-	tv.ClickButton(fxBtt1)
+	cc := tt.CC
+	tt.CC = nil
+	tt.ClickButton(fxBtt1)
 	t.Eq(notEnough, ftlMsg)
 
-	tv.CC = append([]lines.Componenter{&button{}}, cc...)
-	tv.ClickButton(fxBtt1)
+	tt.CC = append([]lines.Componenter{&button{}}, cc...)
+	tt.ClickButton(fxBtt1)
 	t.True(strings.HasSuffix(ftlMsg, bbrErr))
 
-	tv.CC = cc
-	tv.ClickButton(fxBtt1Upd)
+	tt.CC = cc
+	tt.ClickButton(fxBtt1Upd)
 	t.True(strings.HasPrefix(
 		ftlMsg, "gounit: view: fixture: no button labeled"))
 }
 
 func (s *_test) Clicks_requested_button(t *T) {
-	_, fx, tv := s.fx(t, nil)
+	tt := Fixture(t, 0, nil)
 
-	tv.ClickButton(fxBtt2)
-	t.True(fx.bttTwoReported)
+	tt.ClickButton(fxBtt2)
+	t.Eq(tt.ReportedButton, fxBtt2)
 }
 
 func (s *_test) Clicks_requested_reporting_line(t *T) {
-	ee, fx, tv := s.fx(t, nil)
-	ee.Update(fx.Report, nil, func(e *lines.Env) {
+	tt := Fixture(t, 0, nil)
+	tt.Lines.Update(tt.ReportCmp, nil, func(e *lines.Env) {
 		fmt.Fprint(e, "first\nsecond\nthird")
 	})
 
-	tv.ClickReporting(2)
-	t.Eq(2, fx.reportedLine)
+	tt.ClickReporting(2)
+	t.Eq(2, tt.ReportedLine)
+}
+
+func (s *_test) Updates_message_bar(t *T) {
+	tt := Fixture(t, 0, nil)
+	t.Not.Contains(tt.MessageBarCells(), "updated msg")
+	tt.UpdateMessage("updated msg")
+	t.True(t.Contains(tt.MessageBarCells(), "updated msg"))
+}
+
+func (s *_test) Updates_reporting_component(t *T) {
+	tt, exp := Fixture(t, 0, nil), "first\nseconde\nthird"
+	t.Not.SpaceMatched(tt.ReportCells(), exp)
+	tt.UpdateReporting(&reporterFX{content: exp})
+	t.SpaceMatched(tt.ReportCells(), exp)
+}
+
+func (s *_test) Updates_status_bar(t *T) {
+	tt := Fixture(t, 0, nil)
+	t.Not.Contains(tt.StatusBarCells(), "updated status")
+	tt.UpdateStatus(Statuser{Str: "updated status"})
+	t.True(t.Contains(tt.StatusBarCells(), "updated status"))
+}
+
+func (s *_test) Updates_buttons(t *T) {
+	tt, exp := Fixture(t, 0, nil), []string{"[e]ins", "[z]wei", "[d]rei"}
+	t.Not.SpaceMatched(tt.ButtonBarCells(), exp...)
+	tt.UpdateButtons(&buttonerFX{
+		newBB: []ButtonDef{
+			{Label: "eins", Rune: 'e'},
+			{Label: "zwei", Rune: 'z'},
+			{Label: "drei", Rune: 'd'},
+		},
+		replace: true,
+	})
+	t.SpaceMatched(tt.ButtonBarCells(), exp...)
 }
 
 func TestTest(t *testing.T) {

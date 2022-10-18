@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gdamore/tcell/v2"
 	"github.com/slukits/lines"
 )
 
@@ -135,14 +134,14 @@ func (m *report) OnInit(e *lines.Env) {
 // focusable.
 func (r *report) OnClick(_ *lines.Env, _, y int) {
 	idx := r.Scroll.CoordinateToIndex(y)
-	if r.listener == nil || y >= r.Len() || !r.LL(idx).IsFocusable() {
+	if r.listener == nil || y >= r.Len() || !r.LL.By(idx).IsFocusable() {
 		return
 	}
 	r.listener(idx)
 }
 
 func (r *report) OnUpdate(e *lines.Env) {
-	r.Focus.Reset(true)
+	r.LL.Focus.Reset(true)
 	upd, ok := e.Evt.(*lines.UpdateEvent).Data.(Reporter)
 	if !ok {
 		return
@@ -167,8 +166,8 @@ func (r *report) OnUpdate(e *lines.Env) {
 func (r *report) reportFailed(
 	idx uint, lm LineMask, e *lines.Env, content string,
 ) {
-	sr := lines.SR{Style: tcell.StyleDefault.Background(tcell.ColorRed).
-		Foreground(tcell.ColorWhite)}
+	sr := lines.SR{Style: e.NewStyle().
+		WithFG(lines.White).WithBG(lines.Red)}
 	for _, r := range content { // find first non-blank
 		if r != ' ' {
 			break
@@ -179,7 +178,7 @@ func (r *report) reportFailed(
 	if lm&Focusable == 0 {
 		ff = lines.NotFocusable
 	} else {
-		sr.Style = sr.Underline(true)
+		sr.Style = sr.WithAA(lines.Underline)
 	}
 	spl := strings.Split(content, lines.LineFiller)
 	sr.SetEnd(len(spl[0]))
@@ -188,7 +187,7 @@ func (r *report) reportFailed(
 }
 
 func (r *report) passedSelectable(idx uint, e *lines.Env, content string) {
-	sr := lines.SR{Style: tcell.StyleDefault.Underline(true)}
+	sr := lines.SR{Style: e.NewStyle().WithAA(lines.Underline)}
 	for _, r := range content {
 		if r != ' ' {
 			break

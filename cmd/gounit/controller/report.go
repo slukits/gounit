@@ -572,6 +572,9 @@ func reportTestLine(
 func reportSubTestLine(
 	p *pkg, r *model.SubResult, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
+	if r == nil {
+		return ll, llMask
+	}
 	ll = append(ll, fmt.Sprintf("%s%s",
 		i+r.String(),
 		lines.LineFiller))

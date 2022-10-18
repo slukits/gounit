@@ -2,6 +2,18 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
+/*
+fx_controller_test provides test-fixtures for end to end tests.  The
+main difficulty is that model and view do their work in their own go
+routines, i.e. it is unclear when testing packages are reported and
+their reporting has been processed as well as when a view update has
+made it to the screen.  The two methods beforeWatch and beforeView of
+the Testing-type provide a solution since they are guaranteed to not
+return before reporting packages as consequence of a provided function
+call has been processed; respectively to not return before a view update
+has made it to the screen as consequence of a provided function call.
+*/
+
 package controller
 
 import (
@@ -28,25 +40,22 @@ type Testing struct {
 	// mutex protecting the access and update of afterWatch.
 	*sync.Mutex
 
-	// testing lines events instance.
-	_ee *lines.Events
-
 	// gounit _controller instance created during the initialization
 	// process, i.e. _controller.New.
 	_controller *controller
 
-	// this channel is recreated each time a source directory update is
-	// reported and closed after an subsequent update of the view.
-	_afterWatch chan struct{}
+	// _beforeWatch is closed and recreated each time reported testing
+	// packages have been processed.
+	_beforeWatch chan struct{}
 
-	_afterView chan struct{}
+	// _beforeView is closed and recreated each time a view is update
+	// has been processed.
+	_beforeView chan struct{}
 
-	// _watchTimeout is the time span Testing's AfterWatch-method waits
-	// for an update of the view.  Practically that means the time span
-	// between a reported packages of a source watcher and the update in
-	// the view.  Since the execution of the tests happen in between
-	// this time-span can't be to short (> 0.2sec).
-	_watchTimeout time.Duration
+	// _beforeTimeout is the time span Testing's before*-methods waits
+	// for either the processing of a reported testing package or the
+	// update of the view.
+	_beforeTimeout time.Duration
 
 	// _quitWatching terminates the model's go routine checking for
 	// updated packages in given source directory.
@@ -57,16 +66,6 @@ type Testing struct {
 
 func (tt *Testing) collapseAll() {
 	tt._controller.model.report(rprPackages)
-}
-
-// cleanUp stop all go-routines initiated by a controller test.
-func (tt *Testing) cleanUp() {
-	if tt._quitWatching != nil {
-		tt._quitWatching.QuitAll()
-	}
-	if tt._ee != nil && tt._ee.IsListening() {
-		tt._ee.QuitListening()
-	}
 }
 
 // isOn returns true if given button-mask represents on/off-buttons
@@ -129,10 +128,26 @@ func (tt *Testing) _fxWatchMock(
 	m.replaceViewUpdater(
 		func(vu func(...interface{})) func(i ...interface{}) {
 			return func(i ...interface{}) {
+				// it seems that the created golden tmp-directory by
+				// testing.Cleanup is removed before the closing of the
+				// PackagesDiff-channel is executed hence this final
+				// source-directory change is reported which then leads
+				// to an error in the view update since the test run has
+				// already ended when that update reaches the view.
+				// Since at this point in time so far the PackagesDiff
+				// channel has been already closed we leverage this to
+				// suppress that final view update.
+				select {
+				case pd := <-c:
+					if pd == nil {
+						return
+					}
+				default:
+				}
 				vu(i...)
 				tt.Lock()
-				close(tt._afterView)
-				tt._afterView = make(chan struct{})
+				close(tt._beforeView)
+				tt._beforeView = make(chan struct{})
 				tt.Unlock()
 			}
 		}(m.viewUpdater))
@@ -142,15 +157,11 @@ func (tt *Testing) _fxWatchMock(
 			close(watchRelay)
 			return
 		}
-		if !tt._ee.IsListening() {
-			close(watchRelay)
-			return
-		}
 		watchRelay <- pd
 		<-afterWatch
 		tt.Lock()
-		close(tt._afterWatch)
-		tt._afterWatch = make(chan struct{})
+		close(tt._beforeWatch)
+		tt._beforeWatch = make(chan struct{})
 		tt.Unlock()
 	}
 }
@@ -170,12 +181,12 @@ const (
 func (tt *Testing) beforeView(f func()) {
 	tt.T.GoT().Helper()
 	tt.Lock()
-	cn := tt._afterView
+	cn := tt._beforeView
 	tt.Unlock()
 	f()
 	select {
 	case <-cn:
-	case <-tt.T.Timeout(tt._watchTimeout):
+	case <-tt.T.Timeout(tt._beforeTimeout):
 		tt.T.Fatal("controller: testing: before view: " +
 			"timed out without a view-update")
 	}
@@ -187,14 +198,35 @@ func (tt *Testing) beforeView(f func()) {
 func (tt *Testing) beforeWatch(f func()) {
 	tt.T.GoT().Helper()
 	tt.Lock()
-	cn := tt._afterWatch
+	cn := tt._beforeWatch
 	tt.Unlock()
 	f()
 	select {
 	case <-cn:
-	case <-tt.T.Timeout(tt._watchTimeout):
+	case <-tt.T.Timeout(tt._beforeTimeout):
 		tt.T.Fatal("controller: testing: before watch: " +
 			"timed out without a watch-update")
+	}
+}
+
+func (tt *Testing) before(f func()) {
+	tt.T.GoT().Helper()
+	tt.Lock()
+	bw := tt._beforeWatch
+	bv := tt._beforeView
+	tt.Unlock()
+	f()
+	select {
+	case <-bw:
+	case <-tt.T.Timeout(tt._beforeTimeout):
+		tt.T.Fatal("controller: testing: before: " +
+			"timed out without a watch-update")
+	}
+	select {
+	case <-bv:
+	case <-tt.T.Timeout(tt._beforeTimeout):
+		tt.T.Fatal("controller: testing: before: " +
+			"timed out without a view-update")
 	}
 }
 
@@ -208,12 +240,12 @@ const (
 // controller.Testing instances instantiated by the controller.  If a
 // fixtureSetter is given a cleanup method is stored to given fixture
 // setter. NOTE fx doesn't return before controller.New is listening.
-func fx(t *gounit.T, fs fixtureSetter) (*lines.Events, *Testing) {
-	return fxSource(t, fs, "empty")
+func fx(t *gounit.T) *Testing {
+	return fxSource(t, "empty")
 }
 
-func fxDBG(t *gounit.T, fs fixtureSetter) (*lines.Events, *Testing) {
-	return fxSourceDBG(t, fs, "empty")
+func fxDBG(t *gounit.T) *Testing {
+	return fxSourceDBG(t, "empty")
 }
 
 // initGolden guarantees that the golden module is only once
@@ -236,13 +268,10 @@ var initGolden = func(done bool) func(t tfs.Tester) {
 	}
 }(false)
 
-func fxSource(t *gounit.T, fs fixtureSetter, relDir string) (
-	*lines.Events, *Testing,
-) {
+func fxSource(t *gounit.T, relDir string) *Testing {
 	golden := fxSetupSource(t, relDir)
 	return fxInit(
 		t,
-		fs,
 		InitFactories{
 			Watcher: &model.Sources{
 				Dir:      fp.Join(golden.Path(), relDir),
@@ -254,14 +283,13 @@ func fxSource(t *gounit.T, fs fixtureSetter, relDir string) (
 }
 
 func fxSourceTouched(
-	t *gounit.T, fs fixtureSetter, relDir string, touch string,
-) (*lines.Events, *Testing) {
+	t *gounit.T, relDir string, touch string,
+) *Testing {
 	golden := fxSetupSource(t, relDir)
 	time.Sleep(1 * time.Millisecond)
 	golden.Touch(touch)
 	return fxInit(
 		t,
-		fs,
 		InitFactories{
 			Watcher: &model.Sources{
 				Dir:      fp.Join(golden.Path(), relDir),
@@ -272,13 +300,10 @@ func fxSourceTouched(
 	)
 }
 
-func fxSourceDBG(t *gounit.T, fs fixtureSetter, relDir string) (
-	*lines.Events, *Testing,
-) {
+func fxSourceDBG(t *gounit.T, relDir string) *Testing {
 	golden := fxSetupSource(t, relDir)
 	return fxInit(
 		t,
-		fs,
 		InitFactories{
 			dbgTimeouts: true,
 			Watcher: &model.Sources{
@@ -293,12 +318,9 @@ func fxSourceDBG(t *gounit.T, fs fixtureSetter, relDir string) (
 // fxSourceAbsDBG sets up a testing fixture for debugging using given
 // absolute directory as watched source directory.  This allows to test
 // and debug against go modules from the wild.
-func fxSourceAbsDBG(t *gounit.T, fs fixtureSetter, absDir string) (
-	*lines.Events, *Testing,
-) {
+func fxSourceAbsDBG(t *gounit.T, absDir string) *Testing {
 	return fxInit(
 		t,
-		fs,
 		InitFactories{
 			dbgTimeouts: true,
 			Watcher: &model.Sources{
@@ -311,14 +333,13 @@ func fxSourceAbsDBG(t *gounit.T, fs fixtureSetter, absDir string) (
 }
 
 func fxSourceTouchedDBG(
-	t *gounit.T, fs fixtureSetter, relDir, touch string,
-) (*lines.Events, *Testing) {
+	t *gounit.T, relDir, touch string,
+) *Testing {
 	golden := fxSetupSource(t, relDir)
 	time.Sleep(1 * time.Millisecond)
 	golden.Touch(touch)
 	return fxInit(
 		t,
-		fs,
 		InitFactories{
 			dbgTimeouts: true,
 			Watcher: &model.Sources{
@@ -356,20 +377,17 @@ func fxSetupSource(t *gounit.T, relDir string) (golden *tfs.Dir) {
 // watched source directory.  I.e. tests on an non-testing source
 // directory may not used this fixture factory.
 func fxInit(
-	t *gounit.T, fs fixtureSetter, i InitFactories, golden *tfs.Dir,
-) (*lines.Events, *Testing) {
+	t *gounit.T, i InitFactories, golden *tfs.Dir,
+) *Testing {
 
-	var (
-		ct Testing
-		ee *lines.Events
-	)
+	var ct Testing
 	ct.Mutex = &sync.Mutex{}
-	ct._watchTimeout = 30 * time.Second
+	ct._beforeTimeout = 30 * time.Second
 	if i.dbgTimeouts {
-		ct._watchTimeout = 20 * time.Minute
+		ct._beforeTimeout = 20 * time.Minute
 	}
-	ct._afterWatch = make(chan struct{})
-	ct._afterView = make(chan struct{})
+	ct._beforeWatch = make(chan struct{})
+	ct._beforeView = make(chan struct{})
 	ct.golden = golden
 
 	if i.Fatal == nil {
@@ -383,31 +401,31 @@ func fxInit(
 	if i.watch == nil {
 		i.watch = ct._fxWatchMock
 	}
-	i.Events = func(c lines.Componenter) *lines.Events {
-		events, tt := lines.Test(t.GoT(), c)
+	i.Events = func(c lines.Componenter) *lines.Lines {
+		timeout := 10 * time.Second
 		if i.dbgTimeouts {
-			tt.Timeout = 20 * time.Minute
+			timeout = 20 * time.Minute
 		}
-		ct.Testing = view.NewTesting(t, tt, c)
-		ee = events
-		ct._ee = events
-		return ee
+		ct.Testing = view.FixtureFor(t, timeout, c)
+		ct.Lines.OnQuit(func() {
+			if ct._quitWatching != nil {
+				ct._quitWatching.QuitAll()
+			}
+		})
+		return ct.Lines
 	}
 
-	ensureInit := ct._afterWatch
+	ensureInit := ct._beforeWatch
 	New(&i)
 
 	ct._controller = i.controller
 	if qw, ok := i.Watcher.(interface{ QuitAll() }); ok {
-		ct._quitWatching = qw
-	}
-	if fs != nil {
-		fs.Set(t, ct.cleanUp)
+		t.GoT().Cleanup(func() { qw.QuitAll() })
 	}
 	if !strings.HasSuffix(i.Watcher.SourcesDir(), "empty") {
 		<-ensureInit
 	}
-	return ee, &ct
+	return &ct
 }
 
 // watcherMock mocks up the controller.New Watcher argument.
@@ -436,7 +454,7 @@ func (m *watcherMock) Watch() (
 }
 
 type linesTest struct {
-	ee *lines.Events
+	ee *lines.Lines
 	tt *lines.Testing
 }
 

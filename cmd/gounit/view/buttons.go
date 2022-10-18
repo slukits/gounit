@@ -59,7 +59,7 @@ func (bb *buttonBar) OnUpdate(e *lines.Env) {
 		bb.init(upd)
 		return
 	}
-	bb.update(e.EE, upd)
+	bb.update(e.Lines, upd)
 }
 
 func (bb *buttonBar) init(bbDef *buttonsUpdate) {
@@ -71,7 +71,7 @@ func (bb *buttonBar) init(bbDef *buttonsUpdate) {
 	})
 }
 
-func (bb *buttonBar) update(ee *lines.Events, bbDef *buttonsUpdate) {
+func (bb *buttonBar) update(ee *lines.Lines, bbDef *buttonsUpdate) {
 	bbDef.bb.ForNew(func(bd ButtonDef) error {
 		bb.append(bd, bbDef.setRune)
 		return nil

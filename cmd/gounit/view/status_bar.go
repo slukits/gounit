@@ -7,7 +7,6 @@ package view
 import (
 	"fmt"
 
-	"github.com/gdamore/tcell/v2"
 	"github.com/slukits/lines"
 )
 
@@ -105,16 +104,16 @@ func (sb *statusBar) str() string {
 	return fmt.Sprintf(dfltStatus, sb.np, sb.ns, sb.nt, sb.nf)
 }
 
-func (sb *statusBar) bg() tcell.Color {
+func (sb *statusBar) bg() lines.Color {
 	if sb.nf > 0 {
-		return tcell.ColorRed
+		return lines.Red
 	}
-	return tcell.ColorGreen
+	return lines.Green
 }
 
-func (sb *statusBar) fg() tcell.Color {
+func (sb *statusBar) fg() lines.Color {
 	if sb.nf > 0 {
-		return tcell.ColorWhite
+		return lines.White
 	}
-	return tcell.ColorBlack
+	return lines.Black
 }

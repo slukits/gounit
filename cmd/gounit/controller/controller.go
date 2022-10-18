@@ -66,7 +66,7 @@ type InitFactories struct {
 	View func(view.Initer) lines.Componenter
 
 	// Events returns a controller's events loop; defaults to lines.New
-	Events func(lines.Componenter) *lines.Events
+	Events func(lines.Componenter) *lines.Lines
 }
 
 type controller struct {
@@ -91,11 +91,14 @@ func New(i *InitFactories) {
 			WatcherErr, i.Watcher.SourcesDir(), err))
 		return
 	}
-	ee := i.Events(i.View(&viewIniter{controller: i.controller}))
-	i.controller.bb.quitter = ee.QuitListening
+	lines := i.Events(i.View(&viewIniter{
+		controller: i.controller,
+		ftl:        i.Fatal,
+	}))
+	i.controller.bb.quitter = lines.Quit
 	i.controller.bb.modelState = i.controller.model
 	go i.watch(diff, i.controller.model, nil)
-	ee.Listen()
+	lines.WaitForQuit()
 }
 
 func ensureInitArgs(i *InitFactories) {
@@ -111,7 +114,7 @@ func ensureInitArgs(i *InitFactories) {
 		}
 	}
 	if i.Events == nil {
-		i.Events = lines.New
+		i.Events = lines.Term
 	}
 	if i.watch == nil {
 		i.watch = watch

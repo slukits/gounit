@@ -58,10 +58,13 @@ const eqTypeErr = "types mismatch %v != %v"
 
 // Eq errors with an corresponding diff if possible and returns false if
 // given values are not considered equal; otherwise true is returned.  a
-// and b are considered equal if they are of the same type and
+// and b are considered equal if they are of the same type or one of
+// them is string while the other one is a Stringer implementation and
 //   - a == b in case of two pointers
 //   - a == b in case of two strings
 //   - a.String() == b.String() in case of Stringer implementations
+//   - a == b.Stringer() or a.Stringer() == b in case of string and
+//     Stringer implementation.
 //   - fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b) in other cases
 //
 // if they are not of the same type or one of the above cases replacing
@@ -69,7 +72,8 @@ const eqTypeErr = "types mismatch %v != %v"
 func (t *T) Eq(a, b interface{}) bool {
 	t.t.Helper()
 
-	if fmt.Sprintf("%T", a) != fmt.Sprintf("%T", b) {
+	differentTypes := fmt.Sprintf("%T", a) != fmt.Sprintf("%T", b)
+	if differentTypes && !isStringers(a, b) {
 		t.Errorf(assertErr, "equal: types", fmt.Sprintf(
 			eqTypeErr, fmt.Sprintf("%T", a), fmt.Sprintf("%T", b)))
 		return false
@@ -83,7 +87,7 @@ func (t *T) Eq(a, b interface{}) bool {
 		return true
 	}
 
-	diff := t.diff(a, b)
+	diff := t.diff(a, b, differentTypes)
 	if diff != "" {
 		t.Errorf(assertErr, "equal: string-representations", diff)
 		return false
@@ -92,7 +96,32 @@ func (t *T) Eq(a, b interface{}) bool {
 	return true
 }
 
-func (t *T) diff(a, b interface{}) string {
+func isStringers(a, b interface{}) bool {
+	_, okA := a.(fmt.Stringer)
+	_, okB := b.(fmt.Stringer)
+	if !okA && !okB {
+		return false
+	}
+	if okA && okB {
+		return true
+	}
+	if okA {
+		_, ok := b.(string)
+		return ok
+	}
+	_, ok := a.(string)
+	return ok
+}
+
+func (t *T) diff(a, b interface{}, differentTypes bool) string {
+	if differentTypes {
+		if _a, ok := a.(fmt.Stringer); ok {
+			a = _a.String()
+		}
+		if _b, ok := b.(fmt.Stringer); ok {
+			b = _b.String()
+		}
+	}
 	diff := ""
 	switch a := a.(type) {
 	case string:
@@ -129,10 +158,20 @@ func (n *Not) Eq(a, b interface{}) bool {
 // containsErr default message for failed 'Contains'-assertion.
 const containsErr = "%s doesn't contain %s"
 
-// Contains fails the test and returns false iff given string doesn't
-// contain given sub-string; otherwise true is returned.
-func (t *T) Contains(str, sub string) bool {
+// StringRepresentation documents what a string representation of any
+// type is:
+//   - the string if it is of type string,
+//   - the return value of String if the Stringer interface is
+//     implemented,
+//   - fmt.Sprintf("%v", value) in all other cases.
+type StringRepresentation interface{}
+
+// Contains fails the test and returns false iff given value's string
+// representation doesn't contain given sub-string; otherwise true is
+// returned.
+func (t *T) Contains(value StringRepresentation, sub string) bool {
 	t.t.Helper()
+	str := toString(value)
 	if !strings.Contains(str, sub) {
 		if !strings.HasSuffix(str, "\n") {
 			str += "\n"
@@ -146,23 +185,34 @@ func (t *T) Contains(str, sub string) bool {
 	return true
 }
 
+func toString(value interface{}) string {
+	switch value := value.(type) {
+	case string:
+		return value
+	case fmt.Stringer:
+		return value.String()
+	default:
+		return fmt.Sprintf("%v", value)
+	}
+}
+
 // Not implements negations of [T]-assertions, e.g. [Not.Contains].
 type Not struct{ t *T }
 
 // notContainsErr default message for failed Not-'Contains'-assertion.
-const notContainsErr = "%s does contain %s"
+const notContainsErr = "\n'%s'\ndoes contain\n'%s'"
 
 // Contains passes if called contains assertion with given arguments fails;
 // otherwise if fails.
-func (n *Not) Contains(str, sub string) bool {
+func (n *Not) Contains(value StringRepresentation, sub string) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
-	passed := n.t.Contains(str, sub)
+	passed := n.t.Contains(value, sub)
 	n.t.errorer = err
 	if passed {
 		n.t.Errorf(assertErr, "does't contain",
-			fmt.Sprintf(notContainsErr, str, sub))
+			fmt.Sprintf(notContainsErr, toString(value), sub))
 		return false
 	}
 	return true
@@ -171,10 +221,12 @@ func (n *Not) Contains(str, sub string) bool {
 // matchedErr default message for failed *'Matched'-assertion.
 const matchedErr = "Regexp\n'%s'\ndoesn't match\n'%s'"
 
-// Matched fails the test and returns false iff given string isn't
-// matched by given regex; otherwise true is returned.
-func (t *T) Matched(str, regex string) bool {
+// Matched fails the test and returns false iff given values string
+// interpretation isn't matched by given regex; otherwise true is
+// returned.
+func (t *T) Matched(value StringRepresentation, regex string) bool {
 	t.t.Helper()
+	str := toString(value)
 	re := regexp.MustCompile(regex)
 	if !re.MatchString(str) {
 		t.Errorf(assertErr, "matched",
@@ -189,34 +241,37 @@ const notMatchedErr = "Regexp '%s'\n matches '%s'"
 
 // Matched passes if called match assertion with given arguments fails;
 // otherwise if fails.
-func (n *Not) Matched(str string, regex string) bool {
+func (n *Not) Matched(value StringRepresentation, regex string) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
-	passed := n.t.Matched(str, regex)
+	passed := n.t.Matched(value, regex)
 	n.t.errorer = err
 	if passed {
 		n.t.Errorf(assertErr, "don't-match",
-			fmt.Sprintf(matchedErr, regex, str))
+			fmt.Sprintf(matchedErr, regex, toString(value)))
 		return false
 	}
 	return true
 }
 
 // SpaceMatched escapes given variadic strings before it joins them with
-// the `\s*`-separator and matches the result against given string str:
+// the `\s*`-separator and matches the result against given value's
+// string representation, e.g.:
 //
 //	<p>
 //	   some text
 //	</p>
 //
-// would be matched by t.SpaceMatched(str, "<p>", "some text", "</p>").
+// would be matched by
+//
+//	t.SpaceMatched(value, "<p>", "some text", "</p>").
+//
 // SpaceMatched fails the test and returns false iff the matching
 // fails; otherwise true is returned.
-func (t *T) SpaceMatched(str string, ss ...string) bool {
-
+func (t *T) SpaceMatched(value StringRepresentation, ss ...string) bool {
 	t.t.Helper()
-	spaceRe := reGen(`\s*`, "", ss...)
+	spaceRe, str := reGen(`\s*`, "", ss...), toString(value)
 	if !spaceRe.MatchString(str) {
 		t.Errorf(assertErr, "space-match", fmt.Sprintf(
 			matchedErr, spaceRe.String(), str))
@@ -227,34 +282,38 @@ func (t *T) SpaceMatched(str string, ss ...string) bool {
 
 // SpaceMatch passes if called space match assertion with given
 // arguments fails; otherwise if fails.
-func (n *Not) SpaceMatched(str string, ss ...string) bool {
+func (n *Not) SpaceMatched(value StringRepresentation, ss ...string) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
-	passed := n.t.SpaceMatched(str, ss...)
+	passed := n.t.SpaceMatched(value, ss...)
 	n.t.errorer = err
 	if passed {
 		spaceRe := reGen(`\s*`, "", ss...)
-		n.t.Errorf(assertErr, "not: space-match",
-			fmt.Sprintf(notMatchedErr, spaceRe.String(), str))
+		n.t.Errorf(assertErr, "not: space-match", fmt.Sprintf(
+			notMatchedErr, spaceRe.String(), toString(value)))
 		return false
 	}
 	return true
 }
 
 // StarMatched escapes given variadic-strings before it joins them with
-// the `.*?`-separator and matches the result against given string str:
+// the `.*?`-separator and matches the result against given value's
+// string representation, e.g.:
 //
 //	<p>
 //	   some text
 //	</p>
 //
-// would be matched by t.StarMatch(str, "p", "me", "x", "/p").
+// would be matched by
+//
+//	t.StarMatch(str, "p", "me", "x", "/p").
+//
 // SpaceMatched fails the test and returns false iff the matching
 // fails; otherwise true is returned.
-func (t *T) StarMatched(str string, ss ...string) bool {
+func (t *T) StarMatched(value StringRepresentation, ss ...string) bool {
 	t.t.Helper()
-	startRe := reGen(`.*?`, `(?s)`, ss...)
+	startRe, str := reGen(`.*?`, `(?s)`, ss...), toString(value)
 	if !startRe.MatchString(str) {
 		t.Errorf(assertErr, "star-match", fmt.Sprintf(
 			matchedErr, startRe.String(), str))
@@ -265,16 +324,16 @@ func (t *T) StarMatched(str string, ss ...string) bool {
 
 // StarMatched passes if called star match assertion with given
 // arguments fails; otherwise if fails.
-func (n *Not) StarMatched(str string, ss ...string) bool {
+func (n *Not) StarMatched(value StringRepresentation, ss ...string) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
-	passed := n.t.StarMatched(str, ss...)
+	passed := n.t.StarMatched(value, ss...)
 	n.t.errorer = err
 	if passed {
 		startRe := reGen(`.*?`, `(?s)`, ss...)
 		n.t.Errorf(assertErr, "not: star-match", fmt.Sprintf(
-			notMatchedErr, startRe.String(), str))
+			notMatchedErr, startRe.String(), toString(value)))
 		return false
 	}
 	return true
