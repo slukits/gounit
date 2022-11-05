@@ -353,6 +353,14 @@ func watch(
 			return
 		}
 		st := mdl.clone(false)
+		if st.ee == nil {
+			st.ee = map[string]bool{}
+		}
+		diff.ForDel(func(tp *model.TestingPackage) (stop bool) {
+			delete(st.pp, tp.ID())
+			delete(st.ee, tp.ID())
+			return
+		})
 		rslt, n := make(chan *pkg), 0
 		// TODO: since we don't care about the reported package order we
 		// should be able to remove the sorting of them from the model.
@@ -361,25 +369,33 @@ func watch(
 			go run(&pkg{TestingPackage: tp}, st.isOn, rslt)
 			return
 		})
-		if st.ee == nil {
-			st.ee = map[string]bool{}
-		}
+		rerunEE := false
 		for i := 0; i < n; i++ {
 			p := <-rslt
 			st.pp[p.ID()] = p
-			if !p.HasErr() && p.Passed() {
-				if st.ee[p.ID()] {
-					delete(st.ee, p.ID())
-				}
+			if p.HasErr() || !p.Passed() {
+				st.ee[p.ID()] = true
 				continue
 			}
-			st.ee[p.ID()] = true
+			if st.ee[p.ID()] {
+				delete(st.ee, p.ID())
+				if n == 1 && len(st.ee) > 0 {
+					rerunEE = true
+				}
+			}
 		}
-		diff.ForDel(func(tp *model.TestingPackage) (stop bool) {
-			delete(st.pp, tp.ID())
-			delete(st.ee, tp.ID())
-			return
-		})
+		if rerunEE {
+			for ID := range st.ee {
+				go run(st.pp[ID], st.isOn, rslt)
+			}
+			for i := 0; i < len(st.ee); i++ {
+				p := <-rslt
+				if !p.HasErr() && p.Passed() {
+					delete(st.ee, p.ID())
+					p.inf = nil
+				}
+			}
+		}
 		mdl.updateState(st)
 		if afterUpdate != nil {
 			afterUpdate <- true

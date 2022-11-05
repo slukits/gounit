@@ -124,6 +124,7 @@ type report struct {
 
 func (m *report) OnInit(e *lines.Env) {
 	m.FF.Add(lines.Scrollable | lines.LinesSelectable)
+	m.LL.Focus.Trimmed()
 	m.rr[0].For(m, func(idx uint, content string) {
 		fmt.Fprint(e.LL(int(idx)), content)
 	})
@@ -134,7 +135,7 @@ func (m *report) OnInit(e *lines.Env) {
 // focusable.
 func (r *report) OnClick(_ *lines.Env, _, y int) {
 	idx := r.Scroll.CoordinateToIndex(y)
-	if r.listener == nil || y >= r.Len() || !r.LL.By(idx).IsFocusable() {
+	if r.listener == nil || y >= r.Len() || r.LL.By(idx).IsFlagged(lines.NotFocusable) {
 		return
 	}
 	r.listener(idx)
@@ -150,54 +151,55 @@ func (r *report) OnUpdate(e *lines.Env) {
 	r.listener = upd.Listener()
 	upd.For(r, func(idx uint, content string) {
 		lm := upd.LineMask(idx)
-		if lm&Failed > 0 {
-			r.reportFailed(idx, lm, e, content)
-			return
-		}
 		if lm&Focusable == 0 {
-			fmt.Fprint(e.LL(int(idx), lines.NotFocusable), content)
+			idx, indent := int(idx), indent(content)
+			if !r.LL.By(idx).IsFlagged(lines.NotFocusable) {
+				r.LL.By(idx).Switch(lines.NotFocusable)
+			}
+			lines.Print(e.LL(idx).At(0), []rune(content)[:indent])
+			w := e.LL(idx).At(indent)
+			if lm&Failed != 0 {
+				w = w.FG(lines.White).BG(lines.DarkRed)
+			}
+			lines.Print(w, []rune(content)[indent:])
 			return
 		}
-
-		r.passedSelectable(idx, e, content)
+		r.reportFocusable(int(idx), lm, e, content)
 	})
 }
 
-func (r *report) reportFailed(
-	idx uint, lm LineMask, e *lines.Env, content string,
+func (r *report) reportFocusable(
+	idx int, lm LineMask, e *lines.Env, content string,
 ) {
-	sr := lines.SR{Style: e.NewStyle().
-		WithFG(lines.White).WithBG(lines.Red)}
-	for _, r := range content { // find first non-blank
-		if r != ' ' {
-			break
-		}
-		sr.IncrementStart()
+	if r.LL.By(idx).IsFlagged(lines.NotFocusable) {
+		r.LL.By(idx).Switch(lines.NotFocusable)
 	}
-	ff := lines.LineFlags(0)
-	if lm&Focusable == 0 {
-		ff = lines.NotFocusable
-	} else {
-		sr.Style = sr.WithAA(lines.Underline)
+	indent := indent(content)
+	cc := strings.Split(content, lines.Filler)
+	lines.Print(e.LL(idx).At(0), []rune(cc[0][:indent]))
+	w := e.LL(idx).AA(lines.Underline)
+	if lm&Failed != 0 {
+		w = w.FG(lines.White).BG(lines.DarkRed)
 	}
-	spl := strings.Split(content, lines.LineFiller)
-	sr.SetEnd(len(spl[0]))
-	fmt.Fprint(e.LL(int(idx), ff), content)
-	e.AddStyleRange(int(idx), sr)
+	lines.Print(w.At(indent), []rune(cc[0][indent:]))
+	if len(cc) == 1 {
+		return
+	}
+	lines.Print(
+		e.LL(idx).At(len([]rune(cc[0]))),
+		[]rune(lines.Filler+strings.Join(cc[1:], lines.Filler)),
+	)
 }
 
-func (r *report) passedSelectable(idx uint, e *lines.Env, content string) {
-	sr := lines.SR{Style: e.NewStyle().WithAA(lines.Underline)}
+func indent(content string) int {
+	indent := 0
 	for _, r := range content {
 		if r != ' ' {
 			break
 		}
-		sr.IncrementStart()
+		indent++
 	}
-	spl := strings.Split(content, lines.LineFiller)
-	sr.SetEnd(len(spl[0]))
-	fmt.Fprint(e.LL(int(idx)), content)
-	e.AddStyleRange(int(idx), sr)
+	return indent
 }
 
 // OnContext scrolls given reporting component down.  If at bottom it is
@@ -208,7 +210,7 @@ func (r *report) OnContext(e *lines.Env, x, y int) {
 
 // OnRune scrolls given reporting component down iff given rune is the
 // space rune.  If at bottom it is scrolled to the top.
-func (r *report) OnRune(e *lines.Env, rn rune) {
+func (r *report) OnRune(e *lines.Env, rn rune, mm lines.Modifier) {
 	if rn != ' ' {
 		return
 	}

@@ -6,10 +6,10 @@ go 1.19
 
 require (
 	github.com/google/go-cmp v0.5.9
-	github.com/slukits/lines v0.0.0-20221018074510-1a4f4c1e68b3
+	github.com/slukits/lines v0.0.0-20221105221133-0f2a8e7fb3f9
 )
 
-require golang.org/x/exp v0.0.0-20221012211006-4de253d81b95
+require golang.org/x/exp v0.0.0-20221031165847-c99f073a8326
 
 require (
 	github.com/gdamore/encoding v1.0.0 // indirect

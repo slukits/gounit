@@ -213,7 +213,7 @@ func findReportLine(r *report, idx int, lm view.LineMask) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSpace(strings.Split(
-		r.ll[idx], lines.LineFiller)[0]), true
+		r.ll[idx], lines.Filler)[0]), true
 }
 
 // reportPackages reports all packages of watched source directory
@@ -470,7 +470,7 @@ func reportSuite(
 
 func withFoldInfo(content string, tr *model.TestResult) string {
 	return fmt.Sprintf("%s%s%d/%d %s",
-		content, lines.LineFiller, tr.Len(), tr.LenFailed(),
+		content, lines.Filler, tr.Len(), tr.LenFailed(),
 		time.Duration(tr.End.Sub(tr.Start)).Round(1*time.Millisecond))
 }
 
@@ -491,11 +491,11 @@ func reportPackageLine(
 	case true:
 		ss := p.SrcStats()
 		content = fmt.Sprintf("%s%s%d/%d %d/%d/%d  %s",
-			p.ID(), lines.LineFiller, ss.Files, ss.TestFiles,
+			p.ID(), lines.Filler, ss.Files, ss.TestFiles,
 			ss.Code, ss.TestCode, ss.Doc, content)
 	default:
 		content = fmt.Sprintf(
-			"%s%s%s", p.ID(), lines.LineFiller, content)
+			"%s%s%s", p.ID(), lines.Filler, content)
 	}
 	ll = append(ll, content)
 	idx := uint(len(ll) - 1)
@@ -512,7 +512,7 @@ func reportGoTestsLine(
 
 	content := "go-tests"
 	if lm == view.GoTestsFoldedLine {
-		content = fmt.Sprintf("%s%s%d/%d", content, lines.LineFiller, n, f)
+		content = fmt.Sprintf("%s%s%d/%d", content, lines.Filler, n, f)
 	}
 	ll = append(ll, content)
 	idx := uint(len(ll) - 1)
@@ -530,7 +530,7 @@ func reportGoSuiteLine(
 	content := i + r.String()
 	if lm == view.GoSuiteFoldedLine {
 		content = fmt.Sprintf("%s%s%d/%d",
-			content, lines.LineFiller, r.Len(), r.LenFailed())
+			content, lines.Filler, r.Len(), r.LenFailed())
 	}
 	ll = append(ll, content)
 	idx := uint(len(ll) - 1)
@@ -549,7 +549,7 @@ func reportSuiteLine(
 	r := p.OfSuite(s)
 	if lm == view.SuiteFoldedLine {
 		content = fmt.Sprintf("%s%s%d/%d", content,
-			lines.LineFiller, r.Len(), r.LenFailed())
+			lines.Filler, r.Len(), r.LenFailed())
 	}
 	ll = append(ll, content)
 	idx := uint(len(ll) - 1)
@@ -565,7 +565,7 @@ func reportTestLine(
 ) (rprLines, linesMask) {
 	ll = append(ll, fmt.Sprintf("%s%s",
 		i+r.String(),
-		lines.LineFiller))
+		lines.Filler))
 	idx := uint(len(ll) - 1)
 	llMask[idx] = view.TestLine
 	if !r.Passed {
@@ -580,9 +580,7 @@ func reportSubTestLine(
 	if r == nil {
 		return ll, llMask
 	}
-	ll = append(ll, fmt.Sprintf("%s%s",
-		i+r.String(),
-		lines.LineFiller))
+	ll = append(ll, i+r.String())
 	idx := uint(len(ll) - 1)
 	llMask[idx] = view.TestLine
 	if !r.Passed {
@@ -733,12 +731,15 @@ func newStatus(pp pkgs, om onMask) *view.Statuser {
 	// count suites, tests and failed tests
 	ssLen, ttLen, ffLen := 0, 0, 0
 	cf, tf, cl, tl, dl := 0, 0, 0, 0, 0
-	n, rslt := 0, make(chan *statusCount)
+	n, rslt, hasErr := 0, make(chan *statusCount), false
 	sourceStats := om&statsOn == statsOn
 	for _, p := range pp {
 		n++
 		go func(p *pkg, srcStt bool, rslt chan *statusCount) {
 			n, f, s, _ := p.info()
+			if p.HasErr() && !hasErr {
+				hasErr = true
+			}
 			sc := statusCount{ssLen: s, ttLen: n, ffLen: f}
 			if srcStt {
 				ss := p.SrcStats()
@@ -765,6 +766,7 @@ func newStatus(pp pkgs, om onMask) *view.Statuser {
 		}
 	}
 	return &view.Statuser{
+		HasError:  hasErr,
 		Packages:  len(pp),
 		Suites:    ssLen,
 		Tests:     ttLen,

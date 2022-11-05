@@ -122,14 +122,14 @@ func defaultButtons(l func(string)) *buttoner {
 }
 
 const (
-	bttRaceOff    = "race=off"
-	bttRaceOn     = "race=on"
-	bttVetOff     = "vet=off"
-	bttVetOn      = "vet=on"
-	bttStatsOff   = "stats=off"
-	bttStatsOn    = "stats=on"
-	bttCurrentOff = "current=off"
-	bttCurrentOn  = "current=on"
+	bttRaceOff  = "race=off"
+	bttRaceOn   = "race=on"
+	bttVetOff   = "vet=off"
+	bttVetOn    = "vet=on"
+	bttStatsOff = "stats=off"
+	bttStatsOn  = "stats=on"
+	// bttCurrentOff = "current=off"
+	// bttCurrentOn  = "current=on"
 )
 
 func switchButtons(on onMask, l func(string)) *buttoner {
@@ -140,7 +140,7 @@ func switchButtons(on onMask, l func(string)) *buttoner {
 			{Label: bttVetOff, Rune: 'v'},
 			{Label: bttRaceOff, Rune: 'r'},
 			{Label: bttStatsOff, Rune: 's'},
-			{Label: bttCurrentOff, Rune: 'c'},
+			// {Label: bttCurrentOff, Rune: 'c'},
 			{Label: "back", Rune: 'b'},
 		},
 	}

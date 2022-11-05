@@ -455,7 +455,7 @@ func (m *watcherMock) Watch() (
 
 type linesTest struct {
 	ee *lines.Lines
-	tt *lines.Testing
+	tt *lines.Fixture
 }
 
 // fixtureSetter provides implements a method to store a fixture which

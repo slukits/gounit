@@ -23,11 +23,14 @@ import (
 // whereas t is an *gounit.T and i and view.Initier implementation.
 type Testing struct {
 	T *gounit.T
-	*lines.Testing
+	*lines.Fixture
 	*view
 
 	// ReportCmp provides a view's reporting component.
 	ReportCmp *report
+
+	// MsgCmp provides a view's message bar component.
+	MsgCmp *messageBar
 
 	// Cmp provides the embedded Component of a view's root component.
 	Cmp *lines.Component
@@ -68,8 +71,9 @@ func Fixture(t *gounit.T, timeout time.Duration, i Initer) *Testing {
 		vw = New(&fxInit{t: t, tt: tt, initer: i})
 	}
 	tt.view = vw
-	tt.Testing = lines.TermFixture(t.GoT(), timeout, vw)
+	tt.Fixture = lines.TermFixture(t.GoT(), timeout, vw)
 	tt.ReportCmp = tt.getReporting()
+	tt.MsgCmp = tt.getMessageBar()
 	tt.Cmp = &vw.Component
 	return tt
 }
@@ -86,7 +90,7 @@ func FixtureFor(
 			"got: %T", vw)
 	}
 	return &Testing{T: t,
-		Testing:         lines.TermFixture(t.GoT(), timeout, vw),
+		Fixture:         lines.TermFixture(t.GoT(), timeout, vw),
 		view:            _vw,
 		UpdateMessage:   _vw.updateMessageBar,
 		UpdateReporting: _vw.updateLines,
@@ -201,6 +205,20 @@ func (fx *Testing) TwoPointFiveTimesReportedLines() (int, string) {
 }
 
 const notEnough = "gounit: view: fixture: not enough ui components"
+
+func (t *Testing) getMessageBar() *messageBar {
+	if len(t.CC) < 1 {
+		t.T.Fatal(notEnough)
+		return nil
+	}
+	rp, ok := t.CC[0].(*messageBar)
+	if !ok {
+		t.T.Fatal("gounit: view: fixture: " +
+			"expected first component to be a message bar")
+		return nil
+	}
+	return rp
+}
 
 func (t *Testing) getReporting() *report {
 	if len(t.CC) < 2 {

@@ -67,12 +67,9 @@ func (s *AView) Is_quit_able(t *T) {
 }
 
 func (s *AView) Updates_message_bar_with_given_message(t *T) {
-	tt := Fixture(t, 0, nil)
-	exp := "updated message"
-
+	tt, exp := Fixture(t, 0, nil), "updated message"
 	tt.UpdateMessage(exp)
-
-	t.Contains(tt.Screen().String(), exp)
+	t.Eq(exp, tt.ScreenOf(tt.MsgCmp).Trimmed())
 }
 
 func (s *AView) Resets_message_bar_to_default_if_zero_update(t *T) {
@@ -124,7 +121,7 @@ func (s *AView) Status_has_red_background_if_failing(t *T) {
 
 	l1 := sb[1]
 	for i := range l1 {
-		t.True(l1.HasBG(i, lines.Red))
+		t.True(l1.HasBG(i, lines.DarkRed))
 	}
 }
 

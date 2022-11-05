@@ -91,7 +91,7 @@ func (s *Report) lineIsFailing(l lines.CellsLine) bool {
 		if c.Rune == ' ' {
 			continue
 		}
-		return l.HasBG(i, lines.Red)
+		return l.HasBG(i, lines.DarkRed)
 	}
 	return false
 }

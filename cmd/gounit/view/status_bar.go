@@ -13,6 +13,9 @@ import (
 // Statuser instance passed to the provided status bar updater at
 // initialization time
 type Statuser struct {
+	// HasError indicates that a package's test run failed without
+	// executing its tests, e.g. a compile error.
+	HasError bool
 	// Str is a status-bar string superseding all other status
 	// information.
 	Str string
@@ -47,6 +50,7 @@ type Statuser struct {
 
 type statusBar struct {
 	lines.Component
+	hasError bool
 	// np packages count
 	np int
 	// ns suites count
@@ -79,6 +83,7 @@ func (sb *statusBar) OnUpdate(e *lines.Env) {
 		fmt.Fprint(e.BG(sb.bg()).FG(sb.fg()).LL(1), s.Str)
 		return
 	}
+	sb.hasError = s.HasError
 	sb.np = s.Packages
 	sb.ns = s.Suites
 	sb.nt = s.Tests
@@ -88,7 +93,7 @@ func (sb *statusBar) OnUpdate(e *lines.Env) {
 	sb.nc = s.Lines
 	sb.nct = s.TestLines
 	sb.nd = s.DocLines
-	fmt.Fprint(e.BG(sb.bg()).FG(sb.fg()).LL(1), sb.str())
+	fmt.Fprint(e.LL(1).BG(sb.bg()).FG(sb.fg()), sb.str())
 }
 
 const dfltStatus = "pkgs/suites: %d/%d; tests: %d/%d"
@@ -105,14 +110,14 @@ func (sb *statusBar) str() string {
 }
 
 func (sb *statusBar) bg() lines.Color {
-	if sb.nf > 0 {
-		return lines.Red
+	if sb.nf > 0 || sb.hasError {
+		return lines.DarkRed
 	}
 	return lines.Green
 }
 
 func (sb *statusBar) fg() lines.Color {
-	if sb.nf > 0 {
+	if sb.nf > 0 || sb.hasError {
 		return lines.White
 	}
 	return lines.Black

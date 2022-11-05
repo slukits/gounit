@@ -218,6 +218,7 @@ const (
 // the test files separately and then match the findings to the result
 // of the test run.
 func (tp *TestingPackage) Run(rm RunMask) (*Results, error) {
+	tp.parsed = false
 	ctx, cancel := context.WithTimeout(
 		context.Background(), tp.Timeout)
 	defer cancel()

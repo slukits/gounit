@@ -37,7 +37,7 @@ func (t *T) TODO() bool {
 }
 
 // notTrueErr default message for failed 'false'-assertion.
-const notTrueErr = "expected given value be not true"
+const notTrueErr = "expected given value be false"
 
 // True passes if called true assertion with given argument fails;
 // otherwise if fails.
@@ -470,18 +470,8 @@ func (t *T) Within(d *TimeStepper, cond func() bool) (fulfilled bool) {
 		t.Errorf(assertErr, "within", withinErr)
 		return false
 	}
-	// select {
-	// case success := <-done:
-	// 	if success {
-	// 		return
-	// 	}
-	// 	t.Errorf(assertErr, "within", withinErr)
-	// 	return false
-	// case <-t.Timeout(2 * d.Duration()):
-	// 	panic("gounit: within: should have concluded by now")
-	// }
 	return true
 }
 
 // assertErr is the format-string for assertion errors.
-const assertErr = "assert %s: %v"
+const assertErr = "assert %s:%v"
