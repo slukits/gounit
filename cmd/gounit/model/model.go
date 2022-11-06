@@ -368,9 +368,6 @@ func reportDiffs(
 	ww map[uint64]*watcher,
 	timeout time.Duration,
 ) {
-	if len(snapshot.pp) == 0 {
-		return
-	}
 
 	for _, w := range ww {
 		// w.diff has a 1-buffer which is drained ...
