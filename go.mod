@@ -2,14 +2,14 @@ module github.com/slukits/gounit
 
 go 1.19
 
-// replace github.com/slukits/lines => /home/goedel/go/src/github.com/slukits/lines
+replace github.com/slukits/lines => /home/goedel/go/src/github.com/slukits/lines
 
 require (
 	github.com/google/go-cmp v0.5.9
-	github.com/slukits/lines v0.0.0-20221105221133-0f2a8e7fb3f9
+	github.com/slukits/lines v0.0.0-20221106130544-f947afa3809b
 )
 
-require golang.org/x/exp v0.0.0-20221031165847-c99f073a8326
+require golang.org/x/exp v0.0.0-20221106115401-f9659909a136
 
 require (
 	github.com/gdamore/encoding v1.0.0 // indirect

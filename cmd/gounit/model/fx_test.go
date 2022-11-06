@@ -281,6 +281,14 @@ func (x *ModuleFX) packageNameOf(n int) string {
 // but it suffices for evaluating tests-parsing results and source
 // statistics.
 func createFixturePkg(t *gounit.T, testDataDir string) *TestingPackage {
+	tp, _ := fixturePkgTmpDir(t, testDataDir)
+	return tp
+}
+
+func fixturePkgTmpDir(
+	t *gounit.T, testDataDir string,
+) (*TestingPackage, *tfs.Dir) {
+
 	testData, _ := t.FS().Data()
 	tmp := t.FS().Tmp()
 	testData.Child(testDataDir).Copy(tmp)
@@ -292,5 +300,5 @@ func createFixturePkg(t *gounit.T, testDataDir string) *TestingPackage {
 	}
 	tt, err := pkgStats.loadTestFiles()
 	t.FatalOn(err)
-	return &TestingPackage{abs: pkgStats.abs, files: tt}
+	return &TestingPackage{abs: pkgStats.abs, files: tt}, tmp
 }

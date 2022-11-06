@@ -35,7 +35,7 @@ import (
 type Testing struct {
 
 	// testing instance of gounit's view.
-	*view.Testing
+	*view.Fixture
 
 	// mutex protecting the access and update of afterWatch.
 	*sync.Mutex
@@ -402,11 +402,11 @@ func fxInit(
 		i.watch = ct._fxWatchMock
 	}
 	i.Events = func(c lines.Componenter) *lines.Lines {
-		timeout := 10 * time.Second
+		timeout := 20 * time.Second
 		if i.dbgTimeouts {
 			timeout = 20 * time.Minute
 		}
-		ct.Testing = view.FixtureFor(t, timeout, c)
+		ct.Fixture = view.NewFixtureFor(t, timeout, c)
 		ct.Lines.OnQuit(func() {
 			if ct._quitWatching != nil {
 				ct._quitWatching.QuitAll()

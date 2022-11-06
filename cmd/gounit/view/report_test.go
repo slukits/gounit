@@ -18,8 +18,8 @@ type Reporting struct {
 
 func (s *Reporting) SetUp(t *T) { t.Parallel() }
 
-func (s *Reporting) fx(t *T) *Testing {
-	return Fixture(t, 0, nil)
+func (s *Reporting) fx(t *T) *Fixture {
+	return NewFixture(t, 0, nil)
 }
 
 func (s *Reporting) Component_is_initially_focused(t *T) {

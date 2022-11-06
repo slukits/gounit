@@ -23,12 +23,12 @@ func (s *_test) SetUp(t *T) { t.Parallel() }
 // fx creates and returns a new view fixture and in case of a given
 // string pointer test-error reporting is mocked up to report to given
 // string pointer.
-func (s *_test) fx(t *T, str *string, i ...Initer) *Testing {
-	var tt *Testing
+func (s *_test) fx(t *T, str *string, i ...Initer) *Fixture {
+	var tt *Fixture
 	if len(i) == 0 {
-		tt = Fixture(t, 0, nil)
+		tt = NewFixture(t, 0, nil)
 	} else {
-		tt = Fixture(t, 0, i[0])
+		tt = NewFixture(t, 0, i[0])
 	}
 
 	if str != nil {
@@ -155,14 +155,14 @@ func (s *_test) Fails_button_bar_click_if_not_forth_cmp(t *T) {
 }
 
 func (s *_test) Clicks_requested_button(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 
 	tt.ClickButton(fxBtt2)
 	t.Eq(tt.ReportedButton, fxBtt2)
 }
 
 func (s *_test) Clicks_requested_reporting_line(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	tt.Lines.Update(tt.ReportCmp, nil, func(e *lines.Env) {
 		fmt.Fprint(e, "first\nsecond\nthird")
 	})
@@ -172,28 +172,28 @@ func (s *_test) Clicks_requested_reporting_line(t *T) {
 }
 
 func (s *_test) Updates_message_bar(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	t.Not.Contains(tt.MessageBarCells(), "updated msg")
 	tt.UpdateMessage("updated msg")
 	t.True(t.Contains(tt.MessageBarCells(), "updated msg"))
 }
 
 func (s *_test) Updates_reporting_component(t *T) {
-	tt, exp := Fixture(t, 0, nil), "first\nseconde\nthird"
+	tt, exp := NewFixture(t, 0, nil), "first\nseconde\nthird"
 	t.Not.SpaceMatched(tt.ReportCells(), exp)
 	tt.UpdateReporting(&reporterFX{content: exp})
 	t.SpaceMatched(tt.ReportCells(), exp)
 }
 
 func (s *_test) Updates_status_bar(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	t.Not.Contains(tt.StatusBarCells(), "updated status")
 	tt.UpdateStatus(Statuser{Str: "updated status"})
 	t.True(t.Contains(tt.StatusBarCells(), "updated status"))
 }
 
 func (s *_test) Updates_buttons(t *T) {
-	tt, exp := Fixture(t, 0, nil), []string{"[e]ins", "[z]wei", "[d]rei"}
+	tt, exp := NewFixture(t, 0, nil), []string{"[e]ins", "[z]wei", "[d]rei"}
 	t.Not.SpaceMatched(tt.ButtonBarCells(), exp...)
 	tt.UpdateButtons(&buttonerFX{
 		newBB: []ButtonDef{

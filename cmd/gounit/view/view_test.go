@@ -18,22 +18,22 @@ type ANewViewDisplaysInitiallyGiven struct{ Suite }
 func (s *ANewViewDisplaysInitiallyGiven) SetUp(t *T) { t.Parallel() }
 
 func (s *ANewViewDisplaysInitiallyGiven) Message(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	t.Contains(tt.Screen(), fxMsg)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Status(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	t.Contains(tt.Screen(), fxStatus)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Main_info(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	t.Contains(tt.Screen(), fxReporting)
 }
 
 func (s *ANewViewDisplaysInitiallyGiven) Buttons(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	t.Contains(tt.Screen(), fxBtt1)
 	t.Contains(tt.Screen(), fxBtt2)
 }
@@ -50,7 +50,7 @@ type AView struct {
 func (s *AView) SetUp(t *T) { t.Parallel() }
 
 func (s *AView) Sets_its_width_to_80_if_screen_bigger(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	tt.FireResize(120, 24)
 
 	tt.Lines.Update(tt.Cmp, nil, func(e *lines.Env) {
@@ -59,7 +59,7 @@ func (s *AView) Sets_its_width_to_80_if_screen_bigger(t *T) {
 }
 
 func (s *AView) Is_quit_able(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 
 	tt.Lines.Update(tt.Cmp, nil, func(e *lines.Env) {
 		t.True(tt.Cmp.FF.Has(lines.Quitable))
@@ -67,13 +67,13 @@ func (s *AView) Is_quit_able(t *T) {
 }
 
 func (s *AView) Updates_message_bar_with_given_message(t *T) {
-	tt, exp := Fixture(t, 0, nil), "updated message"
+	tt, exp := NewFixture(t, 0, nil), "updated message"
 	tt.UpdateMessage(exp)
 	t.Eq(exp, tt.ScreenOf(tt.MsgCmp).Trimmed())
 }
 
 func (s *AView) Resets_message_bar_to_default_if_zero_update(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	exp := "updated message"
 
 	tt.UpdateMessage(exp)
@@ -84,14 +84,14 @@ func (s *AView) Resets_message_bar_to_default_if_zero_update(t *T) {
 }
 
 func (s *AView) Updates_statusbar_with_given_string(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	exp := Statuser{Str: "updated status"}
 	tt.UpdateStatus(exp)
 	t.Contains(tt.Screen(), exp.Str)
 }
 
 func (s *AView) Updates_statusbar_with_given_numbers(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	exp := Statuser{Packages: 1, Suites: 2, Tests: 5, Failed: 2}
 
 	tt.UpdateStatus(exp)
@@ -100,7 +100,7 @@ func (s *AView) Updates_statusbar_with_given_numbers(t *T) {
 }
 
 func (s *AView) Status_has_green_background_if_not_failing(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	tt.UpdateStatus(Statuser{
 		Packages: 1, Suites: 2, Tests: 5, Failed: 0})
 	sb := tt.StatusBarCells()
@@ -113,7 +113,7 @@ func (s *AView) Status_has_green_background_if_not_failing(t *T) {
 }
 
 func (s *AView) Status_has_red_background_if_failing(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	tt.UpdateStatus(Statuser{
 		Packages: 1, Suites: 2, Tests: 5, Failed: 2})
 	sb := tt.StatusBarCells()
@@ -145,7 +145,7 @@ func (s *AView) Fails_buttons_init_if_ambiguous_labels(t *T) {
 			errReported = true
 		},
 	}
-	Fixture(t, 0, fx)
+	NewFixture(t, 0, fx)
 	t.True(errReported)
 }
 
@@ -170,12 +170,12 @@ func (s *AView) Fails_buttons_init_if_ambiguous_event_runes(t *T) {
 			errReported = true
 		},
 	}
-	Fixture(t, 0, fx)
+	NewFixture(t, 0, fx)
 	t.True(errReported)
 }
 
 func (s *AView) Reports_button_clicks(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 
 	tt.ClickButton(fxBtt1)
 	t.Eq(tt.ReportedButton, fxBtt1)
@@ -188,7 +188,7 @@ func (s *AView) Reports_button_clicks(t *T) {
 }
 
 func (s *AView) Reports_button_runes(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 
 	tt.FireRune(fxRnBtt1)
 	t.Eq(tt.ReportedButton, fxBtt1)
@@ -201,7 +201,7 @@ func (s *AView) Reports_button_runes(t *T) {
 }
 
 func (s *AView) Fails_a_buttons_update_if_ambiguous_label_given(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	tt.UpdateButtons(
 		&buttonerFX{
 			updBB: map[string]ButtonDef{fxBtt1: {Label: fxBtt2}},
@@ -213,7 +213,7 @@ func (s *AView) Fails_a_buttons_update_if_ambiguous_label_given(t *T) {
 }
 
 func (s *AView) Fails_a_buttons_update_if_ambiguous_rune_given(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	tt.UpdateButtons(
 		&buttonerFX{
 			updBB: map[string]ButtonDef{
@@ -225,7 +225,7 @@ func (s *AView) Fails_a_buttons_update_if_ambiguous_rune_given(t *T) {
 }
 
 func (s *AView) Removes_button_rune_on_zero_rune_update(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	tt.FireRune(fxRnBtt1)
 	t.Eq(tt.ReportedButton, fxBtt1)
 	tt.ReportedButton = ""
@@ -237,7 +237,7 @@ func (s *AView) Removes_button_rune_on_zero_rune_update(t *T) {
 }
 
 func (s *AView) Updates_button_rune(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 
 	// rune no-op for coverage
 	tt.UpdateButtons(&buttonerFX{
@@ -254,7 +254,7 @@ func (s *AView) Updates_button_rune(t *T) {
 }
 
 func (s *AView) Replaces_its_buttons(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	upd1, upd2 := false, false
 
 	tt.UpdateButtons(&buttonerFX{
@@ -278,7 +278,7 @@ func (s *AView) Replaces_its_buttons(t *T) {
 }
 
 func (s *AView) Updates_its_reporting_content(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	exp := "first\n\nthird\nforth"
 
 	tt.UpdateReporting(&reporterFX{content: ""}) // no-op, coverage
@@ -288,7 +288,7 @@ func (s *AView) Updates_its_reporting_content(t *T) {
 }
 
 func (s *AView) Clears_unused_main_lines(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	exp := "first line\nsecond\nthird\nforth\nfifth"
 	tt.UpdateReporting(&reporterFX{content: exp})
 	t.SpaceMatched(tt.Screen().String(), strings.Split(exp, "\n")...)
@@ -303,7 +303,7 @@ func (s *AView) Clears_unused_main_lines(t *T) {
 }
 
 func (s *AView) Reports_click_in_reporting_component(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	tt.Lines.Update(tt.ReportCmp, nil, func(e *lines.Env) {
 		fmt.Fprint(e, "first\n\nsecond\nthird")
 	})
@@ -313,7 +313,7 @@ func (s *AView) Reports_click_in_reporting_component(t *T) {
 }
 
 func (s *AView) Reporting_component_scrolls_on_context(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 
 	nLines, _ := tt.TwoPointFiveTimesReportedLines()
 	scr := tt.ScreenOf(tt.ReportCmp).Trimmed()
@@ -327,7 +327,7 @@ func (s *AView) Reporting_component_scrolls_on_context(t *T) {
 }
 
 func (s *AView) Reporting_component_at_bottom_scrolls_to_top(t *T) {
-	tt := Fixture(t, 0, nil)
+	tt := NewFixture(t, 0, nil)
 	_, LastLine := tt.TwoPointFiveTimesReportedLines()
 	firstLine := tt.ScreenOf(tt.ReportCmp).Trimmed()[0]
 

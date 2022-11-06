@@ -474,4 +474,4 @@ func (t *T) Within(d *TimeStepper, cond func() bool) (fulfilled bool) {
 }
 
 // assertErr is the format-string for assertion errors.
-const assertErr = "assert %s:%v"
+const assertErr = "assert %s:\n%v"

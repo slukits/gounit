@@ -14,14 +14,14 @@ import (
 	"github.com/slukits/lines"
 )
 
-// Testing augments a view-instance with functionality useful for
-// testing but not meant for production.  A Testing-view instance may be
+// Fixture augments a view-instance with functionality useful for
+// testing but not meant for production.  A Fixture-view instance may be
 // initialized by
 //
-//	tt := view.Testing{t, view.New(i)}
+//	tt := view.Fixture{t, view.New(i)}
 //
 // whereas t is an *gounit.T and i and view.Initier implementation.
-type Testing struct {
+type Fixture struct {
 	T *gounit.T
 	*lines.Fixture
 	*view
@@ -59,11 +59,11 @@ type Testing struct {
 	ReportedLine int
 }
 
-// Fixture creates a new view testing fixture instance embedding created
+// NewFixture creates a new view testing fixture instance embedding created
 // view and lines.Testing-instance and augmenting their methods with
 // some convenience methods for testing.
-func Fixture(t *gounit.T, timeout time.Duration, i Initer) *Testing {
-	tt := &Testing{T: t}
+func NewFixture(t *gounit.T, timeout time.Duration, i Initer) *Fixture {
+	tt := &Fixture{T: t}
 	var vw *view
 	if i == nil {
 		vw = New(&fxInit{t: t, tt: tt})
@@ -81,15 +81,15 @@ func Fixture(t *gounit.T, timeout time.Duration, i Initer) *Testing {
 // Fixture creates a new view testing fixture instance embedding created
 // view and lines.Testing-instance and augmenting their methods with
 // some convenience methods for testing.
-func FixtureFor(
+func NewFixtureFor(
 	t *gounit.T, timeout time.Duration, vw lines.Componenter,
-) *Testing {
+) *Fixture {
 	_vw, ok := vw.(*view)
 	if !ok {
 		t.Fatalf("view: fixture for: expect componenter of type view "+
 			"got: %T", vw)
 	}
-	return &Testing{T: t,
+	return &Fixture{T: t,
 		Fixture:         lines.TermFixture(t.GoT(), timeout, vw),
 		view:            _vw,
 		UpdateMessage:   _vw.updateMessageBar,
@@ -102,7 +102,7 @@ func FixtureFor(
 // ClickButton clicks the button in the button-bar with given label.
 // ClickButton does not return before subsequent view-changes triggered
 // by requested button click are processed.
-func (t *Testing) ClickButton(label string) {
+func (t *Fixture) ClickButton(label string) {
 	t.T.GoT().Helper()
 	bb := t.getButtonBar()
 	if bb == nil {
@@ -122,7 +122,7 @@ func (t *Testing) ClickButton(label string) {
 // reporting component.  ClickReporting does not return before
 // subsequent view-changes triggered by requested reporting click are
 // processed.
-func (t *Testing) ClickReporting(idx int) {
+func (t *Fixture) ClickReporting(idx int) {
 	rp := t.getReporting()
 	if rp == nil {
 		return
@@ -131,7 +131,7 @@ func (t *Testing) ClickReporting(idx int) {
 }
 
 // MessageBarCells returns the test-screen portion of the message bar.
-func (t *Testing) MessageBarCells() lines.CellsScreen {
+func (t *Fixture) MessageBarCells() lines.CellsScreen {
 	if len(t.CC) < 1 {
 		t.T.Fatal("gounit: view: fixture: no ui components")
 		return nil
@@ -146,7 +146,7 @@ func (t *Testing) MessageBarCells() lines.CellsScreen {
 }
 
 // ReportCells returns the test-screen portion of the reporting component.
-func (t *Testing) ReportCells() lines.CellsScreen {
+func (t *Fixture) ReportCells() lines.CellsScreen {
 	rp := t.getReporting()
 	if rp == nil {
 		return nil
@@ -155,7 +155,7 @@ func (t *Testing) ReportCells() lines.CellsScreen {
 }
 
 // StatusBarCells returns the test-screen portion of the status bar.
-func (t *Testing) StatusBarCells() lines.CellsScreen {
+func (t *Fixture) StatusBarCells() lines.CellsScreen {
 	if len(t.CC) < 3 {
 		t.T.Fatal(notEnough)
 		return nil
@@ -170,7 +170,7 @@ func (t *Testing) StatusBarCells() lines.CellsScreen {
 }
 
 // ButtonBarCells returns the test-screen portion of the button bar.
-func (t *Testing) ButtonBarCells() lines.CellsScreen {
+func (t *Fixture) ButtonBarCells() lines.CellsScreen {
 	bb := t.getButtonBar()
 	if bb == nil {
 		return nil
@@ -180,7 +180,7 @@ func (t *Testing) ButtonBarCells() lines.CellsScreen {
 
 // TwoPointFiveTimesReportedLines fills the reporting area with 2.5
 // times the displayed lines.  Handy for scrolling tests.
-func (fx *Testing) TwoPointFiveTimesReportedLines() (int, string) {
+func (fx *Fixture) TwoPointFiveTimesReportedLines() (int, string) {
 	len, lastLine := 0, ""
 	fx.UpdateReporting(&reporterFX{f: func(
 		r lines.Componenter, f func(uint, string),
@@ -206,7 +206,7 @@ func (fx *Testing) TwoPointFiveTimesReportedLines() (int, string) {
 
 const notEnough = "gounit: view: fixture: not enough ui components"
 
-func (t *Testing) getMessageBar() *messageBar {
+func (t *Fixture) getMessageBar() *messageBar {
 	if len(t.CC) < 1 {
 		t.T.Fatal(notEnough)
 		return nil
@@ -220,7 +220,7 @@ func (t *Testing) getMessageBar() *messageBar {
 	return rp
 }
 
-func (t *Testing) getReporting() *report {
+func (t *Fixture) getReporting() *report {
 	if len(t.CC) < 2 {
 		t.T.Fatal(notEnough)
 		return nil
@@ -234,7 +234,7 @@ func (t *Testing) getReporting() *report {
 	return rp
 }
 
-func (t *Testing) getButtonBar() *buttonBar {
+func (t *Fixture) getButtonBar() *buttonBar {
 	if len(t.CC) < 4 {
 		t.T.Fatal(notEnough)
 		return nil
@@ -248,18 +248,18 @@ func (t *Testing) getButtonBar() *buttonBar {
 	return bb
 }
 
-func (t *Testing) defaultButtonListener(label string) {
+func (t *Fixture) defaultButtonListener(label string) {
 	t.ReportedButton = label
 }
 
-func (t *Testing) defaultReportListener(idx int) {
+func (t *Fixture) defaultReportListener(idx int) {
 	t.ReportedLine = idx
 }
 
 type fxInit struct {
 	t      *gounit.T
 	initer Initer
-	tt     *Testing
+	tt     *Fixture
 
 	// fatal is provided to the view to report fatal errors; it defaults
 	// to log.Fatal
