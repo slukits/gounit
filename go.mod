@@ -2,7 +2,7 @@ module github.com/slukits/gounit
 
 go 1.19
 
-replace github.com/slukits/lines => /home/goedel/go/src/github.com/slukits/lines
+// replace github.com/slukits/lines => /home/goedel/go/src/github.com/slukits/lines
 
 require (
 	github.com/google/go-cmp v0.5.9
