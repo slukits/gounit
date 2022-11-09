@@ -40,6 +40,28 @@ func (s *Buttons) Switch_to_switches_if_switches_selected(t *T) {
 	t.SpaceMatched(tt.ButtonBarCells(), switchBttFX...)
 }
 
+// type dbg struct{ Suite }
+//
+// func (s *dbg) fx(t *T) *Testing {
+// 	return fxDBG(t)
+// }
+//
+// func (s *dbg) Dbg(t *T) {
+// 	tt := s.fx(t)
+// 	t.SpaceMatched(tt.ButtonBarCells(), dfltBttFX...)
+//
+// 	tt.ClickButton("switches")
+// 	t.SpaceMatched(tt.ButtonBarCells(), switchBttFX...)
+//
+// 	tt.ClickButton("back")
+// 	t.SpaceMatched(tt.ButtonBarCells(), dfltBttFX...)
+//
+// 	tt.FireRune('s')
+// 	t.SpaceMatched(tt.ButtonBarCells(), switchBttFX...)
+// }
+//
+// func TestDBG(t *testing.T) { Run(&dbg{}, t) }
+
 func (s *Buttons) Switches_vet_button(t *T) {
 	tt := s.fx(t)
 	tt.ClickButton("switches")

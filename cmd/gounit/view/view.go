@@ -28,7 +28,7 @@ gounit's terminal user interface.
 	|                                                                  |
 	| packages: n; tests: t/f; stat: c/t d                             |
 	+------------------------------------------------------------------+
-	|      [v]et=off      [r]ace=off      [s]tats=off      [m]ore      |
+	|    [s]witches=off     [h]help=off     [a]bout=off      [q]uit    |
 	+------------------------------------------------------------------+
 
 Note: the actual ui has no frames.
@@ -134,7 +134,7 @@ func (v *view) OnInit(e *lines.Env) {
 	if err := e.Lines.Focus(v.reporting()); err != nil {
 		v.fatal(fmt.Sprintf("gounit: view: move focus: %v", err))
 	}
-	width, _ := e.DisplaySize()
+	width, _ := e.ScreenSize()
 	if width > 80 {
 		v.Dim().SetWidth(80)
 	}
@@ -143,13 +143,13 @@ func (v *view) OnInit(e *lines.Env) {
 func (v *view) reporting() lines.Componenter { return v.CC[1] }
 
 func (v *view) OnLayout(e *lines.Env) {
-	width, _ := e.DisplaySize()
+	width, _ := e.ScreenSize()
 	if width > 80 {
 		v.Dim().SetWidth(80)
 	}
 }
 
-func (v *view) OnRune(_ *lines.Env, r rune, m lines.Modifier) {
+func (v *view) OnRune(_ *lines.Env, r rune, m lines.ModifierMask) {
 	b, ok := v.runeButtons[r]
 	if !ok || b.listener == nil {
 		return

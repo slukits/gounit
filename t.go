@@ -83,34 +83,34 @@ func (t *T) Mock() *TMock {
 // GoT returns a pointer to wrapped testing.T instance which usually was
 // created by the testing.T-runner of the suite-runner's testing.T
 // instance.
-func (t *T) GoT() *testing.T { return t.t }
+func (t T) GoT() *testing.T { return t.t }
 
 // Log writes given arguments to set logger which defaults to the logger
-// of wrapped testing.T instance.  The default may be overwritten by a
-// suite-embedder implementing the [SuiteLogging] interface or
+// of wrapped testing.T instance.  The default is superseded by a
+// suite-embedder implementing the [SuiteLogger] interface or by
 // leveraging [T.Mock].
-func (t *T) Log(args ...interface{}) {
+func (t T) Log(args ...interface{}) {
 	t.t.Helper()
 	t.logger(args...)
 }
 
-// Logf writes given format string leveraging Sprintf to set logger which
-// defaults to the logger of wrapped testing.T instance.  The default
-// may be overwritten by a suite-embedder implementing the [SuiteLogging]
-// interface or leveraging [T.Mock].
-func (t *T) Logf(format string, args ...interface{}) {
+// Logf writes given format string to set logger which defaults to the
+// logger of wrapped testing.T instance.  The default is superseded by a
+// suite-embedder implementing the [SuiteLogger] interface or by
+// leveraging [T.Mock].
+func (t T) Logf(format string, args ...interface{}) {
 	t.Log(fmt.Sprintf(format, args...))
 }
 
 // Parallel signals that this test may be run in parallel with other
 // parallel flagged tests.
-func (t *T) Parallel() { t.t.Parallel() }
+func (t T) Parallel() { t.t.Parallel() }
 
 // Error logs given arguments and flags test as failed but continues its
 // execution.  t's errorer defaults to a Error-call of a wrapped
 // testing.T instance and may be overwritten for a test-suite by
 // implementing [SuiteErrorer] or leveraging [T.Mock].
-func (t *T) Error(args ...interface{}) {
+func (t T) Error(args ...interface{}) {
 	t.t.Helper()
 	t.errorer(args...)
 }
@@ -119,7 +119,7 @@ func (t *T) Error(args ...interface{}) {
 // as failed but continues its execution.  t's errorer defaults to a
 // Error-call of a wrapped testing.T instance and may be overwritten for
 // a test-suite by implementing [SuiteErrorer] or leveraging [T.Mock].
-func (t *T) Errorf(format string, args ...interface{}) {
+func (t T) Errorf(format string, args ...interface{}) {
 	t.t.Helper()
 	t.Error(fmt.Sprintf(format, args...))
 }
@@ -136,9 +136,9 @@ func (t *T) FailNow() {
 	t.canceler()
 }
 
-// FatalIfNot cancels receiving test (see [T.FailNow]) if passed argument
-// is false and is a no-op otherwise.
-func (t *T) FatalIfNot(assertion bool) {
+// FatalIfNot cancels the test execution (see [T.FailNow]) if passed
+// argument is false and is a no-op otherwise.
+func (t T) FatalIfNot(assertion bool) {
 	if assertion {
 		return
 	}
@@ -146,10 +146,10 @@ func (t *T) FatalIfNot(assertion bool) {
 	t.FailNow()
 }
 
-// FatalOn cancels receiving test (see [T.FailNow]) after logging given
-// error message iff passed argument is not nil and is a no-op
+// FatalOn cancels the test execution (see [T.FailNow]) after logging
+// given error message iff passed argument is not nil and is a no-op
 // otherwise.
-func (t *T) FatalOn(err error) {
+func (t T) FatalOn(err error) {
 	t.t.Helper()
 	if err == nil {
 		return
@@ -159,7 +159,7 @@ func (t *T) FatalOn(err error) {
 
 // Fatal logs given arguments and cancels the test execution (see
 // [T.FailNow]).
-func (t *T) Fatal(args ...interface{}) {
+func (t T) Fatal(args ...interface{}) {
 	t.t.Helper()
 	t.Log(args...)
 	t.FailNow()
@@ -167,7 +167,7 @@ func (t *T) Fatal(args ...interface{}) {
 
 // Fatalf logs given format-string leveraging fmt.Sprintf and cancels
 // the test execution (see [T.FailNow]).
-func (t *T) Fatalf(format string, args ...interface{}) {
+func (t T) Fatalf(format string, args ...interface{}) {
 	t.t.Helper()
 	t.Log(fmt.Sprintf(format, args...))
 	t.FailNow()
@@ -175,7 +175,7 @@ func (t *T) Fatalf(format string, args ...interface{}) {
 
 // Timeout returns a channel which is closed after given duration has
 // elapsed.  Is given duration 0 it defaults to 10ms.
-func (t *T) Timeout(d time.Duration) chan struct{} {
+func (t T) Timeout(d time.Duration) chan struct{} {
 	if d == 0 {
 		d = 10 * time.Millisecond
 	}
@@ -228,9 +228,9 @@ const FinalPrefix = "__final__"
 // An S instance provides logging-mechanisms and the possibility to
 // cancel a suite's test-run.  Note implementations of [SuiteLogging] or
 // [SuiteCanceler] in a test-suite replace the default logging or
-// cancellation behavior of an S-instance.  NOTE an S-instance wraps a
-// suite runner's testing.T instance while a T-instance wraps a suite
-// runner's sub-test testing.T instance created for a particular suite
+// cancellation behavior of an S-instance.  NOTE an S-instance wraps the
+// suite runner's [testing.T] instance while a T-instance wraps a suite
+// runner's sub-test [testing.T] instance created for a particular suite
 // test.
 type S struct {
 	t        *testing.T
@@ -242,28 +242,28 @@ type S struct {
 
 // GoT returns a pointer to wrapped testing.T instance of the
 // suite-runner's test.
-func (st *S) GoT() *testing.T { return st.t }
+func (st S) GoT() *testing.T { return st.t }
 
-// Log given arguments to wrapped test-runner's testing.T-logger or its
-// replacement provided by a suite's [SuiteLogging]-implementation.
-func (st *S) Log(args ...interface{}) {
+// Log given arguments to wrapped test-runner's testing.T-logger which
+// is superseded by an optional [SuiteLogging]-implementation.
+func (st S) Log(args ...interface{}) {
 	st.t.Helper()
 	st.logger(append([]interface{}{st.prefix}, args...)...)
 }
 
 // Logf format logs leveraging fmt.Sprintf given arguments to wrapped
-// test-runner's testing.T-logger or its replacement provided by a
-// suite's [SuiteLogging]-implementation.
-func (st *S) Logf(format string, args ...interface{}) {
+// test-runner's testing.T-logger which is superseded by an optional
+// [SuiteLogging]-implementation.
+func (st S) Logf(format string, args ...interface{}) {
 	st.t.Helper()
 	st.Log(fmt.Sprintf(format, args...))
 }
 
 // Fatal cancels the test-suite's test-run after given arguments were
 // logged.  The cancellation defaults to a FailNow call of wrapped
-// test-runner's testing.T-instance or its replacement  provided by a
-// suite's [SuiteCanceler]-implementation.
-func (st *S) Fatal(args ...interface{}) {
+// test-runner's testing.T-instance which is superseded by an optional
+// [SuiteCanceler]-implementation.
+func (st S) Fatal(args ...interface{}) {
 	st.t.Helper()
 	st.Log(args...)
 	st.canceler()
@@ -271,9 +271,9 @@ func (st *S) Fatal(args ...interface{}) {
 
 // Fatalf cancels the test-suite's test-run after given arguments were
 // logged.  The cancellation defaults to a FailNow call of wrapped
-// test-runner's testing.T-instance or its replacement  provided by a
-// suite's [SuiteCanceler]-implementation.
-func (st *S) Fatalf(format string, args ...interface{}) {
+// test-runner's testing.T-instance which is superseded by an optional
+// [SuiteCanceler]-implementation.
+func (st S) Fatalf(format string, args ...interface{}) {
 	st.t.Helper()
 	st.Logf(format, args...)
 	st.canceler()
@@ -281,9 +281,9 @@ func (st *S) Fatalf(format string, args ...interface{}) {
 
 // FatalOn cancels the test-suite's test-run iff given error is not
 // nil.  The cancellation defaults to a FailNow call of wrapped
-// test-runner's testing.T-instance or its replacement provided by a
-// suite's [SuiteCanceler]-implementation.
-func (st *S) FatalOn(err error) {
+// test-runner's testing.T-instance which is superseded by an optional
+// [SuiteCanceler]-implementation.
+func (st S) FatalOn(err error) {
 	st.t.Helper()
 	if err != nil {
 		st.Fatal(err.Error())

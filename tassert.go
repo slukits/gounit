@@ -20,7 +20,7 @@ const trueErr = "expected given value to be true"
 
 // True fails the test and returns false iff given value is not true;
 // otherwise true is returned.
-func (t *T) True(value bool) bool {
+func (t T) True(value bool) bool {
 	t.t.Helper()
 	if !value {
 		t.Errorf(assertErr, "true", trueErr)
@@ -30,7 +30,7 @@ func (t *T) True(value bool) bool {
 }
 
 // TODO fails a test logging "not implemented yet".
-func (t *T) TODO() bool {
+func (t T) TODO() bool {
 	t.t.Helper()
 	t.Error("not implemented yet")
 	return false
@@ -39,9 +39,9 @@ func (t *T) TODO() bool {
 // notTrueErr default message for failed 'false'-assertion.
 const notTrueErr = "expected given value be false"
 
-// True passes if called true assertion with given argument fails;
-// otherwise if fails.
-func (n *Not) True(value bool) bool {
+// True passes if called [T.True] assertion with given argument fails;
+// otherwise it fails.
+func (n Not) True(value bool) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
@@ -69,7 +69,7 @@ const eqTypeErr = "types mismatch %v != %v"
 //
 // if they are not of the same type or one of the above cases replacing
 // "==" by "!=" is true then given values are considered not equal.
-func (t *T) Eq(a, b interface{}) bool {
+func (t T) Eq(a, b interface{}) bool {
 	t.t.Helper()
 
 	differentTypes := fmt.Sprintf("%T", a) != fmt.Sprintf("%T", b)
@@ -87,7 +87,7 @@ func (t *T) Eq(a, b interface{}) bool {
 		return true
 	}
 
-	diff := t.diff(a, b, differentTypes)
+	diff := diff(a, b, differentTypes)
 	if diff != "" {
 		t.Errorf(assertErr, "equal: string-representations", diff)
 		return false
@@ -113,7 +113,7 @@ func isStringers(a, b interface{}) bool {
 	return ok
 }
 
-func (t *T) diff(a, b interface{}, differentTypes bool) string {
+func diff(a, b interface{}, differentTypes bool) string {
 	if differentTypes {
 		if _a, ok := a.(fmt.Stringer); ok {
 			a = _a.String()
@@ -140,9 +140,9 @@ func (t *T) diff(a, b interface{}, differentTypes bool) string {
 	return diff
 }
 
-// Eq passes if called equals assertion with given arguments fails;
-// otherwise if fails.
-func (n *Not) Eq(a, b interface{}) bool {
+// Eq negation passes if called [T.Eq] assertion with given arguments
+// fails; otherwise it fails.
+func (n Not) Eq(a, b interface{}) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
@@ -169,7 +169,7 @@ type StringRepresentation interface{}
 // Contains fails the test and returns false iff given value's string
 // representation doesn't contain given sub-string; otherwise true is
 // returned.
-func (t *T) Contains(value StringRepresentation, sub string) bool {
+func (t T) Contains(value StringRepresentation, sub string) bool {
 	t.t.Helper()
 	str := toString(value)
 	if !strings.Contains(str, sub) {
@@ -196,15 +196,16 @@ func toString(value interface{}) string {
 	}
 }
 
-// Not implements negations of [T]-assertions, e.g. [Not.Contains].
+// Not implements negations of [T]-assertions, e.g. [Not.True].  Negated
+// assertions can be accessed through [T]'s Not field.
 type Not struct{ t *T }
 
 // notContainsErr default message for failed Not-'Contains'-assertion.
 const notContainsErr = "\n'%s'\ndoes contain\n'%s'"
 
-// Contains passes if called contains assertion with given arguments fails;
-// otherwise if fails.
-func (n *Not) Contains(value StringRepresentation, sub string) bool {
+// Contains negation passes if called [T.Contains] assertion with given
+// arguments fails; otherwise it fails.
+func (n Not) Contains(value StringRepresentation, sub string) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
@@ -224,7 +225,7 @@ const matchedErr = "Regexp\n'%s'\ndoesn't match\n'%s'"
 // Matched fails the test and returns false iff given values string
 // interpretation isn't matched by given regex; otherwise true is
 // returned.
-func (t *T) Matched(value StringRepresentation, regex string) bool {
+func (t T) Matched(value StringRepresentation, regex string) bool {
 	t.t.Helper()
 	str := toString(value)
 	re := regexp.MustCompile(regex)
@@ -239,9 +240,9 @@ func (t *T) Matched(value StringRepresentation, regex string) bool {
 // notMatchedErr default message for failed *'Matched'-assertion.
 const notMatchedErr = "Regexp '%s'\n matches '%s'"
 
-// Matched passes if called match assertion with given arguments fails;
-// otherwise if fails.
-func (n *Not) Matched(value StringRepresentation, regex string) bool {
+// Matched negation passes if called [T.Matched] assertion with given
+// arguments fails; otherwise it fails.
+func (n Not) Matched(value StringRepresentation, regex string) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
@@ -269,7 +270,7 @@ func (n *Not) Matched(value StringRepresentation, regex string) bool {
 //
 // SpaceMatched fails the test and returns false iff the matching
 // fails; otherwise true is returned.
-func (t *T) SpaceMatched(value StringRepresentation, ss ...string) bool {
+func (t T) SpaceMatched(value StringRepresentation, ss ...string) bool {
 	t.t.Helper()
 	spaceRe, str := reGen(`\s*`, "", ss...), toString(value)
 	if !spaceRe.MatchString(str) {
@@ -280,9 +281,9 @@ func (t *T) SpaceMatched(value StringRepresentation, ss ...string) bool {
 	return true
 }
 
-// SpaceMatch passes if called space match assertion with given
-// arguments fails; otherwise if fails.
-func (n *Not) SpaceMatched(value StringRepresentation, ss ...string) bool {
+// SpaceMatched negation passes if called [T.SpaceMatched] assertion with given
+// arguments fails; otherwise it fails.
+func (n Not) SpaceMatched(value StringRepresentation, ss ...string) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
@@ -309,9 +310,9 @@ func (n *Not) SpaceMatched(value StringRepresentation, ss ...string) bool {
 //
 //	t.StarMatch(str, "p", "me", "x", "/p").
 //
-// SpaceMatched fails the test and returns false iff the matching
+// StarMatched fails the test and returns false iff the matching
 // fails; otherwise true is returned.
-func (t *T) StarMatched(value StringRepresentation, ss ...string) bool {
+func (t T) StarMatched(value StringRepresentation, ss ...string) bool {
 	t.t.Helper()
 	startRe, str := reGen(`.*?`, `(?s)`, ss...), toString(value)
 	if !startRe.MatchString(str) {
@@ -322,9 +323,9 @@ func (t *T) StarMatched(value StringRepresentation, ss ...string) bool {
 	return true
 }
 
-// StarMatched passes if called star match assertion with given
-// arguments fails; otherwise if fails.
-func (n *Not) StarMatched(value StringRepresentation, ss ...string) bool {
+// StarMatched passes if called T.StarMatched assertion with given
+// arguments fails; otherwise it fails.
+func (n Not) StarMatched(value StringRepresentation, ss ...string) bool {
 	n.t.t.Helper()
 	err := n.t.errorer
 	n.t.errorer = func(i ...interface{}) {}
@@ -359,7 +360,7 @@ const errErr = "given value doesn't implement 'error'"
 
 // Err fails the test and returns false iff given value doesn't
 // implement the error-interface; otherwise true is returned.
-func (t *T) Err(err interface{}) bool {
+func (t T) Err(err interface{}) bool {
 
 	t.t.Helper()
 
@@ -377,7 +378,7 @@ const errIsErr = "given error doesn't wrap target-error"
 // ErrIs fails the test and returns false iff given err doesn't
 // implement the error-interface or doesn't wrap given target; otherwise
 // true is returned.
-func (t *T) ErrIs(err interface{}, target error) bool {
+func (t T) ErrIs(err interface{}, target error) bool {
 	t.t.Helper()
 
 	e, ok := err.(error)
@@ -399,7 +400,7 @@ const errMatchedErr = "given regexp '%s' doesn't match '%s'"
 // ErrMatched fails the test and returns false iff given err doesn't
 // implement the error-interface or its message isn't matched by given
 // regex; otherwise true is returned.
-func (t *T) ErrMatched(err interface{}, re string) bool {
+func (t T) ErrMatched(err interface{}, re string) bool {
 
 	t.t.Helper()
 
@@ -424,10 +425,8 @@ func (t *T) ErrMatched(err interface{}, re string) bool {
 const panicsErr = "given function doesn't panic"
 
 // Panics fails the test and returns false iff given function doesn't
-// panic; otherwise true is returned.  Given (formatted) message
-// replaces the default error message, i.e. msg[0] must be a string if
-// len(msg) == 1 it must be a format-string iff len(msg) > 1.
-func (t *T) Panics(f func(), msg ...interface{}) (hasPanicked bool) {
+// panic; otherwise true is returned.
+func (t T) Panics(f func()) (hasPanicked bool) {
 	t.t.Helper()
 	defer func() {
 		t.t.Helper()
@@ -448,7 +447,7 @@ const withinErr = "timeout while condition unfulfilled"
 // Within tries after each step of given time-stepper if given condition
 // returns true and fails the test iff the whole duration of given time
 // stepper is elapsed without given condition returning true.
-func (t *T) Within(d *TimeStepper, cond func() bool) (fulfilled bool) {
+func (t T) Within(d *TimeStepper, cond func() bool) (fulfilled bool) {
 	done := make(chan bool)
 	go func(c chan bool) {
 		time.Sleep(d.Step())

@@ -41,7 +41,7 @@ type Fixtures struct {
 	ff    map[*T]interface{}
 }
 
-// Set adds concurrency save a mapping from given test to given fixture.
+// Set adds a mapping from given test to given fixture.
 func (ff *Fixtures) Set(t *T, fixture interface{}) {
 	ff.mutex.Lock()
 	defer ff.mutex.Unlock()

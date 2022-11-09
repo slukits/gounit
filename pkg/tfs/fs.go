@@ -9,10 +9,9 @@ failing) standard lib filesystem operations.  Error handling is
 fully replaced by the assumption that it's not worth to run a
 test whose filesystem operations fail since the typical use case is a
 fixture setup.  Hence if a filesystem operation fails it fatales the
-associated test.  All used failing standard lib filesystem operation can
-be mocked by obtaining a wrapped FS-instance using [NewFX]. allowing
+associated test.
 
-An FS instance is usually obtained from a [gounit.T] instance
+An FS instance is usually obtained from a gounit.T instance:
 
 	import (
 		"testing"
@@ -50,6 +49,8 @@ import (
 	"time"
 )
 
+// Tester summarizes and abstracts what a [FS] instance needs from an
+// associated test's testing instance.
 type Tester interface {
 	Fatal(...interface{})
 	Fatalf(string, ...interface{})
@@ -98,7 +99,8 @@ func (fs *FS) Data() (_ *Dir, undo func()) {
 
 // Dir wraps given path in a directory which is created if not existing.
 // In the later case an undo function is returned to undo the directory
-// creation.
+// creation.  Dir fatales associated test on any fs-error.   Returned
+// undo panics if its execution fails.
 func (fs *FS) Dir(path string) (_ *Dir, undo func()) {
 	created := false
 	if _, err := fs.tools.Stat(path); err != nil {
@@ -127,14 +129,15 @@ func (fs *FS) Tmp() *Dir {
 	return &Dir{t: fs.t, path: fs.t.GoT().TempDir(), fs: fs.tls}
 }
 
-// Dir provides file system operations inside its path, i.e. either a
-// temporary directory or (in) a a package's testdata directory.  It
-// replaces error handling by failing the test.  The zero value of a Dir
-// instance is *NOT* usable.  Use [gounit.T.FS] to obtain a Dir-instance.
+// Dir provides file system operations inside its path, which is
+// typically nested in either a temporary directory or the package's
+// testdata directory.  It replaces error handling by failing the test.
+// The zero value of a Dir instance is *NOT* usable.  Use [FS.Data],
+// [FS.Dir] or [FS.Tmp] to obtain a Dir-instance:
 //
 //	func (s *MySuite) Suite_test(t *gounit.T) {
-//		td := t.FS().Tmp() // create temporary Dir-instance
-//		// ...
+//	    td := t.FS().Tmp() // create temporary Dir-instance
+//	    // ...
 //	}
 type Dir struct {
 	t    Tester
@@ -142,12 +145,12 @@ type Dir struct {
 	path string
 }
 
-// Path returns the directory's directory, och, path.
+// Path returns the directory's path.
 func (d *Dir) Path() string { return d.path }
 
-// Child returns a Dir from given directory with given name.  Child
-// fatales if child's file info can't be obtained or if child is not a
-// directory.
+// Child returns a Dir in given directory d with given name.  Child
+// fatales associated test if child's file info can't be obtained or if
+// child is not a directory.
 func (d *Dir) Child(name string) *Dir {
 	stt, err := d.fs().Stat(fp.Join(d.path, name))
 	if err != nil {
@@ -161,10 +164,11 @@ func (d *Dir) Child(name string) *Dir {
 
 type Pather interface{ Path() string }
 
-// Copy copies given directory to given path and returns a function to
-// undo this operation.  Note next to directories only regular files and
-// symlinks are supported.  Copy fatales on other irregular files as
-// well as on any failing filesystem operation.  A failing undo panics.
+// Copy copies given directory d to given path toDir and returns a
+// function to undo this operation.  Note next to directories only
+// regular files and symlinks are supported.  Copy fatales associated
+// test on other irregular files as well as on any failing filesystem
+// operation.  Returned undo panics if its execution fails.
 func (d *Dir) Copy(toDir Pather) (undo func()) {
 
 	err := d.fs().Walk(d.path, func(
@@ -235,16 +239,14 @@ func (d *Dir) Copy(toDir Pather) (undo func()) {
 	}
 }
 
-// Eq return true if given dir and given path have the same [fp.Base],
-// both contain the same directory structure with the same files whereas
-// two files are considered the same iff they have the same name, the
-// same size and the same mode.  I.e. the content of two files is not
-// compared.  Otherwise Eq returns false.  Eq fatales associated
-// testing instance if any of the executed file system operations fails.
-// Note this implementation could be more efficient by avoiding the
-// FileInfo calculation in case of directories.  Since the typical use
-// case in testing are simple local directory structures I haven't
-// jumped through this hoop yet.
+// Eq return true if given dir d's and given path p's last directories
+// have the same name, both contain the same directory structure with
+// the same files whereas two files are considered the same iff they
+// have the same name, the same size and the same mode.  I.e. the
+// content of two files is not compared.  Otherwise Eq returns false.
+// Eq fatales associated test if any of the executed file system
+// operations fails.  Note this implementation could be more efficient
+// by avoiding the FileInfo calculation in case of directories.
 func (d *Dir) Eq(p Pather) bool {
 
 	src, dest := fp.Dir(d.path), fp.Dir(p.Path())
@@ -311,11 +313,11 @@ func (d *Dir) replaceDirWithContent(
 	}
 }
 
-// Mk crates a new directory inside given directory's path by combining
-// given strings to a (relative) path.  The returned function removes
-// the root directory of given path and resets returned Dir instance.
-// It fails associated test in case the directory creation fails.  It
-// panics in case the undo function fails.
+// Mk crates a new directory inside given directory d's path by
+// combining given strings dir and path to a (relative) path.  The
+// returned function removes the root directory of given path and resets
+// returned Dir instance.  It fails associated test in case the
+// directory creation fails.  Returned undo panics if its execution fails.
 func (d *Dir) Mk(dir string, path ...string) (_ *Dir, undo func()) {
 	_path := fp.Join(append([]string{d.path, dir}, path...)...)
 	if err := d.fs().MkdirAll(_path, 0711); err != nil {
@@ -331,6 +333,9 @@ func (d *Dir) Mk(dir string, path ...string) (_ *Dir, undo func()) {
 	}
 }
 
+// Rm removes in given directory d given relatives directory rel with
+// all its files and sub-directories.  Rm fatales associated test the
+// removal fails.
 func (d *Dir) Rm(rel string) {
 	d.t.GoT().Helper()
 	if err := d.fs().RemoveAll(fp.Join(d.path, rel)); err != nil {
@@ -338,9 +343,10 @@ func (d *Dir) Rm(rel string) {
 	}
 }
 
-// MkFile adds to given directory a new file (mod 0644) with given name
-// and given content.  MkFile fatales if the file already exists or
-// os.WriteFile fails.  MkFile panics if reset fails.
+// MkFile adds to given directory d a new file (mod 0644) with given
+// name and content and returns an undo function.  MkFile fatales
+// associated test if the file already exists or os.WriteFile fails.
+// Returned undo panics if its execution fails.
 func (d *Dir) MkFile(name string, content []byte) (undo func()) {
 	d.t.GoT().Helper()
 
@@ -360,8 +366,8 @@ func (d *Dir) MkFile(name string, content []byte) (undo func()) {
 	}
 }
 
-// FileCopy copies the content of given file from given directory to given
-// Path().  FileCopy fatales associated testing instance if ReadFile or
+// FileCopy copies the content of given file from given directory d to
+// given path toDir.  FileCopy fatales associated test if ReadFile or
 // WriteFile fails.  Returned undo function removes the copy and panics
 // if its execution fails.
 func (d *Dir) FileCopy(file string, toDir Pather) (undo func()) {
@@ -382,7 +388,7 @@ func (d *Dir) FileCopy(file string, toDir Pather) (undo func()) {
 	}
 }
 
-// FileContent joins given directory with given file name and returns
+// FileContent joins given directory d with given file name relName and returns
 // its content.  FileContent fatales if it cant be read.
 func (d *Dir) FileContent(relName string) []byte {
 	d.t.GoT().Helper()
@@ -405,8 +411,8 @@ func (d *Dir) WriteContent(relName string, bb []byte) {
 	}
 }
 
-// FileMod returns a directory-file's modification time.  It fatales iff
-// stats can't be obtained.
+// FileMod returns a directory-file relName's modification time.  It fatales
+// associated test iff stats can't be obtained.
 func (d *Dir) FileMod(relName string) time.Time {
 	stat, err := d.fs().Stat(fp.Join(d.path, relName))
 	if err != nil {
@@ -423,8 +429,8 @@ func (d *Dir) FileMod(relName string) time.Time {
 //	d.Touch("my_file")
 //	fmt.Println(mt.Before(d.FileMod("my_file")) // => "true"
 //
-// Touch fatales iff given file doesn't exist in given directory or if
-// its modification time can't be updated.
+// Touch fatales associated test iff given file doesn't exist in given
+// directory or if its modification time can't be updated.
 func (d *Dir) Touch(relName string) {
 	fileName := fp.Join(d.path, relName)
 	if _, err := os.Stat(fileName); err != nil {
@@ -436,9 +442,10 @@ func (d *Dir) Touch(relName string) {
 	}
 }
 
-// MkMod adds to given directory a go.mod file with given module name.
-// It fatales/panics iff subsequent [Dir.AddFile] call fatales/panics.
-func (d *Dir) MkMod(module string) (reset func()) {
+// MkMod adds to given directory d a go.mod file with given module name.
+// It fatales if subsequent [Dir.MkFile] call fatales.  Returned undo
+// panics if its execution fails.
+func (d *Dir) MkMod(module string) (undo func()) {
 	d.t.GoT().Helper()
 	return d.MkFile("go.mod", []byte(fmt.Sprintf("module %s", module)))
 }
@@ -581,8 +588,10 @@ func (d *Dir) moduleName() string {
 
 var rePkgComment = regexp.MustCompile(`(?s)^(\s*?\n|// .*?\n|/\*.*\*/)*`)
 
-// MkPkgFile adds a file with given content prefixing its content with a
-// package declaration and suffixing given file name with ".go" if missing.
+// MkPkgFile adds a file in given directory d prefixing given content
+// with a package declaration and suffixing given file name with ".go"
+// if missing.  MkPkgFile fatales associated test on failing
+// fs-operations.  Returned undo panics if its execution fails.
 func (d *Dir) MkPkgFile(name string, content []byte) (undo func()) {
 	pkg := fp.Base(d.path)
 	if !bytes.Contains(content, []byte(fmt.Sprintf("package %s", pkg))) {
@@ -596,9 +605,10 @@ func (d *Dir) MkPkgFile(name string, content []byte) (undo func()) {
 	return d.MkFile(name, []byte(content))
 }
 
-// MkPkgTest adds a test file with given content prefixing its content
-// with a package declaration and suffixes "_test.go" to the name if
-// missing.
+// MkPkgTest adds a test file in given directory d prefixing given
+// content with a package declaration and suffixing given file name with
+// "_test.go" if missing.  MkPkgTest fatales associated test on failing
+// fs-operations.  Returned undo panics if its execution fails.
 func (d *Dir) MkPkgTest(name string, content []byte) (undo func()) {
 	if !strings.HasSuffix(name, "_test.go") {
 		name = fmt.Sprintf("%s%s", name, "_test.go")
@@ -607,9 +617,9 @@ func (d *Dir) MkPkgTest(name string, content []byte) (undo func()) {
 }
 
 // CWD changes the current working directory to given directory and
-// returns a function to undo this change.  CWD fatales given testing
-// instance if the working directory change fails.  It panics if the
-// undo fails.
+// returns a function to undo this change.  CWD fatales associated
+// testing instance if the working directory change fails.  Returned
+// undo panics if its execution fails.
 func (d *Dir) CWD() (undo func()) {
 	wd, err := d.fs().Getwd()
 	if err != nil {

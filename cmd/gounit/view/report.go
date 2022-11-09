@@ -210,7 +210,7 @@ func (r *report) OnContext(e *lines.Env, x, y int) {
 
 // OnRune scrolls given reporting component down iff given rune is the
 // space rune.  If at bottom it is scrolled to the top.
-func (r *report) OnRune(e *lines.Env, rn rune, mm lines.Modifier) {
+func (r *report) OnRune(e *lines.Env, rn rune, mm lines.ModifierMask) {
 	if rn != ' ' {
 		return
 	}

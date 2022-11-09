@@ -392,7 +392,8 @@ func fxInit(
 
 	if i.Fatal == nil {
 		i.Fatal = func(i ...interface{}) {
-			t.Fatalf("unexpected error: %s", fmt.Sprint(i...))
+			panic(fmt.Sprintf("unexpected error: %s", fmt.Sprint(i...)))
+			// t.Fatalf("unexpected error: %s", fmt.Sprint(i...))
 		}
 	}
 	if i.Watcher == nil {

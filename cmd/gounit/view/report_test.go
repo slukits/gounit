@@ -95,7 +95,7 @@ func (s *Reporting) Component_s_selectable_lines_are_underlined(t *T) {
 		if r == ' ' {
 			continue
 		}
-		t.FatalIfNot(t.True(line.HasAttr(i, lines.Underline)))
+		t.FatalIfNot(t.True(line.HasAA(i, lines.Underline)))
 	}
 }
 

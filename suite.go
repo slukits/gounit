@@ -53,7 +53,7 @@ func newFinalizer(
 
 // exec executes a found Init-method in a Suite.
 func (s *Suite) exec(init *reflect.Method, t *testing.T) {
-	suiteLogging, hasLogger := s.self.(SuiteLogging)
+	suiteLogging, hasLogger := s.self.(SuiteLogger)
 	suiteCanceler, hasCanceler := s.self.(SuiteCanceler)
 	suiteI := &S{
 		t:        t,
@@ -74,7 +74,7 @@ func (s *Suite) exec(init *reflect.Method, t *testing.T) {
 // sWrapper wraps given testing.T-instance in a S-instance for a suites
 // finalizer, i.e. its logging prefix is going to be [FinalPrefix].
 func (s *Suite) sWrapper(t *testing.T) *S {
-	suiteLogging, hasLogger := s.self.(SuiteLogging)
+	suiteLogging, hasLogger := s.self.(SuiteLogger)
 	suiteCanceler, hasCanceler := s.self.(SuiteCanceler)
 	suiteT := &S{
 		t:        t,
@@ -129,10 +129,10 @@ type SuiteEmbedder interface {
 // Run sets up embedded Suite-instance and runs all methods of given
 // test-suite embedder which are public, have exactly one argument and
 // are not special:
-//   - Init(*gounit.S): run before any other method of a suite
-//   - SetUp(*gounit.T): run before every suite-test
-//   - TearDown(*gounit.T): run after every suite-test
-//   - Finalize(*gounit.S): run after any other method of a suite
+//   - Init(*[gounit.S]): run before any other method of a suite
+//   - SetUp(*[gounit.T]): run before every suite-test
+//   - TearDown(*[gounit.T]): run after every suite-test
+//   - Finalize(*[gounit.S]): run after any other method of a suite
 //   - Get, Set, Del as methods of [gounit.Fixtures] are also
 //     considered special for the use case that Fixtures is
 //     embedded in a Suite-embedder (i.e. test-suite)
@@ -151,9 +151,8 @@ func Run(suite SuiteEmbedder, t *testing.T) {
 	}
 }
 
-// SuiteLogging implementation of a suite-embedder overwrites default
-// logging mechanism of [gounit.T]-instances passed to suite-tests with
-// the function provided by the implementation's Logger-method. E.g.:
+// SuiteLogger implementation of a suite-embedder replaces the default
+// logging mechanism of [gounit.T]-instances E.g.:
 //
 //	type MySuite {
 //	    gounit.Suite
@@ -175,7 +174,7 @@ func Run(suite SuiteEmbedder, t *testing.T) {
 //	    gounit.Run(testSuite, t)
 //	    t.Log(testSuite.Logs) // prints "A_test has run" if verbose
 //	}
-type SuiteLogging interface {
+type SuiteLogger interface {
 	Logger() func(args ...interface{})
 }
 
@@ -206,7 +205,7 @@ type SuiteCanceler interface {
 func newSubTestFactory(
 	suite *Suite,
 ) func(reflect.Method) func(*testing.T) {
-	suiteLogging, hasLogger := suite.self.(SuiteLogging)
+	suiteLogging, hasLogger := suite.self.(SuiteLogger)
 	suiteErrorer, hasErrorer := suite.self.(SuiteErrorer)
 	suiteCanceler, hasCanceler := suite.self.(SuiteCanceler)
 	var tearDown func(t *T)

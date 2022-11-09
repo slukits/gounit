@@ -48,7 +48,7 @@ before respectively after each suite-test.  The other three methods are
 considered special because they are implemented by the [Fixtures]
 utility and it turned out to be a quite natural use case to embedded the
 Fixtures-type next to the Suite type in a test suite.  Special methods
-along with compact assertions provided by gounit.T allow you in a
+along with compact assertions provided by [gounit.T] allow you in a
 systematic way to remove noise from your tests with the goal to make
 your suite-test implementations the specification of your production
 API.  While suite tests reported in the order they were written will
@@ -69,14 +69,11 @@ NOTE:
 	    // tear down your fixtures environment
 	}
 
-Init and Finalize have not *gounit.T but *gounit.S as argument type.
-The reason is that the argument of Init and Finalize has a different
-semantic than the argument of suite tests.  S and and T wrap testing.T
-instances of the go testing framework.  S wraps the suite runner's
-testing.T instance, i.e. in above example it is TestTestedSubject's
-testing.T instance.  While T wraps a testing.T instance of a test
-runner's sub-test created to execute the suite test.  A typical
-full-blown test suite (in pseudo-code) might look like this:
+Init and Finalize have not *[gounit.T] but *[gounit.S] as argument type.
+[gounit.S] wraps the test runner's testing.T instance while [gounit.T]
+wraps a test runner's sub-test testing.T instance created to run a
+particular suite test.  A typical full-blown test suite (in pseudo-code)
+might look like this:
 
 	type testedSubject struct{
 	    gounit.Suite

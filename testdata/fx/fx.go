@@ -82,7 +82,7 @@ func (s *FX) Error() func(args ...interface{}) {
 }
 
 // FixtureLog provides the general logging facility for test suites
-// fixtures by implementing gounit.SuiteLogger.  A FixtureLog mustn't
+// fixtures by implementing [gounit.SuiteLogger].  A FixtureLog mustn't
 // been copied once it has been used.
 type FixtureLog struct {
 	Logs  string
