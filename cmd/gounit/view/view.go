@@ -28,7 +28,7 @@ gounit's terminal user interface.
 	|                                                                  |
 	| packages: n; tests: t/f; stat: c/t d                             |
 	+------------------------------------------------------------------+
-	|    [s]witches=off     [h]help=off     [a]bout=off      [q]uit    |
+	|      [s]witches        [h]help        [a]bout        [q]uit      |
 	+------------------------------------------------------------------+
 
 Note: the actual ui has no frames.
