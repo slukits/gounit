@@ -76,9 +76,9 @@ func (sb *statusBar) OnInit(e *lines.Env) {
 	fmt.Fprint(e.BG(sb.bg()).FG(sb.fg()).LL(1), sb.str())
 }
 
-func (sb *statusBar) OnUpdate(e *lines.Env) {
+func (sb *statusBar) OnUpdate(e *lines.Env, data interface{}) {
 	// type save because message bar update only allows string
-	s, _ := e.Evt.(*lines.UpdateEvent).Data.(Statuser)
+	s, _ := data.(Statuser)
 	if s.Str != "" {
 		fmt.Fprint(e.BG(sb.bg()).FG(sb.fg()).LL(1), s.Str)
 		return

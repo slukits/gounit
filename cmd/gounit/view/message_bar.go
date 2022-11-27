@@ -20,9 +20,9 @@ func (mb *messageBar) OnInit(e *lines.Env) {
 	fmt.Fprint(e.LL(1), mb.dflt)
 }
 
-func (mb *messageBar) OnUpdate(e *lines.Env) {
+func (mb *messageBar) OnUpdate(e *lines.Env, data interface{}) {
 	// type save because message bar update only allows string
-	s, _ := e.Evt.(*lines.UpdateEvent).Data.(string)
+	s, _ := data.(string)
 	if s == "" {
 		fmt.Fprint(e.LL(1), mb.dflt)
 		return

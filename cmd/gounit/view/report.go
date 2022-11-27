@@ -141,9 +141,9 @@ func (r *report) OnClick(_ *lines.Env, _, y int) {
 	r.listener(idx)
 }
 
-func (r *report) OnUpdate(e *lines.Env) {
+func (r *report) OnUpdate(e *lines.Env, data interface{}) {
 	r.LL.Focus.Reset(true)
-	upd, ok := e.Evt.(*lines.UpdateEvent).Data.(Reporter)
+	upd, ok := data.(Reporter)
 	if !ok {
 		return
 	}
@@ -177,11 +177,11 @@ func (r *report) reportFocusable(
 	indent := indent(content)
 	cc := strings.Split(content, lines.Filler)
 	lines.Print(e.LL(idx).At(0), []rune(cc[0][:indent]))
-	w := e.LL(idx).AA(lines.Underline)
+	w := e.LL(idx).At(indent).AA(lines.Underline)
 	if lm&Failed != 0 {
 		w = w.FG(lines.White).BG(lines.DarkRed)
 	}
-	lines.Print(w.At(indent), []rune(cc[0][indent:]))
+	lines.Print(w, []rune(cc[0][indent:]))
 	if len(cc) == 1 {
 		return
 	}

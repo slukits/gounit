@@ -53,8 +53,8 @@ func (bb *buttonBar) OnInit(_ *lines.Env) {
 	bb.Dim().SetHeight(1)
 }
 
-func (bb *buttonBar) OnUpdate(e *lines.Env) {
-	upd := e.Evt.(*lines.UpdateEvent).Data.(*buttonsUpdate)
+func (bb *buttonBar) OnUpdate(e *lines.Env, data interface{}) {
+	upd := data.(*buttonsUpdate)
 	if upd.bb.Replace() {
 		bb.init(upd)
 		return
@@ -178,8 +178,8 @@ func (b *button) OnClick(_ *lines.Env, _, _ int) {
 	b.listener(b.label)
 }
 
-func (b *button) OnUpdate(e *lines.Env) {
-	bd := e.Evt.(*lines.UpdateEvent).Data.(ButtonDef)
+func (b *button) OnUpdate(e *lines.Env, data interface{}) {
+	bd := data.(ButtonDef)
 	b.label = bd.Label
 	b.rn = bd.Rune
 	fmt.Fprint(e, b.uiLabel())

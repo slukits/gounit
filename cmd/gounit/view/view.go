@@ -142,11 +142,12 @@ func (v *view) OnInit(e *lines.Env) {
 
 func (v *view) reporting() lines.Componenter { return v.CC[1] }
 
-func (v *view) OnLayout(e *lines.Env) {
+func (v *view) OnLayout(e *lines.Env) bool {
 	width, _ := e.ScreenSize()
 	if width > 80 {
 		v.Dim().SetWidth(80)
 	}
+	return false
 }
 
 func (v *view) OnRune(_ *lines.Env, r rune, m lines.ModifierMask) {
