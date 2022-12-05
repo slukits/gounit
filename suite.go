@@ -6,6 +6,7 @@ package gounit
 
 import (
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -239,7 +240,15 @@ func newSubTestFactory(
 				(*suite.setUp).Func.Call(
 					[]reflect.Value{suite.value, suiteTVl})
 			}
-			test.Func.Call([]reflect.Value{suite.value, suiteTVl})
+			func(vl []reflect.Value) {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Helper()
+						t.Errorf("panicked:\n%v\n%v", r, string(debug.Stack()))
+					}
+				}()
+				test.Func.Call(vl)
+			}([]reflect.Value{suite.value, suiteTVl})
 			if tearDown != nil {
 				tearDown(suiteT)
 			}

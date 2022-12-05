@@ -607,6 +607,9 @@ func reportOutput(
 		return ll, llMask
 	}
 	var dataRace bool
+	if strings.HasSuffix(out[0], "panicked:") {
+		return reportPanickedOutput(p, out, i, ll, llMask)
+	}
 	for _, s := range out {
 		if strings.Contains(s, "WARNING: DATA RACE") {
 			dataRace = true
@@ -622,9 +625,10 @@ func reportOutput(
 			if reHex.MatchString(strings.TrimSpace(s[n:])) {
 				continue
 			}
-			ll, llMask = reportOutputLine(
-				outputWidth, strings.TrimSpace(s[n:]), i+indent,
-				ll, llMask)
+			if s := strings.TrimSpace(s[n:]); s != "" {
+				ll, llMask = reportOutputLine(
+					outputWidth, s, i+indent, ll, llMask)
+			}
 			continue
 		}
 		if dataRace && raceLineBreak.MatchString(s) {
@@ -632,7 +636,58 @@ func reportOutput(
 			llMask[uint(len(ll)-1)] = view.OutputLine
 		}
 		ll, llMask = reportOutputLine(
-			outputWidth, s, i+indent, ll, llMask)
+			outputWidth, s, i, ll, llMask)
+	}
+	return ll, llMask
+}
+
+func reportPanickedOutput(
+	p *pkg, out []string, i string, ll rprLines, llMask linesMask,
+) (rprLines, linesMask) {
+	report := func(s string) {
+		if flLoc, n, ok := pkgFileLoc(p, s); ok {
+			ll, llMask = reportOutputLine(
+				outputWidth, flLoc, i, ll, llMask)
+			if reHex.MatchString(strings.TrimSpace(s[n:])) {
+				return
+			}
+			if s := strings.TrimSpace(s[n:]); s != "" {
+				ll, llMask = reportOutputLine(
+					outputWidth, s, i+indent, ll, llMask)
+			}
+			return
+		}
+		ll, llMask = reportOutputLine(
+			outputWidth, s, i, ll, llMask)
+	}
+	outFilter, testFilter := fmt.Sprintf("/%s", p.Name()), "_test.go:"
+	panicFilter := "runtime/panic.go"
+	panicIdx := func() int {
+		for i, s := range out {
+			if !strings.Contains(s, panicFilter) {
+				continue
+			}
+			return i + 1
+		}
+		return 2
+	}()
+	first := out[0]
+	for _, s := range out[panicIdx:] {
+		if !strings.Contains(s, testFilter) {
+			continue
+		}
+		first = s
+	}
+	report(first)
+	if !strings.HasSuffix(ll[len(ll)-1], "panicked:") {
+		ll[len(ll)-1] = ll[len(ll)-1] + ": panicked:"
+	}
+	ll, llMask = reportOutputLine(outputWidth, out[1], i, ll, llMask)
+	for _, s := range out[panicIdx:] {
+		if !strings.Contains(s, outFilter) {
+			continue
+		}
+		report(s)
 	}
 	return ll, llMask
 }
@@ -643,7 +698,6 @@ func reportOutput(
 func reportOutputLine(
 	width int, out, i string, ll rprLines, llMask linesMask,
 ) (rprLines, linesMask) {
-
 	if len(out)+len(i) < width {
 		ll = append(ll, i+out)
 		llMask[uint(len(ll)-1)] = view.OutputLine
@@ -701,9 +755,9 @@ func pkgFileLoc(p *pkg, s string) (loc string, n int, ok bool) {
 		}
 	}
 	idx := strings.Index(flLoc, ":")
-	pkgPrefix := strings.TrimSuffix(p.Abs(), filepath.Dir(p.ID()))
+	pkgPrefix := filepath.Join(p.Abs(), p.Name())
 	if strings.HasPrefix(flLoc, pkgPrefix) {
-		return strings.TrimPrefix(flLoc, pkgPrefix), len(flLoc), true
+		return "." + strings.TrimPrefix(flLoc, pkgPrefix), len(flLoc), true
 	}
 	_, err := os.Stat(filepath.Join(
 		p.Abs(), filepath.Base(p.ID()), flLoc[:idx]))
