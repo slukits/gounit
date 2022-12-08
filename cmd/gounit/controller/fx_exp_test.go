@@ -42,7 +42,7 @@ var fxExp = map[string][]string{
 		"suite finalize log"},
 	"logging folded": {"logging", "go-tests", "suite"},
 	"fail compile": {"fail/compile", "shell exit error: exit status 2:",
-		"fail/compile/compile_test.go:7:33:", "undefined: Sum",
+		"./compile_test.go:7:33:", "undefined: Sum",
 		"FAIL example.com/gounit/controller/golden/fail/compile "},
 	"fail mixed go-suite": {"test2 fail", "test4 failing", "p4 sub 2"},
 	"fail mixed suite": {

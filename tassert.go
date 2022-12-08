@@ -37,7 +37,7 @@ func (t T) TODO() bool {
 }
 
 // notTrueErr default message for failed 'false'-assertion.
-const notTrueErr = "expected given value be false"
+const notTrueErr = "expected given value to be false"
 
 // True passes if called [T.True] assertion with given argument fails;
 // otherwise it fails.

@@ -223,7 +223,7 @@ func (s *Report) Current_package_vetted_if_vet_is_turned_on(t *T) {
 	tt.beforeView(func() { tt.ClickButton("vet=off") })
 	t.Contains(tt.ButtonBarCells(), "[v]et=on")
 	t.Contains(tt.ReportCells().Trimmed(), "FAIL")
-	t.Contains(tt.ReportCells().Trimmed(), "vet/src.go:11:26")
+	t.Contains(tt.ReportCells().Trimmed(), "./src.go:11:26")
 }
 
 func (s *Report) Selected_package_vetted_if_vet_is_turned_on(t *T) {
@@ -237,7 +237,7 @@ func (s *Report) Selected_package_vetted_if_vet_is_turned_on(t *T) {
 
 	tt.beforeView(func() { tt.ClickReporting(0) })
 	t.Contains(tt.ReportCells().Trimmed(), "FAIL")
-	t.Contains(tt.ReportCells().Trimmed(), "vet/src.go:11:26")
+	t.Contains(tt.ReportCells().Trimmed(), "./src.go:11:26")
 }
 
 func (s *Report) Updated_package_vetted_if_vet_is_turned_on(t *T) {
@@ -252,7 +252,7 @@ func (s *Report) Updated_package_vetted_if_vet_is_turned_on(t *T) {
 
 	tt.beforeWatch(func() { tt.golden.Touch("vet") })
 	t.Contains(tt.ReportCells().Trimmed(), "FAIL")
-	t.Contains(tt.ReportCells().Trimmed(), "vet/src.go:11:26")
+	t.Contains(tt.ReportCells().Trimmed(), "./src.go:11:26")
 }
 
 func (s *Report) Current_package_not_vetted_if_vet_is_turned_off(t *T) {

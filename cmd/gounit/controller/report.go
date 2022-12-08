@@ -595,7 +595,9 @@ func reportSubTestLine(
 	return ll, llMask
 }
 
-const outputWidth = 68
+const (
+	outputWidth = 68
+)
 
 var raceLineBreak = regexp.MustCompile(`^\s*Goroutine \d+|^\s*Read at` +
 	`|^\s*Previous read at|^\s*Write at|^\s*Previous write at`)
@@ -610,11 +612,15 @@ func reportOutput(
 	if strings.HasSuffix(out[0], "panicked:") {
 		return reportPanickedOutput(p, out, i, ll, llMask)
 	}
+	addIndent := 0
 	for _, s := range out {
 		if strings.Contains(s, "WARNING: DATA RACE") {
 			dataRace = true
 		}
 		if flLoc, n, ok := pkgFileLoc(p, s); ok {
+			for ; addIndent > 0; addIndent-- {
+				i = i[:len(i)-len(indent)]
+			}
 			if dataRace {
 				ll, llMask = reportOutputLine(
 					outputWidth, flLoc, i+indent, ll, llMask)
@@ -622,12 +628,18 @@ func reportOutput(
 				ll, llMask = reportOutputLine(
 					outputWidth, flLoc, i, ll, llMask)
 			}
+			i += indent
+			addIndent++
 			if reHex.MatchString(strings.TrimSpace(s[n:])) {
 				continue
 			}
 			if s := strings.TrimSpace(s[n:]); s != "" {
 				ll, llMask = reportOutputLine(
-					outputWidth, s, i+indent, ll, llMask)
+					outputWidth, s, i, ll, llMask)
+				if strings.HasSuffix(s, ":") {
+					i += indent
+					addIndent++
+				}
 			}
 			continue
 		}
@@ -764,7 +776,7 @@ func pkgFileLoc(p *pkg, s string) (loc string, n int, ok bool) {
 	if err != nil {
 		return "", 0, false
 	}
-	return filepath.Join(p.ID(), flLoc), len(flLoc), true
+	return "./" + flLoc, len(flLoc), true
 }
 
 type statusCount struct {
