@@ -100,7 +100,7 @@ type Reporter interface {
 
 	// For is provided with the reporting component instance and a
 	// callback function which must be called for each line which should
-	// be updated.  If Clearing is ture all other lines of the reporting
+	// be updated.  If Clearing is true all other lines of the reporting
 	// component are reset to zero.  For each updated line Mask is
 	// called for optional formatting information.
 	For(_ lines.Componenter, line func(idx uint, content string))
@@ -142,7 +142,7 @@ func (r *report) OnClick(_ *lines.Env, _, y int) {
 }
 
 func (r *report) OnUpdate(e *lines.Env, data interface{}) {
-	r.LL.Focus.Reset(true)
+	r.LL.Focus.Reset()
 	upd, ok := data.(Reporter)
 	if !ok {
 		return

@@ -149,15 +149,6 @@ func (s *AView) Fails_buttons_init_if_ambiguous_labels(t *T) {
 	t.True(errReported)
 }
 
-type fxFailButtonInitRunes struct {
-	newBB         []ButtonDef
-	buttonInitErr func(error)
-}
-
-func (fx *fxFailButtonInitRunes) Buttons(upd func(Buttoner)) Buttoner {
-	return &buttonerFX{err: fx.buttonInitErr, newBB: fx.newBB}
-}
-
 func (s *AView) Fails_buttons_init_if_ambiguous_event_runes(t *T) {
 	errReported := false
 	fx := &fxFailButtonInitLabels{

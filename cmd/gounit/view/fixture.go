@@ -265,8 +265,6 @@ type fxInit struct {
 	// to log.Fatal
 	fatal func(...interface{})
 
-	bttOneReported, bttTwoReported, bttThreeReported bool
-
 	listenReporting func(int)
 
 	reportedLine int
