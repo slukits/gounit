@@ -225,6 +225,6 @@ func (r *report) scroll() {
 	r.Scroll.Down()
 }
 
-func (r *report) OnLineSelection(e *lines.Env, idx int) {
-	r.listener(idx)
+func (r *report) OnLineSelection(e *lines.Env, cIdx, sIdx int) {
+	r.listener(cIdx)
 }
