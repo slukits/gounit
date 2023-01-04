@@ -20,6 +20,14 @@ module.  The gounit command
   - provides handy switches to turn go vet, the race detector or
     source-code statistics on and off.
 
+execute
+
+```bash
+$ go install github.com/slukits/gounit/cmd/gounit@latest
+```
+
+to install the gounit command.
+
 
 ![simple gounit use-case](gounit.gif)
 
