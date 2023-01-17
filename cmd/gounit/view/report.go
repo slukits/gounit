@@ -123,8 +123,8 @@ type report struct {
 }
 
 func (m *report) OnInit(e *lines.Env) {
-	m.FF.Add(lines.Scrollable | lines.LinesSelectable)
-	m.LL.Focus.Trimmed()
+	m.FF.Set(lines.Scrollable | lines.LinesSelectable |
+		lines.TrimmedHighlightEnabled)
 	m.rr[0].For(m, func(idx uint, content string) {
 		fmt.Fprint(e.LL(int(idx)), content)
 	})

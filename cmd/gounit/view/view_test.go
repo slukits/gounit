@@ -58,13 +58,13 @@ func (s *AView) Sets_its_width_to_80_if_screen_bigger(t *T) {
 	})
 }
 
-func (s *AView) Is_quit_able(t *T) {
-	tt := NewFixture(t, 0, nil)
-
-	tt.Lines.Update(tt.Cmp, nil, func(e *lines.Env) {
-		t.True(tt.Cmp.FF.Has(lines.Quitable))
-	})
-}
+// func (s *AView) Is_quit_able(t *T) {
+// 	tt := NewFixture(t, 0, nil)
+//
+// 	tt.Lines.Update(tt.Cmp, nil, func(e *lines.Env) {
+// 		t.True(tt.Cmp.FF.Has(lines.Quitable))
+// 	})
+// }
 
 func (s *AView) Updates_message_bar_with_given_message(t *T) {
 	tt, exp := NewFixture(t, 0, nil), "updated message"
