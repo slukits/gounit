@@ -149,7 +149,7 @@ func (n Not) Eq(a, b interface{}) bool {
 	passed := n.t.Eq(a, b)
 	n.t.errorer = err
 	if passed {
-		n.t.Errorf(assertErr, "not-equal", fmt.Sprintf("%p == %p", a, b))
+		n.t.Errorf(assertErr, "not-equal", fmt.Sprintf("%v == %v", a, b))
 		return false
 	}
 	return true

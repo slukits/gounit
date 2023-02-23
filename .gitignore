@@ -2,3 +2,4 @@
 cmd/gounit/gounit
 cmd/gounit/controller/testdata/goldenmod/go.mod
 cmd/gounit/controller/testdata/goldenmod/go.sum
+fix.txt
